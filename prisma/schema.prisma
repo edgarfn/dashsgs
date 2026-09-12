@@ -1,0 +1,185 @@
+// DashSGS — modelo de dados (doc 05).
+// Convenções: PK uuid nas tabelas de app; timestamptz; nomes físicos em snake_case com os
+// prefixos app_/erp_/agg_. Políticas de RLS, triggers e grants vivem nas migrações SQL
+// (Prisma não os modela) — ver prisma/migrations e doc 08 §3.
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native"]
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  // Migrações usam um papel separado (app_migrator), nunca o papel da aplicação (doc 08 §3).
+  directUrl         = env("DATABASE_URL_MIGRATOR")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+enum TenantStatus {
+  active
+  suspended
+
+  @@map("tenant_status")
+}
+
+enum UserStatus {
+  invited
+  active
+  disabled
+
+  @@map("user_status")
+}
+
+/// Papéis do doc 07 (matriz de permissões).
+enum MembershipRole {
+  owner
+  admin
+  manager
+  analyst
+  viewer
+  auditor
+
+  @@map("membership_role")
+}
+
+enum AuditResult {
+  success
+  denied
+  error
+
+  @@map("audit_result")
+}
+
+/// Um contrato DashSGS = uma rede/empresa que usa o ERP SG (doc 08 §1).
+model Tenant {
+  id        String       @id @default(uuid()) @db.Uuid
+  name      String       @db.VarChar(120)
+  slug      String       @unique @db.VarChar(60)
+  status    TenantStatus @default(active)
+  plan      String       @default("beta") @db.VarChar(40)
+  timezone  String       @default("America/Sao_Paulo") @db.VarChar(60)
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  /// Exclusão lógica; a purga física roda no offboarding (doc 08 §5).
+  deletedAt DateTime?    @map("deleted_at") @db.Timestamptz(6)
+
+  memberships Membership[]
+  sessions    Session[]
+
+  @@index([status])
+  @@map("app_tenants")
+}
+
+/// Identidade global: um usuário pode pertencer a vários tenants (doc 08 §1).
+model User {
+  id                   String     @id @default(uuid()) @db.Uuid
+  /// Sempre normalizado em minúsculas pela aplicação.
+  email                String     @unique @db.VarChar(255)
+  name                 String     @db.VarChar(120)
+  /// Argon2id (doc 06). Nulo enquanto o convite não for aceito.
+  passwordHash         String?    @map("password_hash") @db.VarChar(255)
+  status               UserStatus @default(invited)
+  /// TOTP cifrado com envelope AES-256-GCM (doc 09 §2) — nunca em claro.
+  totpSecretCiphertext Bytes?     @map("totp_secret_ciphertext")
+  totpKeyVersion       Int?       @map("totp_key_version")
+  totpEnabled          Boolean    @default(false) @map("totp_enabled")
+  failedAttempts       Int        @default(0) @map("failed_attempts")
+  lockedUntil          DateTime?  @map("locked_until") @db.Timestamptz(6)
+  lastLoginAt          DateTime?  @map("last_login_at") @db.Timestamptz(6)
+  createdAt            DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt            DateTime?  @map("deleted_at") @db.Timestamptz(6)
+
+  memberships    Membership[]
+  sessions       Session[]
+  passwordResets PasswordReset[]
+
+  @@map("app_users")
+}
+
+/// Vínculo usuário↔tenant com papel e recorte de filiais (doc 07 / doc 08 §1).
+model Membership {
+  id       String         @id @default(uuid()) @db.Uuid
+  userId   String         @map("user_id") @db.Uuid
+  tenantId String         @map("tenant_id") @db.Uuid
+  role     MembershipRole
+
+  /// Allowlist de filiais do ERP. Array VAZIO = todas as filiais do tenant.
+  /// (o doc 05 fala em NULL; o Prisma não modela array anulável, e vazio tem a mesma
+  /// semântica sem admitir dois "sem restrição" diferentes no banco)
+  filiaisAllowed Int[] @default([]) @map("filiais_allowed")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+  @@map("app_memberships")
+}
+
+/// Sessão server-side (ADR-004): o navegador só carrega o cookie; nada de JWT no cliente.
+model Session {
+  /// Hash do token de sessão (o token em si nunca é persistido).
+  id        String    @id @db.VarChar(64)
+  userId    String    @map("user_id") @db.Uuid
+  /// Tenant ativo da sessão; NULL enquanto o usuário não escolheu.
+  tenantId  String?   @map("tenant_id") @db.Uuid
+  ip        String?   @db.Inet
+  userAgent String?   @map("user_agent") @db.VarChar(255)
+  mfaPassed Boolean   @default(false) @map("mfa_passed")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastSeenAt DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(6)
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("app_sessions")
+}
+
+/// Token de recuperação de senha: uso único, expira, invalida sessões ao ser usado (doc 06).
+model PasswordReset {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @map("token_hash") @db.VarChar(64)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tokenHash])
+  @@index([userId])
+  @@map("app_password_resets")
+}
+
+/// Trilha de auditoria append-only com encadeamento de hash (doc 05 §6 / E6-01).
+/// UPDATE e DELETE são revogados e bloqueados por trigger na migração.
+model AuditLog {
+  id           BigInt      @id @default(autoincrement())
+  tenantId     String?     @map("tenant_id") @db.Uuid
+  userId       String?     @map("user_id") @db.Uuid
+  sessionId    String?     @map("session_id") @db.VarChar(64)
+  action       String      @db.VarChar(80)
+  resourceType String      @map("resource_type") @db.VarChar(60)
+  resourceId   String?     @map("resource_id") @db.VarChar(120)
+  result       AuditResult
+  ip           String?     @db.Inet
+  userAgent    String?     @map("user_agent") @db.VarChar(255)
+  /// Diffs relevantes — NUNCA senha, token ou PII bruta (doc 18 §1).
+  changes      Json?       @db.JsonB
+  prevHash     Bytes?      @map("prev_hash")
+  entryHash    Bytes?      @map("entry_hash")
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([tenantId, createdAt])
+  @@index([userId, createdAt])
+  @@map("app_audit_log")
+}

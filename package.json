@@ -1,0 +1,76 @@
+{
+  "name": "dashsgs",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DashSGS — plataforma SaaS multi-tenant sobre a API SG Sistemas",
+  "packageManager": "pnpm@10.29.3",
+  "engines": {
+    "node": ">=22.11.0 <23",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "build": "pnpm -r --sequential build",
+    "dev": "pnpm --filter @dashsgs/shared build && pnpm -r --parallel --filter=@dashsgs/api --filter=@dashsgs/web dev",
+    "dev:api": "pnpm --filter @dashsgs/api dev",
+    "dev:web": "pnpm --filter @dashsgs/web dev",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "pnpm -r --sequential typecheck",
+    "test": "pnpm -r --sequential test",
+    "test:cov": "pnpm -r --sequential test:cov",
+    "test:integration": "pnpm --filter @dashsgs/api test:integration",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:drift": "node scripts/check-drift.mjs",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:studio": "prisma studio",
+    "infra:up": "docker compose --env-file .env -f docker/compose.dev.yml up -d",
+    "infra:down": "docker compose --env-file .env -f docker/compose.dev.yml down",
+    "infra:reset": "docker compose --env-file .env -f docker/compose.dev.yml down -v && pnpm infra:up",
+    "prepare": "husky || true",
+    "infra:logs": "docker compose --env-file .env -f docker/compose.dev.yml logs -f"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/node": "^22.10.2",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "globals": "^15.14.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.3.0",
+    "prettier": "^3.4.2",
+    "prisma": "^6.2.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.19.0"
+  },
+  "dependencies": {
+    "@node-rs/argon2": "^2.0.2",
+    "@prisma/client": "^6.2.1"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs,cjs}": [
+      "eslint --fix --max-warnings=0 --no-warn-ignored",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "prisma",
+      "@prisma/engines",
+      "esbuild",
+      "@tailwindcss/oxide",
+      "sharp"
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+# Contexto de build enxuto e seguro: nada de dependências da máquina do dev, nada de segredo.
+**/node_modules
+**/dist
+**/.next
+**/coverage
+**/*.tsbuildinfo
+.git
+.github
+.husky
+docs
+.env
+.env.*
+!.env.example
+**/*.log
+**/.DS_Store

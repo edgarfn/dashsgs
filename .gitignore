@@ -1,0 +1,34 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# build
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# test
+coverage/
+test-results/
+playwright-report/
+
+# env & segredos (NUNCA commitar) — apenas .env.example e *.enc.env são versionáveis
+.env
+.env.*
+!.env.example
+!*.enc.env
+*.pem
+*.key
+!prisma/**/*.key
+
+# ferramentas
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/launch.json
+!.vscode/extensions.json
+*.log
+.cache/

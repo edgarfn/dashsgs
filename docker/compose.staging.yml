@@ -1,0 +1,118 @@
+# DashSGS — staging/produção no MVP (ADR-013: Docker Compose; K8s adiado).
+# A mesma imagem sobe em staging e em produção; só muda a configuração (12-factor, doc 19 §1).
+#
+# Uso:  APP_VERSION=<digest> docker compose -f docker/compose.staging.yml --env-file .env.staging up -d
+name: dashsgs
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '5'
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [web, api]
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [edge, app]
+    logging: *logging
+
+  web:
+    image: ${WEB_IMAGE}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      INTERNAL_API_URL: http://api:3001
+      NEXT_PUBLIC_APP_NAME: DashSGS
+      APP_VERSION: ${APP_VERSION}
+    networks: [app]
+    logging: *logging
+
+  # Job de migração: roda com o papel app_migrator e termina (doc 19 §4, passo 2).
+  api-migrate:
+    image: ${API_IMAGE}
+    restart: 'no'
+    command: ['node', 'node_modules/prisma/build/index.js', 'migrate', 'deploy']
+    # O Prisma migra pelo `directUrl` do schema, que aponta para DATABASE_URL_MIGRATOR:
+    # o papel da aplicação (app_rw) nunca altera schema (doc 08 §3). Ambas as variáveis
+    # vêm do env_file — a ausência de DATABASE_URL_MIGRATOR faz o job falhar, de propósito.
+    env_file: [../.env.staging]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [app, data]
+    logging: *logging
+
+  api:
+    image: ${API_IMAGE}
+    restart: unless-stopped
+    env_file: [../.env.staging]
+    environment:
+      APP_VERSION: ${APP_VERSION}
+    depends_on:
+      api-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    networks: [app, data]
+    read_only: true
+    tmpfs: ['/tmp']
+    security_opt: ['no-new-privileges:true']
+    logging: *logging
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    logging: *logging
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes', '--requirepass', '${REDIS_PASSWORD}']
+    volumes:
+      - redisdata:/data
+    networks: [data]
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD}', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    logging: *logging
+
+networks:
+  edge:
+  app:
+    internal: false
+  # Banco e cache não têm rota para a internet (doc 09 §1 "Infraestrutura").
+  data:
+    internal: true
+
+volumes:
+  pgdata:
+  redisdata:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,44 @@
+# DashSGS — borda (doc 19 §5). TLS automático via ACME, HSTS após validação do domínio.
+# Variáveis: APP_DOMAIN, API_DOMAIN, ACME_EMAIL.
+
+{
+	email {$ACME_EMAIL}
+	servers {
+		protocols h1 h2
+	}
+}
+
+(seguranca) {
+	header {
+		# HSTS só entra depois que o domínio estabiliza (doc 09 §1).
+		Strict-Transport-Security "max-age=63072000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		X-Frame-Options "DENY"
+		-Server
+	}
+	# Nada de listagem de erro do proxy vazando para o usuário.
+	handle_errors {
+		respond "{err.status_code}" {err.status_code}
+	}
+}
+
+{$APP_DOMAIN} {
+	import seguranca
+	encode zstd gzip
+	reverse_proxy web:3000
+}
+
+{$API_DOMAIN} {
+	import seguranca
+	encode zstd gzip
+
+	# /metrics é interno: só o Prometheus na rede privada fala com ele (doc 18 §2).
+	@metrics path /metrics*
+	respond @metrics 404
+
+	reverse_proxy api:3001 {
+		header_up X-Real-IP {remote_host}
+	}
+}

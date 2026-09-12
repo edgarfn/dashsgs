@@ -1,0 +1,15 @@
+# Gate local (doc 11 §1): o que é barato roda antes do commit; o resto é problema do CI.
+set -e
+
+# 1) Segredo nunca chega ao histórico — se o gitleaks existir, ele manda.
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact --config .gitleaks.toml
+else
+  echo "aviso: gitleaks não instalado — o gate roda no CI (https://github.com/gitleaks/gitleaks)"
+fi
+
+# 2) Lint + format apenas nos arquivos preparados.
+pnpm exec lint-staged
+
+# 3) Typecheck rápido do que muda com mais frequência.
+pnpm --filter @dashsgs/api typecheck

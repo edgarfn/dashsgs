@@ -1,0 +1,34 @@
+# Configuração do gitleaks (gate obrigatório — doc 11 §2: qualquer segredo bloqueia o PR)
+title = "DashSGS"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "dashsgs-master-key"
+description = "Chave mestra de cifra de envelope (AES-256-GCM)"
+regex = '''(?i)(MASTER_KEY_(CURRENT|PREVIOUS)|PII_PEPPER|SESSION_SECRET|CSRF_SECRET)\s*[:=]\s*['"]?[A-Za-z0-9+/=]{24,}'''
+tags = ["key", "dashsgs"]
+
+[[rules]]
+id = "dashsgs-erp-credential"
+description = "Credencial do ERP SG em claro"
+regex = '''(?i)(sg_(user|username|password|senha)|SG_HOMOLOG_(USER|PASSWORD))\s*[:=]\s*['"]?[^\s'"]{6,}'''
+tags = ["credential", "dashsgs"]
+
+[allowlist]
+description = "Exemplos e fixtures sem segredo real"
+paths = [
+  '''\.env\.example$''',
+  '''^docs/''',
+  '''^apps/api/test/fixtures/''',
+  '''pnpm-lock\.yaml$''',
+  # Saída de build do Next: chaves efêmeras geradas a cada build, e o diretório é gitignored.
+  # (só aparece em varredura local com --no-git; o CI varre o histórico do git)
+  '''\.next/''',
+]
+regexes = [
+  '''CHANGE_ME''',
+  '''dev_only''',
+  '''homologacao''',
+]

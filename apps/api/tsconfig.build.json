@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // `deleteOutDir` do nest-cli apaga dist/ a cada build; com build incremental o tsc acharia
+    // que nada mudou e não emitiria nada. Build de artefato é sempre do zero.
+    "incremental": false
+  },
+  "exclude": ["node_modules", "test", "dist", "**/*.spec.ts"]
+}

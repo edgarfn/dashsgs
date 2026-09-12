@@ -1,0 +1,114 @@
+# DashSGS — publicação do artefato e deploy em staging (E1-07 / doc 11 §1 / doc 19 §4).
+#
+# Regra do projeto: o que vai para staging é uma imagem IMUTÁVEL identificada por digest, e é
+# exatamente essa imagem que, depois, é promovida para produção — nunca um rebuild.
+
+name: Deploy staging
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write # OIDC no deploy (doc 11 §4) — sem chave longa em secret
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository }}
+
+jobs:
+  publish:
+    name: Publicar imagens (por digest) + SBOM
+    runs-on: ubuntu-latest
+    outputs:
+      api-digest: ${{ steps.api.outputs.digest }}
+      web-digest: ${{ steps.web.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Imagem da API
+        id: api
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.api
+          push: true
+          tags: ${{ env.IMAGE_PREFIX }}-api:${{ github.sha }}
+          build-args: APP_VERSION=${{ github.sha }}
+          provenance: true
+          sbom: true
+
+      - name: Imagem do web
+        id: web
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.web
+          push: true
+          tags: ${{ env.IMAGE_PREFIX }}-web:${{ github.sha }}
+          build-args: APP_VERSION=${{ github.sha }}
+          provenance: true
+          sbom: true
+
+      - name: SBOM (syft) da imagem da API
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.IMAGE_PREFIX }}-api@${{ steps.api.outputs.digest }}
+          format: spdx-json
+          artifact-name: sbom-api.spdx.json
+
+  deploy:
+    name: Deploy em staging
+    runs-on: ubuntu-latest
+    needs: [publish]
+    environment:
+      name: staging
+      url: https://${{ vars.APP_DOMAIN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # O runner de deploy é isolado e acessa a VM por SSH com chave efêmera (doc 11 §4).
+      - name: Executar deploy.sh na VM de staging
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            set -Eeuo pipefail
+            cd /opt/dashsgs
+            git fetch --all --tags
+            git checkout --force ${{ github.sha }}
+            ./scripts/deploy.sh \
+              "${{ env.IMAGE_PREFIX }}-api@${{ needs.publish.outputs.api-digest }}" \
+              "${{ env.IMAGE_PREFIX }}-web@${{ needs.publish.outputs.web-digest }}" \
+              .env.staging
+
+      - name: Smoke externo
+        run: ./scripts/smoke.sh "https://${{ vars.API_DOMAIN }}"
+
+  dast:
+    name: DAST (ZAP baseline)
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    steps:
+      - uses: actions/checkout@v4
+      - name: ZAP baseline
+        uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: https://${{ vars.APP_DOMAIN }}
+          # Alertas High bloqueiam a promoção para produção (doc 11 §2).
+          cmd_options: '-a -I'

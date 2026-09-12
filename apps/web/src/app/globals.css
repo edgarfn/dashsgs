@@ -1,0 +1,11 @@
+@import 'tailwindcss';
+
+/* Tokens visuais mínimos do esqueleto. O design system completo entra na Fase 7 (doc 16). */
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  height: 100%;
+}
