@@ -71,6 +71,25 @@ Um único repositório esquecendo o filtro não pode virar vazamento cross-tenan
 | Suspensão | Bloqueia login de membros e pausa jobs; dados mantidos |
 | Offboarding | Exportação sob demanda → exclusão lógica → job de purge físico (30 dias) → flush cache → registro de destruição (LGPD art. 16) |
 
+## 5.1 Estado da implementação (Fase 4)
+
+| Spec | Implementação |
+|---|---|
+| `SET LOCAL app.tenant_id` por transação | `apps/api/src/common/prisma/prisma.service.ts` (`withTenant`) |
+| Porta única de acesso a dado de tenant | `apps/api/src/common/tenant/tenant-database.service.ts` |
+| Templates de RLS | `prisma/migrations/*_init` (`app_enable_tenant_rls`, `app_enable_identity_rls`) |
+| Gate de introspecção | `app_rls_gaps()` + `pnpm db:rls-check` (job de integração do CI) |
+| Recorte por filial | `apps/api/src/common/tenant/filiais-scope.service.ts` |
+| Suíte A→B gerada do router | `apps/api/test/integration/isolation.int-spec.ts` |
+| Suspensão/reativação | `apps/api/src/modules/platform/platform.service.ts` |
+
+Dois templates, e não um, porque o fluxo de identidade lê `app_memberships` e `app_sessions`
+**antes** de existir tenant escolhido. O template estrito (dados de tenant) levanta erro sem
+contexto; o de identidade permite a leitura quando não há contexto e isola quando há.
+
+Ainda não implementado deste doc: offboarding com purga física (E6-04), múltiplas conexões por
+tenant e extração de tenant enterprise para banco próprio.
+
 ## 6. Testes de isolamento obrigatórios (gate de release — doc 17)
 
 1. **API**: para cada endpoint interno, requisição autenticada do tenant A com ids do tenant B →

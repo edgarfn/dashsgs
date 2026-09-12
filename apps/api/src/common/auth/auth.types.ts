@@ -17,6 +17,8 @@ export interface AuthContext {
     name: string;
     totpEnabled: boolean;
     lastLoginAt: Date | null;
+    /** Conta de operação da plataforma (doc 07 §2) — MFA obrigatório, sem acesso a dado de tenant. */
+    platformAdmin: boolean;
   };
   memberships: Array<{
     tenantId: string;

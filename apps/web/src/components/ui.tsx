@@ -1,5 +1,6 @@
 'use client';
 
+import { useId } from 'react';
 import { useFormStatus } from 'react-dom';
 import type { ReactNode } from 'react';
 
@@ -35,7 +36,10 @@ export function Field({
   autoFocus?: boolean;
   readOnly?: boolean;
 }) {
-  const id = `campo-${name}`;
+  // Id único por instância: a mesma "Filiais" aparece uma vez por membro na tela de acessos,
+  // e ids repetidos fariam todos os rótulos apontarem para o primeiro campo — leitor de tela
+  // e teste automatizado encontrariam a linha errada.
+  const id = `${useId()}-${name}`;
   return (
     <div className="space-y-1.5">
       <label htmlFor={id} className="block text-sm font-medium text-slate-200">

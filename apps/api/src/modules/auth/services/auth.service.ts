@@ -59,7 +59,7 @@ export class AuthService {
 
     const user = await this.prisma.user.findUnique({
       where: { email: input.email },
-      include: { memberships: true },
+      include: { memberships: { include: { tenant: true } } },
     });
 
     if (!user) {
@@ -82,8 +82,20 @@ export class AuthService {
       throw new AppException('AUTH_INVALID_CREDENTIALS');
     }
 
-    const roles = user.memberships.map((membership) => membership.role as Role);
-    const mfaRequired = roles.some((role) => requiresMfa(role));
+    // Tenant suspenso bloqueia o login dos membros — os dados ficam, o acesso para (doc 08 §5).
+    // Contas da plataforma passam: são elas que reativam o contrato.
+    const vinculosUsaveis = user.memberships.filter(
+      (membership) => !membership.tenant.deletedAt && membership.tenant.status === 'active',
+    );
+    if (!user.platformAdmin && user.memberships.length > 0 && vinculosUsaveis.length === 0) {
+      await this.auditLoginFailure(user.id, identity, 'tenant_suspenso');
+      throw new AppException('FORBIDDEN', {
+        message: 'Acesso suspenso para este contrato. Fale com o administrador da sua rede.',
+      });
+    }
+
+    const roles = vinculosUsaveis.map((membership) => membership.role as Role);
+    const mfaRequired = user.platformAdmin || roles.some((role) => requiresMfa(role));
 
     // Caso 1: MFA configurado — só há sessão completa com o segundo fator.
     if (user.totpEnabled) {
@@ -121,7 +133,12 @@ export class AuthService {
       return { status: 'mfa_enrollment_required', userId: user.id };
     }
 
-    const created = await this.sessions.create(user.id, identity, { mfaPassed: true });
+    const created = await this.sessions.create(user.id, identity, {
+      mfaPassed: true,
+      // Vínculo único: já nasce com o tenant fixado. Com vários, a escolha vem depois
+      // (POST /auth/tenant) — adivinhar aqui seria pior que perguntar.
+      tenantId: vinculosUsaveis.length === 1 ? vinculosUsaveis[0]!.tenantId : null,
+    });
     this.sessions.setCookies(res, created);
 
     await this.prisma.user.update({
@@ -234,6 +251,7 @@ export class AuthService {
         name: auth.user.name,
         totpEnabled: auth.user.totpEnabled,
         lastLoginAt: auth.user.lastLoginAt?.toISOString() ?? null,
+        platformAdmin: auth.user.platformAdmin,
       },
       memberships: auth.memberships.map((membership) => ({
         tenantId: membership.tenantId,
@@ -256,8 +274,9 @@ export class AuthService {
     userId: string,
     identity: RequestIdentity,
     res: Response,
+    tenantId?: string | null,
   ): Promise<void> {
-    const created = await this.sessions.create(userId, identity, { mfaPassed: false });
+    const created = await this.sessions.create(userId, identity, { mfaPassed: false, tenantId });
     this.sessions.setCookies(res, created);
   }
 

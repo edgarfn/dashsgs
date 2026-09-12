@@ -14,6 +14,8 @@ export const CONTAS = {
   gerente: 'gerente@demo.local',
   /** Papel que exige segundo fator (doc 06 §MFA). */
   owner: 'owner@demo.local',
+  /** Operação da plataforma: papel global, sem vínculo com tenant (doc 07 §2). */
+  plataforma: 'plataforma@dashsgs.local',
 } as const;
 
 export async function login(page: Page, email: string, password = SEED_PASSWORD): Promise<void> {
@@ -23,6 +25,30 @@ export async function login(page: Page, email: string, password = SEED_PASSWORD)
   await page.getByRole('button', { name: 'Entrar' }).click();
   // O Server Action responde com redirecionamento; sem esperar, o teste navega antes do cookie.
   await page.waitForLoadState('networkidle');
+}
+
+/**
+ * Entra numa conta que exige segundo fator, cadastrando o TOTP no caminho.
+ *
+ * O estado de MFA é zerado antes de cada cenário, então o fluxo é sempre o de cadastro — que é
+ * também o primeiro acesso real de um owner ou de uma conta de plataforma.
+ */
+export async function loginComMfa(
+  page: Page,
+  email: string,
+  password = SEED_PASSWORD,
+): Promise<void> {
+  await login(page, email, password);
+  await expect(page).toHaveURL(/\/mfa\/cadastrar/);
+
+  await page.getByText('Não consigo ler o QR').click();
+  const secret = (await page.locator('details p').innerText()).trim();
+  await page.getByLabel('Código do aplicativo').fill(totpCode(secret, email));
+  await page.getByRole('button', { name: 'Ativar verificação' }).click();
+
+  await expect(page).toHaveURL(/\/mfa\/codigos/);
+  await page.getByRole('link', { name: /Guardei os códigos/ }).click();
+  await expectLoggedIn(page);
 }
 
 /** Sai da aplicação e espera o redirecionamento concluir antes de seguir. */

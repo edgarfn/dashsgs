@@ -67,16 +67,57 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   /**
    * Executa `fn` dentro de uma transação com o contexto de tenant fixado na sessão do banco,
    * que é o que ativa as políticas de RLS (doc 08 §3). `SET LOCAL` garante escopo transacional,
-   * seguro com pool de conexões.
+   * seguro com pool de conexões: o valor morre no commit e não vaza para o próximo request que
+   * pegar a mesma conexão.
+   *
+   * Os ids são validados como UUID antes de entrar no SQL — `SET LOCAL` não aceita parâmetro
+   * ligado, então a validação **é** a defesa contra injeção aqui.
    */
-  async withTenant<T>(tenantId: string, fn: (tx: PrismaTransaction) => Promise<T>): Promise<T> {
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenantId)) {
-      throw new Error('withTenant exige um UUID de tenant válido');
-    }
-    return this.$transaction(async (tx) => {
-      await tx.$executeRawUnsafe(`SET LOCAL app.tenant_id = '${tenantId}'`);
-      return fn(tx as PrismaTransaction);
-    });
+  async withTenant<T>(
+    tenantId: string,
+    fn: (tx: PrismaTransaction) => Promise<T>,
+    options: { userId?: string } = {},
+  ): Promise<T> {
+    assertUuid(tenantId, 'tenantId');
+    if (options.userId) assertUuid(options.userId, 'userId');
+
+    return this.$transaction(
+      async (tx) => {
+        await tx.$executeRawUnsafe(`SET LOCAL app.tenant_id = '${tenantId}'`);
+        if (options.userId) {
+          await tx.$executeRawUnsafe(`SET LOCAL app.user_id = '${options.userId}'`);
+        }
+        return fn(tx as PrismaTransaction);
+      },
+      {
+        // Os padrões do Prisma (2 s de espera, 5 s de duração) foram pensados para transações
+        // pontuais. Aqui TODA leitura de dado de tenant é transacional — inclusive lotes de sync
+        // (Fase 6) e picos com várias em paralelo. Prazos maiores evitam falha artificial sob
+        // concorrência; o limite real continua sendo o pool de conexões.
+        maxWait: 10_000,
+        timeout: 30_000,
+      },
+    );
+  }
+
+  /**
+   * Tabelas que têm `tenant_id` e não estão protegidas por RLS — deve ser sempre vazio
+   * (doc 08 §6.3). Exposto aqui para o gate do CI e para o diagnóstico em produção.
+   */
+  async rlsGaps(): Promise<
+    Array<{ table_name: string; rls_enabled: boolean; rls_forced: boolean; policy_count: number }>
+  > {
+    return this.$queryRaw`
+      SELECT table_name, rls_enabled, rls_forced, policy_count FROM app_rls_gaps()
+    `;
+  }
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function assertUuid(value: string, field: string): void {
+  if (!UUID.test(value)) {
+    throw new Error(`contexto de banco exige UUID válido em ${field}`);
   }
 }
 

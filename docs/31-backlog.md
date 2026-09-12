@@ -83,16 +83,52 @@ Decisões e descobertas da implementação:
 - A suíte inteira sai do mesmo IP e estouraria o próprio rate limit: os testes zeram os
   contadores entre cenários e há um cenário dedicado ao limite.
 
-## Épico E3 — Multi-tenant & RBAC (Fase 4)
+## Épico E3 — Multi-tenant & RBAC (Fase 4) — **concluído**
 | ID | História | Pri | Cx | Depende | CA |
 |---|---|---|---|---|---|
-| E3-01 ◐ | Modelo tenants/memberships/papéis + guard RBAC (guard e matriz já feitos na Fase 3; falta CRUD de tenant e `filiais_allowed`) | P0 | M | E2 | matriz doc 07 testada |
-| E3-02 | RLS: template de migração + políticas + papéis de DB | P0 | G | E1 | introspecção no CI |
-| E3-03 | Tenant-context (interceptor API + wrapper workers) | P0 | M | E3-02 | SET LOCAL comprovado |
-| E3-04 | Suite de isolamento A→B gerada do router | P0 | M | E3-01..03 | 100% endpoints cobertos |
-| E3-05 | Cache prefixado por tenant (helper + lint) | P0 | P | E3-03 | teste de prefixo |
-| E3-06 | `filiais_allowed` fim-a-fim | P1 | M | E3-01 | testes de filial |
-| E3-07 | Painel platform-admin básico (criar tenant/suspender) | P0 | M | E3-01 | runbook 22 §1/2 executável |
+| E3-01 ✅ | Modelo tenants/memberships/papéis + guard RBAC | P0 | M | E2 | matriz doc 07 testada |
+| E3-02 ✅ | RLS: template de migração + políticas + papéis de DB | P0 | G | E1 | introspecção no CI |
+| E3-03 ✅ | Tenant-context (interceptor API + wrapper workers) | P0 | M | E3-02 | SET LOCAL comprovado |
+| E3-04 ✅ | Suite de isolamento A→B gerada do router | P0 | M | E3-01..03 | 100% endpoints cobertos |
+| E3-05 ✅ | Cache prefixado por tenant (helper + lint) | P0 | P | E3-03 | teste de prefixo |
+| E3-06 ✅ | `filiais_allowed` fim-a-fim | P1 | M | E3-01 | testes de filial |
+| E3-07 ✅ | Painel platform-admin básico (criar tenant/suspender) | P0 | M | E3-01 | runbook 22 §1/2 executável |
+
+### O que a Fase 4 deixou pronto
+
+- **E3-01** — gestão de membros do tenant (listar, trocar papel, ajustar filiais, remover) com
+  regras duras: ninguém altera o próprio vínculo, só owner mexe em owner e o último owner não
+  pode ser rebaixado nem removido.
+- **E3-02** — dois templates de RLS em SQL (`app_enable_tenant_rls` estrito e
+  `app_enable_identity_rls` para o fluxo de login) e a função `app_rls_gaps()`, que vira gate
+  no CI (`pnpm db:rls-check`): tabela com `tenant_id` sem política quebra o build.
+- **E3-03** — `TenantDatabase` como porta única de acesso a dado de tenant: abre transação,
+  fixa `app.tenant_id`/`app.user_id` com `SET LOCAL` e oferece `runJob()` para os workers da
+  Fase 6, cada job no seu próprio contexto de correlação.
+- **E3-04** — suíte A→B **gerada do router**: toda rota registrada é classificada; as que têm
+  id recebem ids do tenant vizinho (esperado 404/403) e as listagens são varridas atrás de
+  qualquer marca do vizinho. Rota nova sem classificação quebra o teste.
+- **E3-05** — cache sempre prefixado por tenant, com teste de prefixo e de purga isolada.
+- **E3-06** — `filiais_allowed` fim-a-fim: validado no parâmetro (403 ao pedir filial fora do
+  recorte) **e** aplicado na consulta (listagem sem parâmetro já vem recortada).
+- **E3-07** — painel da plataforma: criar tenant já convidando o owner, suspender com motivo
+  (derruba sessões e bloqueia login) e reativar — runbooks 22 §1 e §2 executáveis sem psql.
+
+Entrou junto porque o isolamento precisava de dado real para ser exercido: a tabela
+`erp_filiais` (primeira do espelho `erp_`) e o endpoint `GET /dim/filiais`. A sincronização com
+a API SG continua sendo da Fase 6 (E5-02); por ora o seed popula filiais sintéticas.
+
+Decisões e descobertas da implementação:
+
+- Contas de plataforma (`platform_admin`) também exigem MFA, e o painel responde **404** para
+  quem não é da operação: a existência da área não é assunto de quem não opera.
+- Suspender precisou derrubar sessões por **membro**, não por `session.tenant_id`: sessão de
+  quem ainda não escolheu tenant não carregava a marca e sobrevivia à suspensão (bug achado
+  pelo teste de integração). O login passou a carimbar o tenant quando o vínculo é único.
+- Os padrões de transação do Prisma (2 s/5 s) foram ampliados para 10 s/30 s: com toda leitura
+  de tenant sendo transacional, o padrão falhava artificialmente sob concorrência.
+- Ids de campo na UI passaram a ser únicos (`useId`): a mesma etiqueta se repete por linha na
+  tela de acessos, e ids duplicados apontavam todos os rótulos para o primeiro campo.
 
 ## Épico E4 — Integração SG (Fase 5)
 | ID | História | Pri | Cx | Depende | CA |

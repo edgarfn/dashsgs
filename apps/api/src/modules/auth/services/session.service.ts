@@ -188,11 +188,14 @@ export class SessionService {
         name: user.name,
         totpEnabled: user.totpEnabled,
         lastLoginAt: user.lastLoginAt,
+        platformAdmin: user.platformAdmin,
       },
       memberships,
       activeTenantId,
       permissions: activeMembership ? [...permissionsForRole(activeMembership.role)] : [],
-      mfaRequired: memberships.some((membership) => requiresMfa(membership.role)),
+      // Operar a plataforma também exige segundo fator, mesmo sem vínculo com tenant algum.
+      mfaRequired:
+        user.platformAdmin || memberships.some((membership) => requiresMfa(membership.role)),
     };
   }
 

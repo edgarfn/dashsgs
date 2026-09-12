@@ -63,7 +63,8 @@ pnpm cli sync verify --tenant rede-exemplo --domain vendas --date 2026-09-01
 ## 7. Como adicionar um novo domínio de sync (passo-a-passo)
 1. Tipar resposta SG em `integration/sg/types` (a partir da doc 03 + fixture real de homologação).
 2. Mapper com allowlist de campos (decisão de privacidade registrada no PR — doc 10).
-3. Tabela espelho + migração (chave natural com tenant_id; RLS automática via template).
+3. Tabela espelho + migração (chave natural com tenant_id) + `CALL app_enable_tenant_rls('erp_x')`
+   na própria migração — sem isso o gate `pnpm db:rls-check` reprova o PR.
 4. Job em `sync/` com watermark e cadência; registrar no scheduler.
 5. Fixture + testes (unit mapper, integração upsert idempotente, contrato).
 6. Expor no BFF (se for a dashboards) + cache com invalidação por evento.
@@ -81,6 +82,9 @@ pnpm cli sync verify --tenant rede-exemplo --domain vendas --date 2026-09-01
 | Erro padronizado | `common/errors/all-exceptions.filter.ts` + testes de contrato |
 | Schema × migrações em sincronia | `pnpm db:drift` (gate do CI) |
 | Segredo no repositório | `gitleaks` no pre-commit e no CI (`.gitleaks.toml`) |
+| Tabela de tenant sem RLS | `app_rls_gaps()` + `pnpm db:rls-check` (gate do CI) |
+| Endpoint novo sem teste de isolamento | suíte A→B gerada do router (`isolation.int-spec.ts`) |
+| Query de tenant sem contexto | `TenantDatabase` é a única porta; a RLS estrita recusa o resto |
 
 `@typescript-eslint/consistent-type-imports` fica **desligado** em `apps/api/src`: o NestJS injeta
 dependências pelos metadados de decorator, e trocar esses imports por `import type` faria a

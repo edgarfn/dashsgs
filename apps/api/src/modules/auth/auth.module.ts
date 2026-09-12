@@ -4,7 +4,7 @@ import { AuthController, MeController, MeSecurityController } from './auth.contr
 import { CsrfGuard } from './guards/csrf.guard';
 import { PermissionsGuard } from './guards/permissions.guard';
 import { SessionGuard } from './guards/session.guard';
-import { InvitesController, TenantMembersController } from './invites.controller';
+import { InvitesController } from './invites.controller';
 import { AuthService } from './services/auth.service';
 import { InviteService } from './services/invite.service';
 import { PasswordPolicyService } from './services/password-policy.service';
@@ -21,13 +21,7 @@ import { TotpService } from './services/totp.service';
  *   3. permissões — RBAC do doc 07 + exigência de MFA recente em ação sensível.
  */
 @Module({
-  controllers: [
-    AuthController,
-    MeController,
-    MeSecurityController,
-    InvitesController,
-    TenantMembersController,
-  ],
+  controllers: [AuthController, MeController, MeSecurityController, InvitesController],
   providers: [
     AuthService,
     SessionService,
@@ -39,6 +33,6 @@ import { TotpService } from './services/totp.service';
     { provide: APP_GUARD, useClass: CsrfGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],
-  exports: [SessionService, AuthService],
+  exports: [SessionService, AuthService, InviteService],
 })
 export class AuthModule {}

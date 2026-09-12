@@ -4,12 +4,12 @@ Especificação completa de produto, arquitetura e desenvolvimento de um sistema
 (dashboard analítico + portal operacional) construído sobre a **API SG - Terceiros** da SG Sistemas
 (ERP de varejo/supermercados), documentada em https://api-doc.sgsistemas.com.br/.
 
-**Status:** Fases 0–1 (Discovery/Arquitetura) concluídas; **Fase 2 — Foundation** e
-**Fase 3 — Autenticação** implementadas (épicos E1 e E2: monorepo com CI, sessões server-side,
-Argon2id, MFA TOTP, convites, recuperação de senha, RBAC e auditoria encadeada). Próxima:
-Fase 4 — Multi-tenant e RLS fim-a-fim (épico E3). Nenhuma linha foi escrita antes da
-especificação, por decisão de método: primeiro entender 100% da capacidade da API, depois
-construir.
+**Status:** Fases 0–1 (Discovery/Arquitetura) concluídas; **Fases 2 (Foundation)**,
+**3 (Autenticação)** e **4 (Multi-tenant/RLS)** implementadas — monorepo com CI, sessões
+server-side com MFA, RBAC, isolamento por tenant provado no banco e na API, recorte por filial
+e painel de operação. Próxima: Fase 5 — Integração com a API SG (épico E4). Nenhuma linha foi
+escrita antes da especificação, por decisão de método: primeiro entender 100% da capacidade da
+API, depois construir.
 
 ## Começando (dev)
 
@@ -34,6 +34,7 @@ Detalhes, tutoriais e padrões de código no [24-development-guide.md](docs/24-d
 | `pnpm test:integration`                                  | testes com Postgres, Redis e Mailpit reais             |
 | `pnpm test:e2e`                                          | E2E no navegador (Playwright) com a aplicação de pé    |
 | `pnpm db:migrate` · `db:seed` · `db:drift` · `db:studio` | banco: migrar, semear, checar drift, inspecionar       |
+| `pnpm db:rls-check`                                      | confere que toda tabela com `tenant_id` tem RLS        |
 | `pnpm infra:up` · `infra:down` · `infra:reset`           | infraestrutura local                                   |
 
 ## Estrutura do repositório

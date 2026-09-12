@@ -186,6 +186,8 @@ jobs:
         run: pnpm db:migrate
       - name: Gate de drift (migrações × schema.prisma)
         run: pnpm db:drift
+      - name: Gate de isolamento (toda tabela com tenant_id tem RLS — doc 08 §6.3)
+        run: pnpm db:rls-check
       - name: Compilar pacote compartilhado
         run: pnpm --filter @dashsgs/shared build
       - name: Testes de integração

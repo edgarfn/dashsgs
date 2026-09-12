@@ -49,6 +49,8 @@ export interface MeResponse {
     name: string;
     totpEnabled: boolean;
     lastLoginAt: string | null;
+    /** Conta de operação da plataforma: habilita o painel de tenants (doc 07 §2). */
+    platformAdmin: boolean;
   };
   memberships: MembershipSummary[];
   activeTenantId: string | null;

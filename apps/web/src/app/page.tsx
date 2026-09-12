@@ -71,11 +71,32 @@ export default async function HomePage() {
           </p>
           <h1 className="text-2xl font-semibold text-white">Olá, {me.user.name.split(' ')[0]}</h1>
           <p className="text-sm text-slate-400">
-            {tenant ? `Seu papel: ${tenant.role}` : 'Peça acesso ao administrador do seu tenant.'}
+            {tenant
+              ? `Seu papel: ${tenant.role}`
+              : me.memberships.length > 1
+                ? 'Você participa de mais de uma rede — escolha uma para continuar.'
+                : 'Sua conta ainda não tem acesso a uma rede ativa. Fale com o administrador.'}
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Cada atalho aparece só para quem o backend deixaria entrar (doc 07 §1). */}
+          {me.permissions.includes('users.manage') ? (
+            <Link
+              href="/admin/usuarios"
+              className="rounded-lg border border-white/15 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/5"
+            >
+              Usuários
+            </Link>
+          ) : null}
+          {me.user.platformAdmin ? (
+            <Link
+              href="/plataforma"
+              className="rounded-lg border border-white/15 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/5"
+            >
+              Plataforma
+            </Link>
+          ) : null}
           <Link
             href="/perfil"
             className="rounded-lg border border-white/15 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/5"

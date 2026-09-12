@@ -65,9 +65,13 @@ para esconder o que o backend já nega) e é cobrada pelo `PermissionsGuard`
 O teste parametrizado em `apps/api/test/unit/authz.spec.ts` replica a tabela à mão: mexer no
 catálogo sem revisar a decisão quebra o CI.
 
-Ainda na Fase 4 (E3): `filiais_allowed` fim-a-fim, tenant-context com `SET LOCAL` em todas as
-consultas, suíte A→B gerada do router e painel de platform-admin. `platform_admin` ainda não
-existe como papel — as contas de plataforma entram com o painel.
+A Fase 4 completou o que faltava: `filiais_allowed` é verificado no parâmetro e aplicado na
+consulta (`FiliaisScopeService`), o tenant-context usa `SET LOCAL` em toda leitura de dado de
+tenant (`TenantDatabase`), a suíte A→B é gerada do router e `platform_admin` existe como papel
+global, com MFA obrigatório e painel próprio (`/platform/*`, respondendo 404 a quem não opera).
+
+Ainda em aberto: `erp.approve` por flag na membership (chega com o épico E10) e o break-glass
+auditado do §4.5 (E9-03).
 
 ## 5. Testes obrigatórios de autorização (ver doc 17)
 

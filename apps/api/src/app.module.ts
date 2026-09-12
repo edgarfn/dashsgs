@@ -4,6 +4,7 @@ import { CryptoModule } from './common/crypto';
 import { ErrorsModule } from './common/errors/errors.module';
 import { MailModule } from './common/mail';
 import { RateLimitModule } from './common/rate-limit';
+import { TenantContextModule } from './common/tenant';
 import { HealthModule } from './common/health/health.module';
 import { LoggerModule } from './common/logging/logger.module';
 import { MetricsModule } from './common/metrics/metrics.module';
@@ -12,6 +13,8 @@ import { RedisModule } from './common/redis/redis.module';
 import { ConfigModule } from './config';
 import { AuthModule } from './modules/auth/auth.module';
 import { MetaModule } from './modules/meta/meta.module';
+import { PlatformModule } from './modules/platform/platform.module';
+import { TenantModule } from './modules/tenant/tenant.module';
 
 /**
  * Monolito modular (ADR-001): plataforma transversal primeiro, módulos de produto depois.
@@ -26,12 +29,15 @@ import { MetaModule } from './modules/meta/meta.module';
     RedisModule,
     CryptoModule,
     RateLimitModule,
+    TenantContextModule,
     MailModule,
     AuditModule,
     MetricsModule,
     HealthModule,
     MetaModule,
     AuthModule,
+    TenantModule,
+    PlatformModule,
   ],
 })
 export class AppModule {}
