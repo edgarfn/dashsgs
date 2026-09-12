@@ -1,4 +1,5 @@
 import { Controller, Get, Header, NotFoundException } from '@nestjs/common';
+import { Public } from '../auth';
 import { AppConfigService } from '../../config';
 import { MetricsService } from './metrics.service';
 
@@ -6,6 +7,7 @@ import { MetricsService } from './metrics.service';
  * Endpoint de scrape do Prometheus. Fica FORA do prefixo `/api/v1` e, em produção, só é
  * alcançável pela rede interna — o Caddy não publica `/metrics` (doc 19 §2 e docker/Caddyfile).
  */
+@Public()
 @Controller('metrics')
 export class MetricsController {
   constructor(

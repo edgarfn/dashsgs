@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
+import { Public } from '../../common/auth';
 import { AppConfigService } from '../../config';
 
 export interface MetaResponse {
@@ -13,6 +14,7 @@ export interface MetaResponse {
  * Metadados públicos da instalação — usado pelo front para selo de versão/ambiente e pelos
  * smoke tests do deploy (doc 19 §4). Não expõe nada sensível.
  */
+@Public()
 @Controller('meta')
 export class MetaController {
   constructor(private readonly config: AppConfigService) {}

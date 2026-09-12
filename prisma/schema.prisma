@@ -4,7 +4,7 @@
 // (Prisma não os modela) — ver prisma/migrations e doc 08 §3.
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native"]
 }
 
@@ -66,6 +66,7 @@ model Tenant {
 
   memberships Membership[]
   sessions    Session[]
+  invites     Invite[]
 
   @@index([status])
   @@map("app_tenants")
@@ -94,8 +95,49 @@ model User {
   memberships    Membership[]
   sessions       Session[]
   passwordResets PasswordReset[]
+  recoveryCodes  TotpRecoveryCode[]
+  invitesCreated Invite[]           @relation("InvitesCreated")
 
   @@map("app_users")
+}
+
+/// Códigos de recuperação do TOTP (doc 06 §MFA): 10 por usuário, uso único, hash no banco.
+model TotpRecoveryCode {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  /// sha256(pepper || código) — o código tem entropia alta, não precisa de KDF lento.
+  codeHash  String    @map("code_hash") @db.VarChar(64)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, codeHash])
+  @@index([userId])
+  @@map("app_totp_recovery_codes")
+}
+
+/// Convite para entrar num tenant (doc 06 §Contas e convites): não existe auto-registro público.
+model Invite {
+  id             String         @id @default(uuid()) @db.Uuid
+  tenantId       String         @map("tenant_id") @db.Uuid
+  email          String         @db.VarChar(255)
+  role           MembershipRole
+  filiaisAllowed Int[]          @default([]) @map("filiais_allowed")
+  /// sha256 do token enviado por e-mail; o token em si nunca é persistido.
+  tokenHash      String         @unique @map("token_hash") @db.VarChar(64)
+  invitedById    String?        @map("invited_by") @db.Uuid
+  expiresAt      DateTime       @map("expires_at") @db.Timestamptz(6)
+  acceptedAt     DateTime?      @map("accepted_at") @db.Timestamptz(6)
+  revokedAt      DateTime?      @map("revoked_at") @db.Timestamptz(6)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invitedBy User?  @relation("InvitesCreated", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, email])
+  @@index([expiresAt])
+  @@map("app_invites")
 }
 
 /// Vínculo usuário↔tenant com papel e recorte de filiais (doc 07 / doc 08 §1).
@@ -124,17 +166,19 @@ model Membership {
 /// Sessão server-side (ADR-004): o navegador só carrega o cookie; nada de JWT no cliente.
 model Session {
   /// Hash do token de sessão (o token em si nunca é persistido).
-  id        String    @id @db.VarChar(64)
-  userId    String    @map("user_id") @db.Uuid
+  id            String    @id @db.VarChar(64)
+  userId        String    @map("user_id") @db.Uuid
   /// Tenant ativo da sessão; NULL enquanto o usuário não escolheu.
-  tenantId  String?   @map("tenant_id") @db.Uuid
-  ip        String?   @db.Inet
-  userAgent String?   @map("user_agent") @db.VarChar(255)
-  mfaPassed Boolean   @default(false) @map("mfa_passed")
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  lastSeenAt DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(6)
-  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
-  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(6)
+  tenantId      String?   @map("tenant_id") @db.Uuid
+  ip            String?   @db.Inet
+  userAgent     String?   @map("user_agent") @db.VarChar(255)
+  mfaPassed     Boolean   @default(false) @map("mfa_passed")
+  /// Momento da última verificação de MFA — ações sensíveis exigem ≤15 min (doc 07 §4.3).
+  mfaVerifiedAt DateTime? @map("mfa_verified_at") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastSeenAt    DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  expiresAt     DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt     DateTime? @map("revoked_at") @db.Timestamptz(6)
 
   user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)

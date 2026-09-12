@@ -39,6 +39,34 @@ Dois domínios distintos de autenticação, que **nunca se misturam**:
 - Onboarding por convite (e-mail com token) vinculado a tenant+papel; sem auto-registro público.
 - Super-admin da plataforma: contas separadas, MFA obrigatório, allowlist de IP opcional.
 
+## 4. Estado da implementação (Fase 3)
+
+O que já está no código, e onde:
+
+| Spec | Implementação |
+|---|---|
+| Sessão opaca + cookie | `apps/api/src/modules/auth/services/session.service.ts` |
+| Argon2id e hashes | `apps/api/src/common/crypto/hashing.service.ts` |
+| Política de senha (zxcvbn) | `apps/api/src/modules/auth/services/password-policy.service.ts` |
+| Login, lockout e MFA | `apps/api/src/modules/auth/services/auth.service.ts` |
+| TOTP e códigos de recuperação | `apps/api/src/modules/auth/services/totp.service.ts` |
+| Recuperação/troca de senha | `apps/api/src/modules/auth/services/password.service.ts` |
+| Convites | `apps/api/src/modules/auth/services/invite.service.ts` |
+| Guards (sessão, CSRF, permissões) | `apps/api/src/modules/auth/guards/` |
+| Telas | `apps/web/src/app/(auth)/` e `apps/web/src/app/perfil/` |
+
+Ajustes de rota em relação ao doc 23, feitos durante a implementação:
+
+- `POST /auth/mfa/setup` e `POST /auth/mfa/enable` são etapas distintas: o segredo fica pendente
+  no Redis (cifrado, TTL 15 min) e só vai para o banco quando a pessoa prova o código. Cadastro
+  abandonado não deixa MFA meio-ligado.
+- `GET /me/pending` devolve o perfil de uma sessão que ainda não concluiu o MFA — é o que as
+  telas de desafio e cadastro precisam para se desenhar.
+- `POST /auth/tenant` fixa o tenant ativo da sessão (usuário com mais de um vínculo).
+
+Em desenvolvimento os cookies são `dashsgs_session`/`dashsgs_csrf`; em produção ganham o prefixo
+`__Host-`, que exige `Secure` — e `Secure` sobre `http://localhost` não funciona em todo navegador.
+
 ## 2. Credencial de integração (DashSGS → API SG)
 
 ### Provisionamento

@@ -10,8 +10,8 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-/** Parâmetros Argon2id recomendados (doc 06): memória 19 MiB, 2 iterações, paralelismo 1. */
-const ARGON2_OPTIONS = { memoryCost: 19_456, timeCost: 2, parallelism: 1 } as const;
+/** Mesmos parâmetros do doc 06 §Senhas usados pela aplicação (HashingService). */
+const ARGON2_OPTIONS = { memoryCost: 65_536, timeCost: 3, parallelism: 4 } as const;
 
 const DEMO_TENANT = { slug: 'demo', name: 'Rede Demo (sintética)' };
 const DEMO_USERS = [
@@ -52,17 +52,6 @@ async function main(): Promise<void> {
       create: { userId: user.id, tenantId: tenant.id, role: demoUser.role },
     });
   }
-
-  await prisma.auditLog.create({
-    data: {
-      tenantId: tenant.id,
-      action: 'seed.executed',
-      resourceType: 'tenant',
-      resourceId: tenant.slug,
-      result: 'success',
-      changes: { users: DEMO_USERS.map((user) => user.email) },
-    },
-  });
 
   console.log('');
   console.log('Seed concluído (dados sintéticos).');

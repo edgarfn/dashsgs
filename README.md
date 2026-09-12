@@ -4,11 +4,12 @@ Especificação completa de produto, arquitetura e desenvolvimento de um sistema
 (dashboard analítico + portal operacional) construído sobre a **API SG - Terceiros** da SG Sistemas
 (ERP de varejo/supermercados), documentada em https://api-doc.sgsistemas.com.br/.
 
-**Status:** Fases 0–1 (Discovery/Arquitetura) concluídas; **Fase 2 — Foundation implementada**
-(épico E1: monorepo, CI com gates, compose de dev, contrato de ambiente, logger com redaction e
-correlação, erro padronizado, migração inicial com RLS, deploy por digest). Próxima: Fase 3 —
-Autenticação (épico E2). Nenhuma linha foi escrita antes da especificação, por decisão de método:
-primeiro entender 100% da capacidade da API, depois construir.
+**Status:** Fases 0–1 (Discovery/Arquitetura) concluídas; **Fase 2 — Foundation** e
+**Fase 3 — Autenticação** implementadas (épicos E1 e E2: monorepo com CI, sessões server-side,
+Argon2id, MFA TOTP, convites, recuperação de senha, RBAC e auditoria encadeada). Próxima:
+Fase 4 — Multi-tenant e RLS fim-a-fim (épico E3). Nenhuma linha foi escrita antes da
+especificação, por decisão de método: primeiro entender 100% da capacidade da API, depois
+construir.
 
 ## Começando (dev)
 
@@ -18,6 +19,7 @@ cp .env.example .env          # já preenchido para dev; nenhum segredo real
 pnpm infra:up                 # postgres + redis + mailpit (docker/compose.dev.yml)
 pnpm db:migrate && pnpm db:seed
 pnpm dev                      # api :3001 · web :3000 · mailpit :8025
+# entre com owner@demo.local (o seed imprime a senha; o papel owner exige cadastrar MFA)
 ```
 
 Se a máquina já tiver Postgres/Redis locais, defina `POSTGRES_PORT`/`REDIS_PORT` no `.env` e
@@ -29,7 +31,8 @@ Detalhes, tutoriais e padrões de código no [24-development-guide.md](docs/24-d
 | `pnpm dev`                                               | sobe API, web e o pacote compartilhado em watch        |
 | `pnpm lint` · `pnpm format` · `pnpm typecheck`           | gates estáticos (mesmos do CI)                         |
 | `pnpm test` · `pnpm test:cov`                            | testes unitários (+cobertura dos módulos transversais) |
-| `pnpm test:integration`                                  | testes com Postgres e Redis reais                      |
+| `pnpm test:integration`                                  | testes com Postgres, Redis e Mailpit reais             |
+| `pnpm test:e2e`                                          | E2E no navegador (Playwright) com a aplicação de pé    |
 | `pnpm db:migrate` · `db:seed` · `db:drift` · `db:studio` | banco: migrar, semear, checar drift, inspecionar       |
 | `pnpm infra:up` · `infra:down` · `infra:reset`           | infraestrutura local                                   |
 

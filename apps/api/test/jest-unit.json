@@ -9,9 +9,11 @@
   "collectCoverageFrom": [
     "src/config/**/*.ts",
     "src/common/correlation/**/*.ts",
+    "src/common/crypto/**/*.ts",
     "src/common/errors/**/*.ts",
     "src/common/logging/**/*.ts",
     "src/common/validation/**/*.ts",
+    "src/modules/auth/services/password-policy.service.ts",
     "!src/**/*.module.ts",
     "!src/**/index.ts"
   ],

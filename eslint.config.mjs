@@ -95,6 +95,7 @@ export default tseslint.config(
       'apps/web/src/lib/server/env.ts',
       'prisma/**/*.ts',
       'scripts/**/*.{ts,mjs}',
+      'e2e/**/*.ts',
       '**/*.config.{ts,mjs,js}',
     ],
     rules: {

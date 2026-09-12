@@ -1,6 +1,7 @@
 # 31 — Backlog Priorizado
 
 Prioridades: P0 obrigatório MVP · P1 importante · P2 recomendado · P3 futuro.
+Estado: ✅ concluído · ◐ parcialmente entregue.
 Complexidade: P/M/G. Cada item herda o DoD do doc 24 §9. Critérios de aceite resumidos (CA).
 
 ## Épico E1 — Foundation (Fase 2) — **concluído**
@@ -39,21 +40,53 @@ Decisões tomadas durante a implementação (não estavam na spec):
   correlation, validation); serviços com I/O são cobertos pela suíte de integração. A régua de
   80% do doc 11 §2 acompanha a chegada de cada módulo core.
 
-## Épico E2 — Autenticação (Fase 3)
+## Épico E2 — Autenticação (Fase 3) — **concluído**
 | ID | História | Pri | Cx | Depende | CA |
 |---|---|---|---|---|---|
-| E2-01 | Modelo users/sessions + Argon2id + login/logout | P0 | M | E1 | testes authn |
-| E2-02 | Rate limit login + lockout incremental | P0 | P | E2-01 | 429/lock testados |
-| E2-03 | Recuperação e troca de senha (tokens single-use) | P0 | P | E2-01 | invalidação de sessões |
-| E2-04 | MFA TOTP + códigos de recuperação | P0 | M | E2-01 | obrigatório p/ admin |
-| E2-05 | Convites por e-mail (fluxo tenant) | P0 | M | E2-01, E3-01 | expira, single-use |
-| E2-06 | Telas: login, MFA, reset, perfil, sessões ativas | P0 | M | E2-01..04 | E2E Playwright |
-| E2-07 | Auditoria de eventos de autenticação | P0 | P | E2-01, E6-01 | eventos gravados |
+| E2-01 ✅ | Modelo users/sessions + Argon2id + login/logout | P0 | M | E1 | testes authn |
+| E2-02 ✅ | Rate limit login + lockout incremental | P0 | P | E2-01 | 429/lock testados |
+| E2-03 ✅ | Recuperação e troca de senha (tokens single-use) | P0 | P | E2-01 | invalidação de sessões |
+| E2-04 ✅ | MFA TOTP + códigos de recuperação | P0 | M | E2-01 | obrigatório p/ admin |
+| E2-05 ✅ | Convites por e-mail (fluxo tenant) | P0 | M | E2-01, E3-01 | expira, single-use |
+| E2-06 ✅ | Telas: login, MFA, reset, perfil, sessões ativas | P0 | M | E2-01..04 | E2E Playwright |
+| E2-07 ✅ | Auditoria de eventos de autenticação | P0 | P | E2-01, E6-01 | eventos gravados |
+
+### O que a Fase 3 deixou pronto
+
+- **E2-01** — sessão server-side opaca (SHA-256 no banco), Argon2id 64 MiB/t=3/p=4, cookies
+  `HttpOnly`+`SameSite=Lax` (prefixo `__Host-` em produção), expiração absoluta 12 h e
+  inatividade 60 min com renovação deslizante.
+- **E2-02** — rate limit por IP e por conta no Redis + bloqueio incremental (1→15 min) no banco.
+- **E2-03** — recuperação por e-mail (token de uso único, 30 min) e troca com senha atual; as
+  duas derrubam as demais sessões e avisam o dono da conta por e-mail.
+- **E2-04** — TOTP (RFC 6238) com segredo cifrado em envelope AES-256-GCM, 10 códigos de
+  recuperação de uso único e rotação do id de sessão ao concluir o segundo fator.
+- **E2-05** — convites por e-mail vinculados a tenant+papel, com expiração de 72 h, uso único e
+  recusa de escalada (admin não convida owner).
+- **E2-06** — telas de login, desafio e cadastro de MFA, códigos de recuperação, recuperação e
+  redefinição de senha, aceite de convite e perfil (senha, MFA, dispositivos conectados).
+- **E2-07** — auditoria de todos os eventos de autenticação com encadeamento de hash.
+
+Também entrou, porque a autenticação precisava: o guard central de RBAC com a matriz do doc 07
+(parte de E3-01), a cifra de envelope reaproveitável pela credencial do ERP (base de E4-03) e o
+encadeamento de hash da trilha (parte de E6-01).
+
+Decisões e descobertas da implementação:
+
+- O cookie anti-CSRF é `HttpOnly`: quem lê e reenvia o token é o BFF (servidor do Next), não
+  script de página — o double-submit continua valendo e a superfície de XSS some.
+- O middleware do front **não** redireciona `/entrar` para a home quando existe cookie. Cookie
+  presente não é sessão válida; fazer isso criava um laço de redirecionamento exatamente para
+  quem estava com a sessão revogada (bug encontrado pelo E2E).
+- `zxcvbn` aceita `dashsgs2026dashsgs` (score 3). Mantivemos a régua do doc 06 em vez de criar
+  regra de composição própria; se virar problema real, a mudança passa por ADR.
+- A suíte inteira sai do mesmo IP e estouraria o próprio rate limit: os testes zeram os
+  contadores entre cenários e há um cenário dedicado ao limite.
 
 ## Épico E3 — Multi-tenant & RBAC (Fase 4)
 | ID | História | Pri | Cx | Depende | CA |
 |---|---|---|---|---|---|
-| E3-01 | Modelo tenants/memberships/papéis + guard RBAC | P0 | M | E2 | matriz doc 07 testada |
+| E3-01 ◐ | Modelo tenants/memberships/papéis + guard RBAC (guard e matriz já feitos na Fase 3; falta CRUD de tenant e `filiais_allowed`) | P0 | M | E2 | matriz doc 07 testada |
 | E3-02 | RLS: template de migração + políticas + papéis de DB | P0 | G | E1 | introspecção no CI |
 | E3-03 | Tenant-context (interceptor API + wrapper workers) | P0 | M | E3-02 | SET LOCAL comprovado |
 | E3-04 | Suite de isolamento A→B gerada do router | P0 | M | E3-01..03 | 100% endpoints cobertos |
@@ -93,7 +126,7 @@ Decisões tomadas durante a implementação (não estavam na spec):
 ## Épico E6 — Plataforma transversal
 | ID | História | Pri | Cx | CA |
 |---|---|---|---|---|
-| E6-01 | Auditoria append-only + hash chain + UI consulta | P0 | M | tamper test |
+| E6-01 ◐ | Auditoria append-only + hash chain + UI consulta (gravação e verificação prontas na Fase 3; falta a tela) | P0 | M | tamper test |
 | E6-02 | Métricas Prometheus + painéis Grafana + alertas doc 18 | P0 | M | SLO board |
 | E6-03 | Backups WAL-G + restore test semanal automatizado | P0 | M | doc 20 §3 |
 | E6-04 | Jobs de retenção/purga (partições, logs, offboarding) | P0 | M | verify-purge zero |

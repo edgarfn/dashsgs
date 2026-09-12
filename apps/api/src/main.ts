@@ -1,6 +1,7 @@
 import { API_PREFIX } from '@dashsgs/shared';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import cookieParser from 'cookie-parser';
 import express from 'express';
 import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
@@ -28,6 +29,9 @@ async function bootstrap(): Promise<void> {
   // 2) Corpo com limite explícito (defesa contra consumo desenfreado — API4).
   app.use(express.json({ limit: BODY_LIMIT }));
   app.use(express.urlencoded({ extended: false, limit: BODY_LIMIT }));
+
+  // 2.1) Cookies: a sessão vive num cookie opaco HttpOnly (ADR-004); o guard precisa dele parseado.
+  app.use(cookieParser());
 
   // 3) Cabeçalhos de segurança (doc 09 §1). A CSP do app é responsabilidade do front/Caddy;
   //    aqui a API só devolve JSON, então a política restritiva padrão basta.

@@ -39,7 +39,10 @@ describe('esqueleto da API (integração)', () => {
         (check) => [check.name, check.detail ? `${check.state} (${check.detail})` : check.state],
       ),
     );
-    expect(byName).toEqual({ postgres: 'ok', redis: 'ok', migrations: 'ok (1 aplicada(s))' });
+    expect(byName.postgres).toBe('ok');
+    expect(byName.redis).toBe('ok');
+    // O número de migrações cresce a cada fase; o que importa é estarem todas aplicadas.
+    expect(byName.migrations).toMatch(/^ok \(\d+ aplicada\(s\)\)$/);
     expect(response.body.state).toBe('ok');
     expect(response.status).toBe(200);
   });

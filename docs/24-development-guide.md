@@ -86,6 +86,27 @@ pnpm cli sync verify --tenant rede-exemplo --domain vendas --date 2026-09-01
 dependências pelos metadados de decorator, e trocar esses imports por `import type` faria a
 injeção receber `undefined` em runtime.
 
+## 7.2 Onde ficam os testes (estado atual)
+
+| Suíte | Comando | O que cobre |
+|---|---|---|
+| Unitária | `pnpm test` | lógica pura: contrato de env, redaction, erros, permissões, cifra, política de senha, cadeia de hash |
+| Integração | `pnpm test:integration` | API real contra Postgres, Redis e Mailpit: login, MFA, convites, senha, auditoria |
+| E2E | `pnpm test:e2e` | navegador contra a aplicação de pé (Next → API): login+MFA, recuperação, perfil, cabeçalhos |
+
+O E2E pressupõe a aplicação rodando e o banco semeado com senha conhecida:
+
+```bash
+pnpm infra:up && pnpm db:migrate
+SEED_PASSWORD="Senha-Demo-Muito-Longa-2026" pnpm db:seed
+pnpm build && pnpm --filter @dashsgs/web start &   # :3000
+node apps/api/dist/main.js &                        # :3001
+pnpm test:e2e
+```
+
+Os testes zeram contadores de rate limit e o estado de MFA das contas do seed antes de cada
+cenário — sem isso um cenário herdaria a sessão (12 h) e o segundo fator do anterior.
+
 ## 8. Debug
 - API: `pnpm dev:api --inspect`; VS Code launch configs no repo.
 - Um request: header `X-Debug-Trace: 1` em dev liga log verbose para aquele correlation id.

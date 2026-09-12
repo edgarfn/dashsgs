@@ -57,6 +57,18 @@ própria proposta** (segregação de funções imposta no serviço).
 5. `platform_admin` acessando dados de tenant: modo break-glass — exige justificativa, gera
    auditoria destacada e notificação ao owner do tenant.
 
+## 4.1 Estado da implementação (Fase 3)
+
+A matriz do §3 vive em `packages/shared/src/authz.ts` (compartilhada com o front, que a usa só
+para esconder o que o backend já nega) e é cobrada pelo `PermissionsGuard`
+(`apps/api/src/modules/auth/guards/permissions.guard.ts`), global e com negação auditada.
+O teste parametrizado em `apps/api/test/unit/authz.spec.ts` replica a tabela à mão: mexer no
+catálogo sem revisar a decisão quebra o CI.
+
+Ainda na Fase 4 (E3): `filiais_allowed` fim-a-fim, tenant-context com `SET LOCAL` em todas as
+consultas, suíte A→B gerada do router e painel de platform-admin. `platform_admin` ainda não
+existe como papel — as contas de plataforma entram com o painel.
+
 ## 5. Testes obrigatórios de autorização (ver doc 17)
 
 - Viewer tenta gerenciar usuários → 403.

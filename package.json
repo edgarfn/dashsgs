@@ -31,21 +31,27 @@
     "infra:down": "docker compose --env-file .env -f docker/compose.dev.yml down",
     "infra:reset": "docker compose --env-file .env -f docker/compose.dev.yml down -v && pnpm infra:up",
     "prepare": "husky || true",
-    "infra:logs": "docker compose --env-file .env -f docker/compose.dev.yml logs -f"
+    "infra:logs": "docker compose --env-file .env -f docker/compose.dev.yml logs -f",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
+    "@playwright/test": "^1.49.1",
     "@types/node": "^22.10.2",
     "eslint": "^9.17.0",
     "eslint-config-prettier": "^9.1.0",
     "globals": "^15.14.0",
     "husky": "^9.1.7",
+    "ioredis": "^5.4.2",
     "lint-staged": "^15.3.0",
+    "otpauth": "^9.3.6",
     "prettier": "^3.4.2",
     "prisma": "^6.2.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
-    "typescript-eslint": "^8.19.0"
+    "typescript-eslint": "^8.19.0",
+    "wait-on": "^8.0.1"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",

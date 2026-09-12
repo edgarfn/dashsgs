@@ -1,6 +1,7 @@
 import type { LivenessBody, ReadinessBody } from '@dashsgs/shared';
 import { Controller, Get, Header, HttpCode, Res } from '@nestjs/common';
 import type { Response } from 'express';
+import { Public } from '../auth';
 import { AppConfigService } from '../../config';
 import { HealthService } from './health.service';
 
@@ -12,6 +13,7 @@ import { HealthService } from './health.service';
  * Nenhum dos dois exige autenticação (são a porta do orquestrador), por isso não revelam
  * nada além do estado das dependências — sem versões de biblioteca, sem hosts, sem DSN.
  */
+@Public()
 @Controller()
 export class HealthController {
   constructor(

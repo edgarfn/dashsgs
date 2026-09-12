@@ -158,12 +158,17 @@ jobs:
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 5s --health-timeout 3s --health-retries 20
+      mailpit:
+        image: axllent/mailpit:latest
+        ports: ['1025:1025', '8025:8025']
     env:
       PGPASSWORD: dev_only_password
       DATABASE_URL: postgresql://app_rw:dev_only_password@localhost:5432/dashsgs?schema=public
       DATABASE_URL_MIGRATOR: postgresql://app_migrator:dev_only_password@localhost:5432/dashsgs?schema=public
       SHADOW_DATABASE_URL: postgresql://app_migrator:dev_only_password@localhost:5432/dashsgs_shadow?schema=public
       REDIS_URL: redis://localhost:6379
+      SMTP_URL: smtp://127.0.0.1:1025
+      MAILPIT_URL: http://127.0.0.1:8025
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -230,3 +235,85 @@ jobs:
           severity: CRITICAL
           exit-code: '1'
           ignore-unfixed: true
+
+  # 11: E2E dos fluxos críticos (doc 17 §1) — login+MFA, recuperação, perfil.
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    needs: [build]
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: dev_only_password
+          POSTGRES_DB: dashsgs
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d dashsgs"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+      mailpit:
+        image: axllent/mailpit:latest
+        ports: ['1025:1025', '8025:8025']
+    env:
+      PGPASSWORD: dev_only_password
+      NODE_ENV: test
+      APP_URL: http://localhost:3000
+      API_URL: http://localhost:3001
+      PORT: '3001'
+      LOG_LEVEL: warn
+      SESSION_SECRET: ci_session_secret_ci_session_secret_32c
+      CSRF_SECRET: ci_csrf_secret_ci_csrf_secret_32chars_ok
+      COOKIE_DOMAIN: localhost
+      DATABASE_URL: postgresql://app_rw:dev_only_password@localhost:5432/dashsgs?schema=public
+      DATABASE_URL_MIGRATOR: postgresql://app_migrator:dev_only_password@localhost:5432/dashsgs?schema=public
+      REDIS_URL: redis://localhost:6379
+      SMTP_URL: smtp://127.0.0.1:1025
+      MAILPIT_URL: http://127.0.0.1:8025
+      MAIL_FROM: DashSGS <ci@dashsgs.local>
+      MASTER_KEY_CURRENT: Y2lfbWFzdGVyX2tleV8zMl9ieXRlc19DSEFOR0VfTUU=
+      PII_PEPPER: ci_pepper_ci_pepper_24ch
+      INTERNAL_API_URL: http://127.0.0.1:3001
+      SEED_PASSWORD: Senha-De-Teste-Bem-Longa-2026
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Criar papéis do banco
+        run: psql -h localhost -U postgres -d dashsgs -v ON_ERROR_STOP=1 -f docker/postgres/init/01-roles.sql
+      - run: pnpm db:generate
+      - name: Migrar e semear (dados sintéticos)
+        run: pnpm db:migrate && pnpm db:seed
+      - name: Build da aplicação
+        run: pnpm build
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+          NEXT_OUTPUT_STANDALONE: 'false'
+      - name: Instalar navegador
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Subir API e web
+        run: |
+          node apps/api/dist/main.js &
+          pnpm --filter @dashsgs/web start &
+          pnpm exec wait-on http://127.0.0.1:3001/readyz http://127.0.0.1:3000/entrar --timeout 90000
+      - name: Playwright
+        run: pnpm test:e2e
+      - name: Publicar relatório
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7
