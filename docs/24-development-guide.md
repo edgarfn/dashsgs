@@ -31,9 +31,17 @@ Notas de ambiente (Fase 2):
    `sgps.sgsistemas.com.br:8201`, usuário `homologacao`].
 2. No app (tenant demo) → Admin→Conexão ERP: base_url `http://sgps.sgsistemas.com.br:8201`
    *(dev aceita http apenas com `ALLOW_INSECURE_ERP=true`; produção nunca)*.
-3. Testar conexão → conferir rotas detectadas → rodar `pnpm sync:run --domain dimensoes`.
-4. Alternativa offline: `SG_MOCK=true` usa fixtures da coleção Postman (pasta
-   `apps/api/test/fixtures/sg`).
+3. Testar conexão → conferir rotas detectadas → rodar `pnpm sync:run --domain dimensoes`
+   *(a partir da Fase 6; hoje o teste de conexão já valida credencial, rotas e versão do ERP)*.
+4. Alternativa offline: `SG_MOCK=true` responde pelas fixtures em
+   `apps/api/src/integration/sg/mock/fixtures.ts`, que reproduzem os defeitos documentados da API
+   (padding, data vazia, decimal com vírgula, envelopes de página diferentes). Usuário/senha que
+   o mock aceita: `homologacao` / `homologacao-senha-de-teste`.
+5. Contrato contra a homologação de verdade: `SG_HOMOLOG_BASE_URL=... SG_HOMOLOG_USER=...
+   SG_HOMOLOG_PASSWORD=... pnpm test:contract`. Sem as variáveis a suíte é pulada com aviso — é o
+   mesmo comando que o job noturno do CI executa.
+6. ERP só em HTTP (sem TLS): não se cadastra pela internet. Provisione o túnel WireGuard e marque
+   VPN no wizard — runbook 22 §7; a faixa aceita é `SG_VPN_CIDR`.
 
 ## 4. Tutorial — criar o primeiro tenant e usuário (fluxo real)
 1. `pnpm cli tenant create --name "Rede Exemplo" --slug rede-exemplo --owner-email dono@ex.com`
@@ -96,7 +104,8 @@ injeção receber `undefined` em runtime.
 |---|---|---|
 | Unitária | `pnpm test` | lógica pura: contrato de env, redaction, erros, permissões, cifra, política de senha, cadeia de hash |
 | Integração | `pnpm test:integration` | API real contra Postgres, Redis e Mailpit: login, MFA, convites, senha, auditoria |
-| E2E | `pnpm test:e2e` | navegador contra a aplicação de pé (Next → API): login+MFA, recuperação, perfil, cabeçalhos |
+| E2E | `pnpm test:e2e` | navegador contra a aplicação de pé (Next → API): login+MFA, recuperação, perfil, cabeçalhos, wizard de conexão ERP |
+| Contrato | `pnpm test:contract` | respostas reais da homologação SG contra nossos schemas (nightly; pula sem credenciais) |
 
 O E2E pressupõe a aplicação rodando e o banco semeado com senha conhecida:
 
@@ -104,7 +113,7 @@ O E2E pressupõe a aplicação rodando e o banco semeado com senha conhecida:
 pnpm infra:up && pnpm db:migrate
 SEED_PASSWORD="Senha-Demo-Muito-Longa-2026" pnpm db:seed
 pnpm build && pnpm --filter @dashsgs/web start &   # :3000
-node apps/api/dist/main.js &                        # :3001
+SG_MOCK=true node apps/api/dist/main.js &           # :3001 (fixtures no lugar do ERP)
 pnpm test:e2e
 ```
 

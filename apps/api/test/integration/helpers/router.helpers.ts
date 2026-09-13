@@ -21,6 +21,20 @@ interface ExpressLayer {
   };
 }
 
+/**
+ * Além dos endpoints, o Nest registra dois artefatos de framework: um coringa por método para
+ * responder 404 (`/api/v1/{*path}`) e uma âncora do próprio prefixo. Nenhum dos dois é endpoint
+ * do produto — incluí-los faria a suíte cobrar classificação de verbos que nem existem aqui.
+ */
+const MARCAS_DE_ARTEFATO = ['*', '$'];
+
+/**
+ * Verbos que o produto expõe. O Express marca como "aceitos" todos os métodos que conhece
+ * (ACL, BIND, CHECKOUT, LINK, LOCK…) nas rotas que o Nest registra internamente — e listar isso
+ * encheria a suíte de verbos fantasmas.
+ */
+const VERBOS_DO_PRODUTO = new Set(['get', 'post', 'put', 'patch', 'delete']);
+
 export function listarRotas(app: INestApplication): RotaRegistrada[] {
   const server = app.getHttpAdapter().getInstance() as {
     router?: { stack: ExpressLayer[] };
@@ -36,8 +50,10 @@ export function listarRotas(app: INestApplication): RotaRegistrada[] {
     const caminhos = Array.isArray(layer.route.path) ? layer.route.path : [layer.route.path];
 
     for (const caminho of caminhos) {
+      if (MARCAS_DE_ARTEFATO.some((marca) => caminho.includes(marca))) continue;
+
       for (const [method, ativo] of Object.entries(layer.route.methods)) {
-        if (!ativo || method === '_all') continue;
+        if (!ativo || !VERBOS_DO_PRODUTO.has(method)) continue;
         rotas.push({
           method: method.toUpperCase(),
           path: caminho,

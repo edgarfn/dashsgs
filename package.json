@@ -34,7 +34,8 @@
     "infra:logs": "docker compose --env-file .env -f docker/compose.dev.yml logs -f",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "db:rls-check": "node scripts/check-rls.mjs"
+    "db:rls-check": "node scripts/check-rls.mjs",
+    "test:contract": "pnpm --filter @dashsgs/api test:contract"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

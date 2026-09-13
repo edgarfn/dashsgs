@@ -115,3 +115,43 @@ prévia contra `routes_granted` — falha rápida com erro claro "rota não cont
 | 400/404 não encontrado | `ERP_NOT_FOUND` | tratar como vazio |
 | 500 | `ERP_SERVER_ERROR` | retry (GET), circuit breaker |
 | timeout/ECONNREFUSED | `ERP_UNREACHABLE` | retry, circuit breaker, health-check |
+
+## 9. Estado da implementação (Fase 5)
+
+| Spec | Implementação |
+|---|---|
+| §1 Configuração por tenant | `apps/api/src/modules/erp-connection/` + tabela `app_erp_connections` (RLS estrita) |
+| §1 Anti-SSRF no `base_url` | `apps/api/src/integration/sg/http/url-guard.ts` |
+| §2 Token manager | `apps/api/src/integration/sg/sg-token.manager.ts` (cache Redis 50 min, lock single-flight, diff de `routes`) |
+| §3 Cliente HTTP | `apps/api/src/integration/sg/http/sg-http.client.ts` + `sg-rate-limiter.ts` + `sg-circuit-breaker.ts` |
+| §4 Normalização | `apps/api/src/integration/sg/normalizers.ts` |
+| §5 Catálogo tipado | `apps/api/src/integration/sg/sg.client.ts` + schemas em `types/index.ts` |
+| §7 Contrato nightly | `apps/api/test/contract/sg-contract.spec.ts` + `.github/workflows/contract-nightly.yml` |
+| §7 Mocks locais | `apps/api/src/integration/sg/mock/` (`SG_MOCK=true`) |
+| §8 Taxonomia de erros | `apps/api/src/integration/sg/sg-errors.ts` |
+| Wizard + health | `apps/web/src/app/admin/conexao-erp/` |
+
+Decisões tomadas na implementação:
+
+- **O schema zod é a allowlist.** Campo que não está no schema não entra no sistema — a
+  minimização de dados (doc 26) fica garantida pela porta de entrada, não por disciplina de quem
+  escreve mapper depois.
+- **Item inválido é posto em quarentena, não derruba a página.** Uma linha estranha em 5.000
+  produtos não pode interromper o sync; o que ela gera é `sg_invalid_items_total` com o recurso,
+  para virar alerta quando deixar de ser exceção.
+- **A verificação anti-SSRF roda a cada requisição**, não só no cadastro: entre o cadastro e a
+  chamada o DNS pode mudar (rebinding). Redirecionamento é recusado (`redirect: 'error'`) pelo
+  mesmo motivo — seguir um 302 pularia o guarda.
+- **Retry só em GET.** A API SG não oferece idempotência; repetir uma escrita seria inventar um
+  risco que a spec não autoriza (doc 03 §Ações).
+- **A senha do ERP é write-only.** O cofre usa a mesma cifra de envelope do TOTP (E2-04); a UI
+  mostra "nova senha" e o valor nunca volta para a tela — testado no E2E pelo HTML inteiro.
+- **O formato do header continua descoberto em execução** (doc 34 Q2 sem resposta): tenta
+  `Authorization: <jwt>`, e em 401 repete uma vez com `Bearer <jwt>`, memorizando o que funcionou
+  por tenant. Quando a SG responder, isto vira configuração.
+- **Modo VPN não é "aceitar rede privada".** Aceita-se apenas a faixa do túnel provisionado
+  (`SG_VPN_CIDR`, padrão `10.66.0.0/16`) — runbook 22 §7.
+
+Ainda não implementado deste doc: as rotas da coleção que só a Fase 6 consome (financeiro,
+compras, perdas, previsão) entram junto com seus jobs de sync, como manda o doc 24 §7 — tipo sem
+consumidor envelhece sem ninguém perceber.

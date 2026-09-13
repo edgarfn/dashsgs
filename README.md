@@ -5,11 +5,13 @@ Especificação completa de produto, arquitetura e desenvolvimento de um sistema
 (ERP de varejo/supermercados), documentada em https://api-doc.sgsistemas.com.br/.
 
 **Status:** Fases 0–1 (Discovery/Arquitetura) concluídas; **Fases 2 (Foundation)**,
-**3 (Autenticação)** e **4 (Multi-tenant/RLS)** implementadas — monorepo com CI, sessões
-server-side com MFA, RBAC, isolamento por tenant provado no banco e na API, recorte por filial
-e painel de operação. Próxima: Fase 5 — Integração com a API SG (épico E4). Nenhuma linha foi
-escrita antes da especificação, por decisão de método: primeiro entender 100% da capacidade da
-API, depois construir.
+**3 (Autenticação)**, **4 (Multi-tenant/RLS)** e **5 (Integração com a API SG)** implementadas —
+monorepo com CI, sessões server-side com MFA, RBAC, isolamento por tenant provado no banco e na
+API, recorte por filial, painel de operação e a camada anti-corrupção que fala com o ERP (cofre
+de credencial, anti-SSRF, token manager, rate-limit, circuit breaker, wizard de conexão e
+contrato nightly). Próxima: Fase 6 — Sincronização (épico E5). Nenhuma linha foi escrita antes
+da especificação, por decisão de método: primeiro entender 100% da capacidade da API, depois
+construir.
 
 ## Começando (dev)
 
@@ -26,21 +28,23 @@ Se a máquina já tiver Postgres/Redis locais, defina `POSTGRES_PORT`/`REDIS_POR
 ajuste as URLs. Verificação rápida: `curl localhost:3001/readyz` e `./scripts/smoke.sh`.
 Detalhes, tutoriais e padrões de código no [24-development-guide.md](docs/24-development-guide.md).
 
-| Comando                                                  | O que faz                                              |
-| -------------------------------------------------------- | ------------------------------------------------------ |
-| `pnpm dev`                                               | sobe API, web e o pacote compartilhado em watch        |
-| `pnpm lint` · `pnpm format` · `pnpm typecheck`           | gates estáticos (mesmos do CI)                         |
-| `pnpm test` · `pnpm test:cov`                            | testes unitários (+cobertura dos módulos transversais) |
-| `pnpm test:integration`                                  | testes com Postgres, Redis e Mailpit reais             |
-| `pnpm test:e2e`                                          | E2E no navegador (Playwright) com a aplicação de pé    |
-| `pnpm db:migrate` · `db:seed` · `db:drift` · `db:studio` | banco: migrar, semear, checar drift, inspecionar       |
-| `pnpm db:rls-check`                                      | confere que toda tabela com `tenant_id` tem RLS        |
-| `pnpm infra:up` · `infra:down` · `infra:reset`           | infraestrutura local                                   |
+| Comando                                                  | O que faz                                               |
+| -------------------------------------------------------- | ------------------------------------------------------- |
+| `pnpm dev`                                               | sobe API, web e o pacote compartilhado em watch         |
+| `pnpm lint` · `pnpm format` · `pnpm typecheck`           | gates estáticos (mesmos do CI)                          |
+| `pnpm test` · `pnpm test:cov`                            | testes unitários (+cobertura dos módulos transversais)  |
+| `pnpm test:integration`                                  | testes com Postgres, Redis e Mailpit reais              |
+| `pnpm test:e2e`                                          | E2E no navegador (Playwright) com a aplicação de pé     |
+| `pnpm test:contract`                                     | contrato contra a homologação SG (pula sem credenciais) |
+| `pnpm db:migrate` · `db:seed` · `db:drift` · `db:studio` | banco: migrar, semear, checar drift, inspecionar        |
+| `pnpm db:rls-check`                                      | confere que toda tabela com `tenant_id` tem RLS         |
+| `pnpm infra:up` · `infra:down` · `infra:reset`           | infraestrutura local                                    |
 
 ## Estrutura do repositório
 
 ```
 apps/api/          NestJS — API interna (BFF), health, métricas, plataforma transversal
+apps/api/src/integration/sg/  camada anti-corrupção da API SG (token, HTTP, schemas, mocks)
 apps/web/          Next.js 15 — front (App Router, CSP com nonce)
 packages/shared/   contratos compartilhados (códigos de erro, paginação, chaves de cache)
 prisma/            schema, migrações (RLS e auditoria append-only) e seed sintético

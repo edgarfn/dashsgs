@@ -80,6 +80,12 @@ export const envSchema = z
     SG_HTTP_TIMEOUT_MS: z.coerce.number().int().min(1000).max(600_000).default(60_000),
     SG_HEAVY_TIMEOUT_MS: z.coerce.number().int().min(1000).max(900_000).default(180_000),
     ALLOW_INSECURE_ERP: boolFromEnv(false),
+    // Faixa do WireGuard da plataforma: é a única rede privada que o guarda anti-SSRF aceita,
+    // e só para conexões com tls_mode=vpn (runbook 22 §7).
+    SG_VPN_CIDR: z
+      .string()
+      .regex(/^\d{1,3}(\.\d{1,3}){3}\/\d{1,2}$/, 'informe um CIDR IPv4, ex.: 10.66.0.0/16')
+      .default('10.66.0.0/16'),
     SG_MOCK: boolFromEnv(false),
 
     // --- Feature flags ---

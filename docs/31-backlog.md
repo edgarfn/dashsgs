@@ -130,18 +130,55 @@ Decisões e descobertas da implementação:
 - Ids de campo na UI passaram a ser únicos (`useId`): a mesma etiqueta se repete por linha na
   tela de acessos, e ids duplicados apontavam todos os rótulos para o primeiro campo.
 
-## Épico E4 — Integração SG (Fase 5)
+## Épico E4 — Integração SG (Fase 5) — **concluído**
 | ID | História | Pri | Cx | Depende | CA |
 |---|---|---|---|---|---|
-| E4-01 | Tipos + fixtures da coleção (todas as respostas doc 03) | P0 | M | — | zod schemas por recurso |
-| E4-02 | Token manager (cache, lock, renovação, rotas) | P0 | M | E4-01 | testes de expiração/401 |
-| E4-03 | Cofre de credencial (AES-GCM envelope + write-only UI) | P0 | M | E3 | DBA não lê; rewrap testado |
-| E4-04 | Cliente HTTP: timeout/retry/backoff/rate-limit/breaker | P0 | G | E4-02 | políticas doc 12 §3 testadas |
-| E4-05 | Mappers com allowlist + normalizações doc 12 §4 + quarentena | P0 | G | E4-01 | fixtures maliciosas tratadas |
-| E4-06 | Anti-SSRF na configuração de base_url | P0 | P | E4-03 | payloads bloqueados |
-| E4-07 | Wizard de conexão + health + rotas detectadas | P0 | M | E4-02..06 | conecta homologação SG |
-| E4-08 | Testes de contrato nightly (homologação) | P1 | M | E4-07 | job agendado + alerta drift |
-| E4-09 | Suporte VPN (tls_mode=vpn) — provisão manual documentada | P1 | M | E4-07 | runbook 22 §7 |
+| E4-01 ◐ | Tipos + fixtures da coleção (todas as respostas doc 03) | P0 | M | — | zod schemas por recurso |
+| E4-02 ✅ | Token manager (cache, lock, renovação, rotas) | P0 | M | E4-01 | testes de expiração/401 |
+| E4-03 ✅ | Cofre de credencial (AES-GCM envelope + write-only UI) | P0 | M | E3 | DBA não lê; rewrap testado |
+| E4-04 ✅ | Cliente HTTP: timeout/retry/backoff/rate-limit/breaker | P0 | G | E4-02 | políticas doc 12 §3 testadas |
+| E4-05 ✅ | Mappers com allowlist + normalizações doc 12 §4 + quarentena | P0 | G | E4-01 | fixtures maliciosas tratadas |
+| E4-06 ✅ | Anti-SSRF na configuração de base_url | P0 | P | E4-03 | payloads bloqueados |
+| E4-07 ✅ | Wizard de conexão + health + rotas detectadas | P0 | M | E4-02..06 | conecta homologação SG |
+| E4-08 ✅ | Testes de contrato nightly (homologação) | P1 | M | E4-07 | job agendado + alerta drift |
+| E4-09 ✅ | Suporte VPN (tls_mode=vpn) — provisão manual documentada | P1 | M | E4-07 | runbook 22 §7 |
+
+**E4-01 ficou parcial de propósito**: os tipos entregues cobrem os recursos que a Fase 6
+sincroniza primeiro (status, filiais, dimensões, produtos, vendas dia/hoje, finalizadoras, resumo
+diário). Os demais recursos do doc 03 entram com seus jobs de sync — schema sem consumidor
+envelhece sem ninguém notar (doc 24 §7).
+
+O que a Fase 5 deixou pronto:
+
+- **Camada anti-corrupção completa** (`integration/sg`): token manager com cache Redis e lock de
+  single-flight, cliente HTTP com timeout/retry-em-GET/backoff/rate-limit/circuit breaker,
+  normalizadores das esquisitices documentadas (padding, `""` em data, "S"/" " como booleano,
+  decimal com vírgula, três formatos de envelope de página) e catálogo tipado de operações.
+- **Cofre de credencial do ERP** com a cifra de envelope da Fase 3, incluindo `rewrap` para
+  rotação de chave; a senha nunca volta para a tela.
+- **Guarda anti-SSRF** que resolve o DNS e recusa loopback, link-local/metadata, faixas privadas,
+  CGNAT e reservadas — revalidando a cada chamada, não só no cadastro.
+- **Wizard de conexão** com teste de conexão, estado (não testado/conectado/erro), versão do ERP e
+  as rotas contratadas visíveis — é o contrato da SG que define quais painéis o produto pode
+  oferecer.
+- **Mocks fiéis** (`SG_MOCK=true`) que reproduzem os defeitos documentados da API, e contrato
+  nightly contra a homologação para achar drift antes do cliente.
+
+Decisões e descobertas da implementação:
+
+- `prisma.upsert` avalia o payload de `create` mesmo quando vai atualizar: editar a conexão sem
+  informar senha nova estourava `null.ciphertext`. Virou `update`/`create` explícitos (bug achado
+  pelo teste de integração).
+- O erro do ERP tem **duas audiências**: `SgError.message` carrega a mensagem de origem para log
+  e Sentry; `toAppException()` devolve texto genérico ao usuário — repassar o texto do ERP
+  entregaria detalhe de infraestrutura alheia a quem abriu a tela.
+- A suíte de isolamento é gerada do router, e rotas novas sem parâmetro passavam sem declaração;
+  o meta-teste passou a falhar nesses casos, além de ignorar artefatos do Nest (catch-all,
+  âncora de prefixo) e tratar `/healthz|/readyz|/metrics` como infraestrutura.
+- A faixa do túnel VPN saiu de constante no código para `SG_VPN_CIDR`: trocar a rede é decisão de
+  operação (runbook 22 §7), não um deploy de código.
+- O contrato nightly **pula com aviso** quando faltam os secrets, em vez de falhar: job vermelho
+  por falta de credencial ensina a equipe a ignorar vermelho.
 
 ## Épico E5 — Sincronização (Fase 6)
 | ID | História | Pri | Cx | Depende | CA |

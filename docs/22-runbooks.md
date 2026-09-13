@@ -42,10 +42,26 @@ subcomandos citados abaixo fazem parte do backlog).
 3. Jobs venenosos: `queue discard --id ...` com justificativa (auditado).
 
 ## 7. Provisionar VPN para tenant sem HTTPS
+Quando usar: o ERP do tenant só expõe HTTP. A plataforma **não** aceita HTTP na internet
+(doc 09 §1) — o túnel é o que torna o endereço privado legítimo.
+
 1. Gerar par WireGuard: `dashsgs-cli vpn new --tenant <slug>` (IP dedicado na rede 10.66.x.x).
+   *(E6-05; enquanto a CLI não existe, o par é gerado à mão no host da VPN.)*
 2. Enviar conf ao TI do tenant (canal seguro); ERP acessível só pelo túnel.
-3. Cadastrar `base_url` com IP do túnel; `tls_mode=vpn`.
+3. Cadastrar `base_url` com IP do túnel e marcar **VPN** no wizard (`tls_mode=vpn`).
 4. Verificar handshake e health-check; monitor de túnel ativo.
+
+O que o guarda anti-SSRF faz nesse modo (implementado em `integration/sg/http/url-guard.ts`):
+
+- aceita IP privado **apenas** dentro de `SG_VPN_CIDR` (padrão `10.66.0.0/16`). Fora dela, a
+  recusa cita a faixa esperada — inclusive para 10.x, 192.168.x e loopback;
+- a checagem se repete **a cada chamada**, não só no cadastro: o endereço é reavaliado antes de
+  cada requisição ao ERP, então mudança de DNS (rebinding) não atravessa;
+- trocar a rede do túnel é mudar `SG_VPN_CIDR` no ambiente da API e reiniciar — nunca editar o
+  código do guarda.
+
+Se o túnel cair, a conexão vai a `error` com motivo "inalcançável" e o admin do tenant recebe
+alerta (E8-05); a credencial permanece válida no cofre, nada precisa ser recadastrado.
 
 ## 8. Incidente de segurança → seguir doc 27 (não improvisar aqui).
 

@@ -7,6 +7,7 @@ export interface SgConfig {
   heavyTimeoutMs: number;
   mock: boolean;
   allowInsecure: boolean;
+  vpnCidr: string;
 }
 
 /**
@@ -68,6 +69,7 @@ export class AppConfigService {
       heavyTimeoutMs: this.env.SG_HEAVY_TIMEOUT_MS,
       mock: this.env.SG_MOCK,
       allowInsecure: this.env.ALLOW_INSECURE_ERP,
+      vpnCidr: this.env.SG_VPN_CIDR,
     };
   }
 
@@ -91,6 +93,7 @@ export class AppConfigService {
       sgMaxRps: this.env.SG_DEFAULT_MAX_RPS,
       sgMock: this.env.SG_MOCK,
       allowInsecureErp: this.env.ALLOW_INSECURE_ERP,
+      sgVpnCidr: this.env.SG_VPN_CIDR,
       featureErpWrite: this.env.FEATURE_ERP_WRITE,
       featureClientModule: this.env.FEATURE_CLIENT_MODULE,
       masterKeyVersion: this.env.MASTER_KEY_VERSION,

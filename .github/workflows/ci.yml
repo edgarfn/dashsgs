@@ -283,6 +283,9 @@ jobs:
       PII_PEPPER: ci_pepper_ci_pepper_24ch
       INTERNAL_API_URL: http://127.0.0.1:3001
       SEED_PASSWORD: Senha-De-Teste-Bem-Longa-2026
+      # Sem ERP de verdade no CI: as fixtures respondem no lugar dele (doc 12 §7).
+      SG_MOCK: 'true'
+      ALLOW_INSECURE_ERP: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

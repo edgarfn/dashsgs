@@ -56,6 +56,25 @@ export async function resetSeedAccounts(emails: string[]): Promise<void> {
   ]);
 }
 
+/**
+ * Apaga as conexões com o ERP de todos os tenants de teste.
+ *
+ * A tela muda de "Senha" para "Nova senha" depois que existe credencial salva — sem zerar,
+ * um cenário herdaria o estado do anterior e o teste passaria a medir a ordem de execução.
+ */
+export async function resetErpConnections(): Promise<void> {
+  const db = prisma();
+  const tenants = await db.tenant.findMany({ select: { id: true } });
+
+  for (const tenant of tenants) {
+    await db.$transaction(async (tx) => {
+      // Dado de tenant: sem `app.tenant_id` fixado, a RLS recusa — inclusive para o teste.
+      await tx.$executeRawUnsafe(`SET LOCAL app.tenant_id = '${tenant.id}'`);
+      await tx.erpConnection.deleteMany({});
+    });
+  }
+}
+
 export async function closeDb(): Promise<void> {
   await client?.$disconnect();
   client = null;

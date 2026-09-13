@@ -14,7 +14,8 @@
     "test": "jest --config test/jest-unit.json",
     "test:watch": "jest --config test/jest-unit.json --watch",
     "test:cov": "jest --config test/jest-unit.json --coverage",
-    "test:integration": "jest --config test/jest-integration.json --runInBand"
+    "test:integration": "jest --config test/jest-integration.json --runInBand",
+    "test:contract": "jest --config test/jest-contract.json --runInBand"
   },
   "dependencies": {
     "@dashsgs/shared": "workspace:*",

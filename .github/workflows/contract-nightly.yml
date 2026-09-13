@@ -1,0 +1,62 @@
+# DashSGS — testes de contrato contra a homologação da SG (doc 12 §7 / E4-08).
+#
+# Roda à noite, fora do caminho do PR: depende de um servidor de terceiro e de credenciais em
+# secret. O que ele procura é **drift** — o dia em que a API mudar um campo, um envelope ou um
+# tipo. Sem esse alarme, a descoberta viria pelo cliente ligando.
+#
+# Sem os secrets configurados, a suíte é pulada com aviso (e o job passa): falhar por falta de
+# credencial ensinaria a equipe a ignorar o vermelho.
+
+name: Contrato SG (nightly)
+
+on:
+  schedule:
+    # 03:10 UTC ≈ 00:10 em São Paulo — depois do fechamento das lojas e antes do expediente.
+    - cron: '10 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contrato-sg
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '22.14.0'
+  PNPM_VERSION: '10.29.3'
+
+jobs:
+  contrato:
+    name: Contrato com a homologação SG
+    runs-on: ubuntu-latest
+    env:
+      # Credenciais de HOMOLOGAÇÃO da SG. Nunca apontar para o ERP de um cliente: contrato é
+      # teste, e teste não roda em produção alheia (doc 11 §3).
+      SG_HOMOLOG_BASE_URL: ${{ secrets.SG_HOMOLOG_BASE_URL }}
+      SG_HOMOLOG_USER: ${{ secrets.SG_HOMOLOG_USER }}
+      SG_HOMOLOG_PASSWORD: ${{ secrets.SG_HOMOLOG_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:generate
+      - name: Compilar pacote compartilhado
+        run: pnpm --filter @dashsgs/shared build
+
+      - name: Testes de contrato
+        run: pnpm test:contract
+
+      - name: Avisar quando faltar credencial
+        if: ${{ success() && env.SG_HOMOLOG_BASE_URL == '' }}
+        run: |
+          echo "::warning title=Contrato SG não executado::Configure os secrets"
+          echo "SG_HOMOLOG_BASE_URL, SG_HOMOLOG_USER e SG_HOMOLOG_PASSWORD para"
+          echo "que o drift da API SG seja detectado (doc 12 §7 / doc 34 Q16)."

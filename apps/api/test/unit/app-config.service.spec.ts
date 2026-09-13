@@ -43,6 +43,7 @@ describe('AppConfigService', () => {
       heavyTimeoutMs: 180_000,
       mock: false,
       allowInsecure: false,
+      vpnCidr: '10.66.0.0/16',
     });
     expect(config.features).toEqual({ erpWrite: false, clientModule: false });
   });

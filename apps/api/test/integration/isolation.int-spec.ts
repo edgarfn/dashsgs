@@ -168,10 +168,13 @@ describe('isolamento multi-tenant (integração)', () => {
      * Rotas que não tocam dado de tenant. Ficam listadas com justificativa porque a suíte é
      * gerada do router: rota nova cai automaticamente no teste A→B até que alguém a classifique.
      */
+    /**
+     * Caminhos de infraestrutura, em qualquer verbo. O Nest registra as rotas excluídas do
+     * prefixo para todos os métodos; nenhum deles toca dado de tenant.
+     */
+    const CAMINHOS_DE_INFRA = new Set(['/healthz', '/readyz', '/metrics']);
+
     const IDENTIDADE_OU_INFRA: Record<string, string> = {
-      'GET /healthz': 'liveness do processo',
-      'GET /readyz': 'readiness das dependências',
-      'GET /metrics': 'scrape do Prometheus (rede interna)',
       [`GET ${API_PREFIX}/meta`]: 'metadados públicos da instalação',
       [`POST ${API_PREFIX}/auth/login`]: 'identidade, antes de existir tenant',
       [`POST ${API_PREFIX}/auth/logout`]: 'encerra a própria sessão',
@@ -198,13 +201,19 @@ describe('isolamento multi-tenant (integração)', () => {
       [`POST ${API_PREFIX}/tenant/invites`]:
         'convida no próprio tenant — ver "convites" em auth.int-spec',
       [`POST ${API_PREFIX}/platform/tenants`]: 'exige platform_admin — ver "plataforma"',
+      [`PUT ${API_PREFIX}/tenant/erp-connection`]:
+        'grava no próprio tenant — ver "cofre de credencial" em sg-integration.int-spec',
+      [`POST ${API_PREFIX}/tenant/erp-connection/test`]:
+        'testa a conexão do próprio tenant — ver "wizard de conexão" em sg-integration.int-spec',
     };
 
     const rotas = (): RotaRegistrada[] => listarRotas(app);
     const chave = (rota: RotaRegistrada) => `${rota.method} ${rota.path}`;
+    const ehInfra = (rota: RotaRegistrada) =>
+      CAMINHOS_DE_INFRA.has(rota.path) || Boolean(IDENTIDADE_OU_INFRA[chave(rota)]);
 
     const alvosDeTenantVizinho = (): RotaRegistrada[] =>
-      rotas().filter((rota) => !IDENTIDADE_OU_INFRA[chave(rota)] && !MUTACOES_SEM_ID[chave(rota)]);
+      rotas().filter((rota) => !ehInfra(rota) && !MUTACOES_SEM_ID[chave(rota)]);
 
     /** Ids do tenant B para preencher os parâmetros de caminho. */
     const valorDoParametro = (rota: RotaRegistrada, nome: string): string => {
@@ -222,17 +231,32 @@ describe('isolamento multi-tenant (integração)', () => {
       return mapa[chave(rota)];
     };
 
-    it('todas as rotas do router estão classificadas (nenhuma escapa da suíte)', () => {
+    it('toda rota do router é exercida ou justificada (nenhuma escapa da suíte)', () => {
       const todas = rotas();
       expect(todas.length).toBeGreaterThan(15);
 
-      const classificadas = todas.filter(
-        (rota) =>
-          IDENTIDADE_OU_INFRA[chave(rota)] ||
-          MUTACOES_SEM_ID[chave(rota)] ||
-          alvosDeTenantVizinho().some((alvo) => chave(alvo) === chave(rota)),
-      );
-      expect(classificadas).toHaveLength(todas.length);
+      /**
+       * Uma rota só está coberta se cair em um destes casos:
+       *  - declarada como identidade/infra (não toca dado de tenant);
+       *  - declarada como mutação sem id, apontando o teste dedicado que a cobre;
+       *  - tem parâmetro → o teste abaixo a chama com ids do tenant vizinho;
+       *  - é GET sem parâmetro → o teste de listagem varre a resposta atrás de marcas do vizinho.
+       *
+       * Sobra exatamente um caso perigoso: mutação sem id que ninguém declarou. É o endpoint
+       * novo que alguém escreveu hoje e ainda não pensou em isolamento — e é por isso que ele
+       * derruba o build.
+       */
+      const descobertas = todas.filter((rota) => {
+        if (ehInfra(rota) || MUTACOES_SEM_ID[chave(rota)]) return false;
+        return rota.params.length === 0 && rota.method !== 'GET';
+      });
+
+      expect(
+        descobertas.map(
+          (rota) =>
+            `${chave(rota)} — classifique em IDENTIDADE_OU_INFRA ou MUTACOES_SEM_ID (com o teste que a cobre)`,
+        ),
+      ).toEqual([]);
 
       // Toda rota de dado de tenant com parâmetro precisa saber qual id de B usar.
       for (const rota of alvosDeTenantVizinho()) {

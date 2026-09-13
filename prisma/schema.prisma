@@ -67,10 +67,11 @@ model Tenant {
   /// Exclusão lógica; a purga física roda no offboarding (doc 08 §5).
   deletedAt        DateTime?    @map("deleted_at") @db.Timestamptz(6)
 
-  memberships Membership[]
-  sessions    Session[]
-  invites     Invite[]
-  filiais     ErpFilial[]
+  memberships   Membership[]
+  sessions      Session[]
+  invites       Invite[]
+  filiais       ErpFilial[]
+  erpConnection ErpConnection?
 
   @@index([status])
   @@map("app_tenants")
@@ -261,4 +262,76 @@ model AuditLog {
   @@index([tenantId, createdAt])
   @@index([userId, createdAt])
   @@map("app_audit_log")
+}
+
+/// Modo de transporte até o ERP do tenant (doc 12 §1). HTTP público é recusado pelo produto.
+enum ErpTlsMode {
+  https
+  vpn
+
+  @@map("erp_tls_mode")
+}
+
+/// Estado operacional da conexão com o ERP (doc 05 §1).
+enum ErpConnectionStatus {
+  pending
+  ok
+  error
+
+  @@map("erp_connection_status")
+}
+
+/// Formato do header Authorization aceito pela instalação (doc 34 Q2 — sem resposta da SG).
+/// O produto descobre na prática: tenta o JWT puro e, em 401, repete com prefixo Bearer.
+enum ErpAuthHeaderMode {
+  raw
+  bearer
+
+  @@map("erp_auth_header_mode")
+}
+
+/// Conexão com o ERP SG de um tenant (doc 05 §1 / doc 12 §1).
+///
+/// Uma por tenant no MVP. A senha vive cifrada (envelope AES-256-GCM) e **nunca** é reexibida:
+/// a UI é write-only e o serviço só decifra no instante de pedir o token (doc 09 §2).
+model ErpConnection {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @unique @map("tenant_id") @db.Uuid
+
+  /// Validado contra SSRF: sem IP privado, loopback, link-local ou metadata (doc 09 §3 API7).
+  baseUrl          String     @map("base_url") @db.VarChar(255)
+  /// SG Cloud usa o prefixo /public na autorização (doc 02 §1).
+  isSgCloud        Boolean    @default(false) @map("is_sg_cloud")
+  authPathOverride String?    @map("auth_path_override") @db.VarChar(255)
+  tlsMode          ErpTlsMode @default(https) @map("tls_mode")
+
+  username         String            @db.VarChar(120)
+  /// Envelope AES-256-GCM: [versão][iv][tag][ciphertext]. Nem o DBA lê.
+  secretCiphertext Bytes             @map("secret_ciphertext")
+  secretKeyVersion Int               @map("secret_key_version")
+  authHeaderMode   ErpAuthHeaderMode @default(raw) @map("auth_header_mode")
+
+  /// Self-rate-limit por tenant (doc 12 §3) — a API SG não documenta limite (doc 34 Q3).
+  maxRps          Int     @default(4) @map("max_rps")
+  /// Janela para cargas pesadas, no fuso do tenant (doc 12 §1).
+  syncWindowStart String? @map("sync_window_start") @db.VarChar(5)
+  syncWindowEnd   String? @map("sync_window_end") @db.VarChar(5)
+
+  status             ErpConnectionStatus @default(pending)
+  lastError          String?             @map("last_error") @db.VarChar(300)
+  lastTokenExpiresAt DateTime?           @map("last_token_expires_at") @db.Timestamptz(6)
+  lastHealthAt       DateTime?           @map("last_health_at") @db.Timestamptz(6)
+  /// Resposta do GET /status (versão do ERP, CNPJ da filial base) — sem segredo.
+  healthPayload      Json?               @map("health_payload") @db.JsonB
+  /// Claim `routes` do último token: o que o contrato com a SG libera (doc 12 §2).
+  routesGranted      String[]            @default([]) @map("routes_granted")
+  routesCheckedAt    DateTime?           @map("routes_checked_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("app_erp_connections")
 }
