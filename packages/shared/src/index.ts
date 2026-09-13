@@ -4,6 +4,7 @@ export * from './tenancy';
 export * from './authz';
 export * from './auth';
 export * from './health';
+export * from './sync';
 
 /** Prefixo único da API interna (doc 23). */
 export const API_PREFIX = '/api/v1';

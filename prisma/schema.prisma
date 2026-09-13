@@ -335,3 +335,452 @@ model ErpConnection {
   @@index([status])
   @@map("app_erp_connections")
 }
+
+// ============================================================================
+// Sincronização (doc 05 §2 / doc 14) — estado dos jobs, não dado do ERP.
+//
+// Daqui para baixo as tabelas de tenant **não** declaram FK contra app_tenants (doc 05 §4): os
+// ids vêm do ERP e podem chegar fora de ordem, e a purga física do offboarding (E6-04) apaga por
+// tenant_id explicitamente. O isolamento continua garantido pela RLS estrita das migrações.
+// ============================================================================
+
+/// Estado da marca d'água de um domínio (doc 14 §1).
+enum SyncStatus {
+  idle
+  running
+  error
+
+  @@map("sync_status")
+}
+
+/// Desfecho de uma execução de job (doc 05 §2).
+enum SyncRunStatus {
+  running
+  success
+  error
+  skipped
+
+  @@map("sync_run_status")
+}
+
+/// Até onde cada domínio já foi sincronizado, por filial quando o recorte existe.
+///
+/// `filial_erp_id = 0` significa "domínio sem recorte por filial" (dimensões, produtos): o doc 05
+/// descreve a PK com `coalesce(filial_erp_id, 0)`, e guardar o zero em vez de NULL evita índice
+/// parcial e comparação com NULL em cada upsert.
+model SyncWatermark {
+  tenantId    String @map("tenant_id") @db.Uuid
+  domain      String @db.VarChar(40)
+  filialErpId Int    @default(0) @map("filial_erp_id")
+
+  /// Fatos por data: o último dia fechado com sucesso.
+  watermarkDate DateTime? @map("watermark_date") @db.Date
+  /// Cadastros por alteração: o instante da última varredura bem-sucedida.
+  watermarkTs   DateTime? @map("watermark_ts") @db.Timestamptz(6)
+  /// Retomada de backfill e paginação longa (doc 14 §3).
+  cursor        Json?     @db.JsonB
+
+  status        SyncStatus @default(idle)
+  lastSuccessAt DateTime?  @map("last_success_at") @db.Timestamptz(6)
+  lastError     String?    @map("last_error") @db.VarChar(300)
+  updatedAt     DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@id([tenantId, domain, filialErpId])
+  @@index([tenantId, status])
+  @@map("sync_watermarks")
+}
+
+/// Histórico de execuções — alimenta o painel de sync-status (E5-12) e o diagnóstico do doc 21.
+model SyncJobRun {
+  id          BigInt  @id @default(autoincrement())
+  tenantId    String  @map("tenant_id") @db.Uuid
+  domain      String  @db.VarChar(40)
+  filialErpId Int?    @map("filial_erp_id")
+  /// Origem: cadência automática, backfill ou pedido manual do admin.
+  trigger     String  @default("scheduler") @db.VarChar(20)
+
+  startedAt  DateTime      @default(now()) @map("started_at") @db.Timestamptz(6)
+  finishedAt DateTime?     @map("finished_at") @db.Timestamptz(6)
+  status     SyncRunStatus @default(running)
+  pages      Int           @default(0)
+  items      Int           @default(0)
+  apiCalls   Int           @default(0) @map("api_calls")
+  /// Itens recusados pelo schema e mandados para quarentena (doc 12 §4.7).
+  invalid    Int           @default(0)
+  durationMs Int?          @map("duration_ms")
+  error      String?       @db.VarChar(300)
+
+  @@index([tenantId, domain, startedAt])
+  @@index([tenantId, status])
+  @@map("sync_job_runs")
+}
+
+/// Contabilidade de chamadas à API SG — **sem payload** (doc 05 §2); retenção de 30 dias.
+model SyncApiCallLog {
+  id         BigInt   @id @default(autoincrement())
+  tenantId   String   @map("tenant_id") @db.Uuid
+  endpoint   String   @db.VarChar(120)
+  method     String   @db.VarChar(10)
+  httpStatus Int      @map("http_status")
+  durationMs Int      @map("duration_ms")
+  items      Int      @default(0)
+  calledAt   DateTime @default(now()) @map("called_at") @db.Timestamptz(6)
+
+  @@index([tenantId, calledAt])
+  @@map("sync_api_call_log")
+}
+
+// ============================================================================
+// Espelho do ERP — dimensões (doc 05 §3)
+//
+// Todas compartilham o formato id+descrição da API. `erp_id` é texto porque o ERP mistura ids
+// numéricos (marcas, departamentos) com códigos (unidades de medida: "UN", "KG").
+// ============================================================================
+
+/// Nível 1 da departamentalização — o corte que o dashboard usa por padrão (doc 15 §4).
+model ErpDepartamentoN1 {
+  tenantId            String   @map("tenant_id") @db.Uuid
+  erpId               String   @map("erp_id") @db.VarChar(20)
+  descricao           String   @db.VarChar(160)
+  /// Encadeamento para o nível seguinte, quando a instalação usa a hierarquia completa.
+  parentNextLevelErpId String? @map("parent_next_level_erp_id") @db.VarChar(20)
+  syncedAt            DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  @@id([tenantId, erpId])
+  @@index([tenantId, syncedAt])
+  @@map("erp_departamentos_n1")
+}
+
+model ErpDepartamentoN2 {
+  tenantId            String   @map("tenant_id") @db.Uuid
+  erpId               String   @map("erp_id") @db.VarChar(20)
+  descricao           String   @db.VarChar(160)
+  parentNextLevelErpId String? @map("parent_next_level_erp_id") @db.VarChar(20)
+  syncedAt            DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  @@id([tenantId, erpId])
+  @@index([tenantId, syncedAt])
+  @@map("erp_departamentos_n2")
+}
+
+model ErpDepartamentoN3 {
+  tenantId            String   @map("tenant_id") @db.Uuid
+  erpId               String   @map("erp_id") @db.VarChar(20)
+  descricao           String   @db.VarChar(160)
+  parentNextLevelErpId String? @map("parent_next_level_erp_id") @db.VarChar(20)
+  syncedAt            DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  @@id([tenantId, erpId])
+  @@index([tenantId, syncedAt])
+  @@map("erp_departamentos_n3")
+}
+
+model ErpDepartamentoN4 {
+  tenantId            String   @map("tenant_id") @db.Uuid
+  erpId               String   @map("erp_id") @db.VarChar(20)
+  descricao           String   @db.VarChar(160)
+  parentNextLevelErpId String? @map("parent_next_level_erp_id") @db.VarChar(20)
+  syncedAt            DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  @@id([tenantId, erpId])
+  @@index([tenantId, syncedAt])
+  @@map("erp_departamentos_n4")
+}
+
+model ErpDepartamentoN5 {
+  tenantId            String   @map("tenant_id") @db.Uuid
+  erpId               String   @map("erp_id") @db.VarChar(20)
+  descricao           String   @db.VarChar(160)
+  parentNextLevelErpId String? @map("parent_next_level_erp_id") @db.VarChar(20)
+  syncedAt            DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  @@id([tenantId, erpId])
+  @@index([tenantId, syncedAt])
+  @@map("erp_departamentos_n5")
+}
+
+model ErpDepartamentoN6 {
+  tenantId            String   @map("tenant_id") @db.Uuid
+  erpId               String   @map("erp_id") @db.VarChar(20)
+  descricao           String   @db.VarChar(160)
+  parentNextLevelErpId String? @map("parent_next_level_erp_id") @db.VarChar(20)
+  syncedAt            DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  @@id([tenantId, erpId])
+  @@index([tenantId, syncedAt])
+  @@map("erp_departamentos_n6")
+}
+
+model ErpMarca {
+  tenantId  String   @map("tenant_id") @db.Uuid
+  erpId     String   @map("erp_id") @db.VarChar(20)
+  descricao String   @db.VarChar(160)
+  syncedAt  DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  @@id([tenantId, erpId])
+  @@index([tenantId, syncedAt])
+  @@map("erp_marcas")
+}
+
+model ErpClasse {
+  tenantId  String   @map("tenant_id") @db.Uuid
+  erpId     String   @map("erp_id") @db.VarChar(20)
+  descricao String   @db.VarChar(160)
+  syncedAt  DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  @@id([tenantId, erpId])
+  @@index([tenantId, syncedAt])
+  @@map("erp_classes")
+}
+
+model ErpAgrupamento {
+  tenantId  String   @map("tenant_id") @db.Uuid
+  erpId     String   @map("erp_id") @db.VarChar(20)
+  descricao String   @db.VarChar(160)
+  syncedAt  DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  @@id([tenantId, erpId])
+  @@index([tenantId, syncedAt])
+  @@map("erp_agrupamentos")
+}
+
+model ErpUnidadeMedida {
+  tenantId  String   @map("tenant_id") @db.Uuid
+  erpId     String   @map("erp_id") @db.VarChar(20)
+  descricao String   @db.VarChar(160)
+  syncedAt  DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  @@id([tenantId, erpId])
+  @@index([tenantId, syncedAt])
+  @@map("erp_unidades_medida")
+}
+
+// ============================================================================
+// Espelho do ERP — produtos e satélites (doc 05 §3)
+// ============================================================================
+
+/// Cadastro de produto **por filial**: custo, preço e estoque variam entre lojas da mesma rede,
+/// e a API devolve uma linha por (produto, filial) — daí a chave natural de três partes.
+model ErpProduto {
+  tenantId    String @map("tenant_id") @db.Uuid
+  filialErpId Int    @map("filial_erp_id")
+  erpId       Int    @map("erp_id")
+
+  descricao     String  @db.VarChar(160)
+  dep1ErpId     String? @map("dep1_erp_id") @db.VarChar(20)
+  marcaErpId    String? @map("marca_erp_id") @db.VarChar(20)
+  classeErpId   String? @map("classe_erp_id") @db.VarChar(20)
+  agrupErpId    String? @map("agrup_erp_id") @db.VarChar(20)
+  unidadeMedida String? @map("unidade_medida") @db.VarChar(10)
+  ativo         Boolean @default(true)
+  balanca       Boolean @default(false)
+  curvaAbc      String? @map("curva_abc") @db.VarChar(3)
+
+  custoReal        Decimal? @map("custo_real") @db.Decimal(14, 4)
+  custoFiscal      Decimal? @map("custo_fiscal") @db.Decimal(14, 4)
+  custoComEncargos Decimal? @map("custo_com_encargos") @db.Decimal(14, 4)
+  custoMedio       Decimal? @map("custo_medio") @db.Decimal(14, 4)
+  precoCusto       Decimal? @map("preco_custo") @db.Decimal(14, 4)
+  precoVenda1      Decimal? @map("preco_venda1") @db.Decimal(14, 4)
+  precoVenda2      Decimal? @map("preco_venda2") @db.Decimal(14, 4)
+
+  estoqueAtual     Decimal? @map("estoque_atual") @db.Decimal(14, 4)
+  estoqueMinimo    Decimal? @map("estoque_minimo") @db.Decimal(14, 4)
+  estoqueMaximo    Decimal? @map("estoque_maximo") @db.Decimal(14, 4)
+  estoqueTrocas    Decimal? @map("estoque_trocas") @db.Decimal(14, 4)
+  vendaMediaDiaria Decimal? @map("venda_media_diaria") @db.Decimal(14, 4)
+
+  dataCadastro    DateTime? @map("data_cadastro") @db.Date
+  dataAltPreco    DateTime? @map("data_alt_preco") @db.Date
+  dataAltCusto    DateTime? @map("data_alt_custo") @db.Date
+  dataAltCadastro DateTime? @map("data_alt_cadastro") @db.Date
+  syncedAt        DateTime  @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  @@id([tenantId, filialErpId, erpId])
+  @@index([tenantId, syncedAt])
+  @@index([tenantId, dep1ErpId])
+  @@index([tenantId, ativo, estoqueAtual])
+  @@map("erp_produtos")
+}
+
+/// Códigos de barras. A chave é o GTIN: um produto tem vários, um GTIN pertence a um produto.
+model ErpGtin {
+  tenantId        String   @map("tenant_id") @db.Uuid
+  gtin            String   @db.VarChar(20)
+  produtoErpId    Int      @map("produto_erp_id")
+  qtdPorEmbalagem Decimal? @map("qtd_por_embalagem") @db.Decimal(14, 4)
+  syncedAt        DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  @@id([tenantId, gtin])
+  @@index([tenantId, produtoErpId])
+  @@map("erp_gtins")
+}
+
+// ============================================================================
+// Espelho do ERP — fatos de venda (doc 05 §3)
+//
+// is_realtime distingue o dia corrente (provisório, de /vendas/hoje) do dia fechado (consolidado,
+// de /vendas) — a UI mostra o selo correspondente (doc 14 §7).
+// ============================================================================
+
+model ErpVendaCupom {
+  tenantId    String   @map("tenant_id") @db.Uuid
+  filialErpId Int      @map("filial_erp_id")
+  data        DateTime @db.Date
+  caixa       Int
+  cupom       Int
+
+  serieNfc String? @map("serie_nfc") @db.VarChar(10)
+  /// HH:MM no fuso da loja (doc 34 Q12 em aberto) — guardado como texto para não inventar fuso.
+  horario  String? @db.VarChar(5)
+
+  /// Só preenchido com o módulo Clientes habilitado (doc 10 §1); identificada sobrevive sem ele.
+  clienteErpId  Int?    @map("cliente_erp_id")
+  identificada  Boolean @default(false)
+  vendedorErpId Int?    @map("vendedor_erp_id")
+
+  cancelada  Boolean  @default(false)
+  valorTotal Decimal  @map("valor_total") @db.Decimal(14, 4)
+  isRealtime Boolean  @default(false) @map("is_realtime")
+  syncedAt   DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  @@id([tenantId, filialErpId, data, caixa, cupom])
+  @@index([tenantId, data])
+  @@index([tenantId, filialErpId, data, isRealtime])
+  @@map("erp_vendas_cupons")
+}
+
+model ErpVendaItem {
+  tenantId    String   @map("tenant_id") @db.Uuid
+  filialErpId Int      @map("filial_erp_id")
+  data        DateTime @db.Date
+  caixa       Int
+  cupom       Int
+  ordem       Int
+
+  produtoErpId     Int?    @map("produto_erp_id")
+  gtin             String? @db.VarChar(20)
+  quantidade       Decimal @db.Decimal(14, 4)
+  precoVenda       Decimal @map("preco_venda") @db.Decimal(14, 4)
+  desconto         Decimal @default(0) @db.Decimal(14, 4)
+  acrescimo        Decimal @default(0) @db.Decimal(14, 4)
+  cancelado        Boolean @default(false)
+  ofertaErpId      String? @map("oferta_erp_id") @db.VarChar(20)
+  pedidoVendaErpId Int?    @map("pedido_venda_erp_id")
+
+  icmsBase       Decimal? @map("icms_base") @db.Decimal(14, 4)
+  icmsAliq       Decimal? @map("icms_aliq") @db.Decimal(7, 4)
+  icmsValor      Decimal? @map("icms_valor") @db.Decimal(14, 4)
+  pisBase        Decimal? @map("pis_base") @db.Decimal(14, 4)
+  cofinsBase     Decimal? @map("cofins_base") @db.Decimal(14, 4)
+  tipoTributacao String?  @map("tipo_tributacao") @db.VarChar(10)
+  modeloDoc      String?  @map("modelo_doc") @db.VarChar(10)
+
+  isRealtime Boolean  @default(false) @map("is_realtime")
+  syncedAt   DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  @@id([tenantId, filialErpId, data, caixa, cupom, ordem])
+  @@index([tenantId, produtoErpId, data])
+  @@index([tenantId, data])
+  @@map("erp_venda_itens")
+}
+
+/// Lançamentos por forma de pagamento. A ordem é posicional dentro do cupom: a API não dá chave
+/// própria, e o mesmo cupom pode ter dois lançamentos idênticos (duas notas de dinheiro).
+model ErpFinalizadoraLancamento {
+  tenantId    String   @map("tenant_id") @db.Uuid
+  filialErpId Int      @map("filial_erp_id")
+  data        DateTime @db.Date
+  caixa       Int
+  cupom       Int
+  ordem       Int
+
+  especie    String   @db.VarChar(40)
+  valor      Decimal  @db.Decimal(14, 4)
+  cancelada  Boolean  @default(false)
+  isRealtime Boolean  @default(false) @map("is_realtime")
+  syncedAt   DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  @@id([tenantId, filialErpId, data, caixa, cupom, ordem])
+  @@index([tenantId, data, especie])
+  @@map("erp_finalizadora_lancamentos")
+}
+
+/// Resumo diário por filial — a fonte das flags de fechamento que orquestram a consolidação.
+model ErpFilialVendaResumo {
+  tenantId    String   @map("tenant_id") @db.Uuid
+  filialErpId Int      @map("filial_erp_id")
+  data        DateTime @db.Date
+
+  valor              Decimal  @db.Decimal(14, 4)
+  custoReal          Decimal? @map("custo_real") @db.Decimal(14, 4)
+  custoSemIcms       Decimal? @map("custo_sem_icms") @db.Decimal(14, 4)
+  custoComEncargos   Decimal? @map("custo_com_encargos") @db.Decimal(14, 4)
+  custoMedio         Decimal? @map("custo_medio") @db.Decimal(14, 4)
+  custoFiscalMedio   Decimal? @map("custo_fiscal_medio") @db.Decimal(14, 4)
+  aliqMediaIcms      Decimal? @map("aliq_media_icms") @db.Decimal(7, 4)
+  aliqMediaPisCofins Decimal? @map("aliq_media_pis_cofins") @db.Decimal(7, 4)
+
+  qtdClientes          Int?     @map("qtd_clientes")
+  qtdUnidades          Decimal? @map("qtd_unidades") @db.Decimal(14, 4)
+  prodComVenda         Int?     @map("prod_com_venda")
+  prodEstoqueAbaixoMin Int?     @map("prod_estoque_abaixo_min")
+  prodEstoqueNegativo  Int?     @map("prod_estoque_negativo")
+  prodEstoqueSemVenda  Int?     @map("prod_estoque_sem_venda")
+  margemAcima          Int?     @map("margem_acima")
+  margemAbaixo         Int?     @map("margem_abaixo")
+  margemNegativa       Int?     @map("margem_negativa")
+
+  atualizouEstoque        Boolean @default(false) @map("atualizou_estoque")
+  gerouVendasDiaria       Boolean @default(false) @map("gerou_vendas_diaria")
+  exportouVendas          Boolean @default(false) @map("exportou_vendas")
+  processouScanntech      Boolean @default(false) @map("processou_scanntech")
+  possuiDivergencia       Boolean @default(false) @map("possui_divergencia")
+  usuarioAtualizouEstoque String? @map("usuario_atualizou_estoque") @db.VarChar(60)
+
+  syncedAt DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  @@id([tenantId, filialErpId, data])
+  @@index([tenantId, data])
+  @@index([tenantId, gerouVendasDiaria, data])
+  @@map("erp_filial_venda_resumo")
+}
+
+// ============================================================================
+// Agregados (doc 05 §3) — recalculados por evento de sync, nunca no caminho do request.
+// ============================================================================
+
+model AggVendasHora {
+  tenantId    String   @map("tenant_id") @db.Uuid
+  filialErpId Int      @map("filial_erp_id")
+  data        DateTime @db.Date
+  hora        Int
+
+  valor  Decimal @db.Decimal(14, 4)
+  cupons Int
+  itens  Decimal @db.Decimal(14, 4)
+
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@id([tenantId, filialErpId, data, hora])
+  @@index([tenantId, data])
+  @@map("agg_vendas_hora")
+}
+
+model AggVendasDiaDep {
+  tenantId    String   @map("tenant_id") @db.Uuid
+  filialErpId Int      @map("filial_erp_id")
+  data        DateTime @db.Date
+  dep1ErpId   String   @map("dep1_erp_id") @db.VarChar(20)
+
+  valor      Decimal  @db.Decimal(14, 4)
+  quantidade Decimal  @db.Decimal(14, 4)
+  custo      Decimal? @db.Decimal(14, 4)
+  margem     Decimal? @db.Decimal(14, 4)
+
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@id([tenantId, filialErpId, data, dep1ErpId])
+  @@index([tenantId, data])
+  @@map("agg_vendas_dia_dep")
+}

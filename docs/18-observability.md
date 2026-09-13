@@ -39,6 +39,9 @@ Campos padrão: `ts, level, msg, service, correlation_id, tenant_id?, user_id?, 
 - `sync_items_upserted_total{domain}`
 - `queue_depth{queue}`; `queue_dlq_depth{queue}`; `job_retries_total`
 
+As métricas de sync nascem no **processo de worker**, que expõe `/metrics` e `/healthz` na porta
+`WORKER_PORT` (padrão 3002) — o Prometheus raspa API e worker como alvos separados.
+
 ### Banco/Redis
 - exporters padrão (pg_stat, redis) + `pg_locks`, replication/backup status.
 

@@ -5,13 +5,14 @@ Especificação completa de produto, arquitetura e desenvolvimento de um sistema
 (ERP de varejo/supermercados), documentada em https://api-doc.sgsistemas.com.br/.
 
 **Status:** Fases 0–1 (Discovery/Arquitetura) concluídas; **Fases 2 (Foundation)**,
-**3 (Autenticação)**, **4 (Multi-tenant/RLS)** e **5 (Integração com a API SG)** implementadas —
-monorepo com CI, sessões server-side com MFA, RBAC, isolamento por tenant provado no banco e na
-API, recorte por filial, painel de operação e a camada anti-corrupção que fala com o ERP (cofre
-de credencial, anti-SSRF, token manager, rate-limit, circuit breaker, wizard de conexão e
-contrato nightly). Próxima: Fase 6 — Sincronização (épico E5). Nenhuma linha foi escrita antes
-da especificação, por decisão de método: primeiro entender 100% da capacidade da API, depois
-construir.
+**3 (Autenticação)**, **4 (Multi-tenant/RLS)**, **5 (Integração com a API SG)** e
+**6 (Sincronização)** implementadas — monorepo com CI, sessões server-side com MFA, RBAC,
+isolamento por tenant provado no banco e na API, a camada anti-corrupção que fala com o ERP
+(cofre de credencial, anti-SSRF, token manager, rate-limit, circuit breaker) e o motor de
+sincronização: watermarks, cadências em fila, consolidação pós-fechamento, backfill resumível,
+agregados e painel de frescor por filial. Próxima: Fase 7 — Dashboard MVP (épico E7). Nenhuma
+linha foi escrita antes da especificação, por decisão de método: primeiro entender 100% da
+capacidade da API, depois construir.
 
 ## Começando (dev)
 
@@ -31,6 +32,7 @@ Detalhes, tutoriais e padrões de código no [24-development-guide.md](docs/24-d
 | Comando                                                  | O que faz                                               |
 | -------------------------------------------------------- | ------------------------------------------------------- |
 | `pnpm dev`                                               | sobe API, web e o pacote compartilhado em watch         |
+| `pnpm dev:worker`                                        | sobe o worker de sincronização (filas + cadências)      |
 | `pnpm lint` · `pnpm format` · `pnpm typecheck`           | gates estáticos (mesmos do CI)                          |
 | `pnpm test` · `pnpm test:cov`                            | testes unitários (+cobertura dos módulos transversais)  |
 | `pnpm test:integration`                                  | testes com Postgres, Redis e Mailpit reais              |
@@ -45,6 +47,7 @@ Detalhes, tutoriais e padrões de código no [24-development-guide.md](docs/24-d
 ```
 apps/api/          NestJS — API interna (BFF), health, métricas, plataforma transversal
 apps/api/src/integration/sg/  camada anti-corrupção da API SG (token, HTTP, schemas, mocks)
+apps/api/src/modules/sync/    sincronização: watermarks, jobs por domínio, filas, backfill
 apps/web/          Next.js 15 — front (App Router, CSP com nonce)
 packages/shared/   contratos compartilhados (códigos de erro, paginação, chaves de cache)
 prisma/            schema, migrações (RLS e auditoria append-only) e seed sintético

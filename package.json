@@ -35,7 +35,8 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "db:rls-check": "node scripts/check-rls.mjs",
-    "test:contract": "pnpm --filter @dashsgs/api test:contract"
+    "test:contract": "pnpm --filter @dashsgs/api test:contract",
+    "dev:worker": "pnpm --filter @dashsgs/api dev:worker"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

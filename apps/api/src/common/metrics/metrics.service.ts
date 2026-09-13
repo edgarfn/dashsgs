@@ -24,6 +24,15 @@ export class MetricsService {
   readonly sgInvalidItemsTotal: Counter<'tenant' | 'domain'>;
   readonly sgRateLimitWait: Histogram<'tenant'>;
 
+  // --- Sincronização (doc 18 §2) — é por estas quatro que se enxerga se o produto está vivo.
+  readonly syncRunsTotal: Counter<'tenant' | 'domain' | 'status'>;
+  readonly syncDuration: Histogram<'domain'>;
+  readonly syncLagSeconds: Gauge<'tenant' | 'domain'>;
+  readonly syncItemsUpsertedTotal: Counter<'domain'>;
+  readonly queueDepth: Gauge<'queue'>;
+  readonly queueDlqDepth: Gauge<'queue'>;
+  readonly jobRetriesTotal: Counter<'queue'>;
+
   constructor(private readonly config: AppConfigService) {
     this.registry.setDefaultLabels({ service: 'dashsgs-api', env: this.config.nodeEnv });
     collectDefaultMetrics({ register: this.registry, prefix: 'dashsgs_' });
@@ -94,6 +103,87 @@ export class MetricsService {
       buckets: [0.05, 0.25, 1, 3, 10, 30],
       registers: [this.registry],
     });
+
+    this.syncRunsTotal = new Counter({
+      name: 'sync_runs_total',
+      help: 'Execuções de sync por tenant, domínio e desfecho',
+      labelNames: ['tenant', 'domain', 'status'],
+      registers: [this.registry],
+    });
+
+    this.syncDuration = new Histogram({
+      name: 'sync_duration_seconds',
+      help: 'Duração das execuções de sync por domínio',
+      labelNames: ['domain'],
+      // Vai de segundos (dimensões) a dezenas de minutos (fatia de backfill).
+      buckets: [1, 5, 15, 60, 300, 900, 1800, 3600],
+      registers: [this.registry],
+    });
+
+    this.syncLagSeconds = new Gauge({
+      name: 'sync_lag_seconds',
+      help: "Agora menos a marca d'água do domínio — é o número que vira alerta de SLO",
+      labelNames: ['tenant', 'domain'],
+      registers: [this.registry],
+    });
+
+    this.syncItemsUpsertedTotal = new Counter({
+      name: 'sync_items_upserted_total',
+      help: 'Linhas gravadas no espelho por domínio',
+      labelNames: ['domain'],
+      registers: [this.registry],
+    });
+
+    this.queueDepth = new Gauge({
+      name: 'queue_depth',
+      help: 'Jobs aguardando ou em atraso na fila',
+      labelNames: ['queue'],
+      registers: [this.registry],
+    });
+
+    this.queueDlqDepth = new Gauge({
+      name: 'queue_dlq_depth',
+      help: 'Jobs que esgotaram as tentativas (fila de veneno — runbook 22 §6)',
+      labelNames: ['queue'],
+      registers: [this.registry],
+    });
+
+    this.jobRetriesTotal = new Counter({
+      name: 'job_retries_total',
+      help: 'Tentativas repetidas de jobs por fila',
+      labelNames: ['queue'],
+      registers: [this.registry],
+    });
+  }
+
+  /** Fotografia das filas, amostrada periodicamente pelo worker (doc 18 §2). */
+  observeQueue(queue: string, contagens: { aguardando: number; falhos: number }): void {
+    this.queueDepth.set({ queue }, contagens.aguardando);
+    this.queueDlqDepth.set({ queue }, contagens.falhos);
+  }
+
+  /** Uma execução de sync concluída — o desfecho e o que ela custou. */
+  observeSyncRun(params: {
+    tenantId: string;
+    domain: string;
+    status: 'success' | 'error' | 'skipped';
+    durationSeconds: number;
+    items?: number;
+  }): void {
+    this.syncRunsTotal.inc({
+      tenant: params.tenantId,
+      domain: params.domain,
+      status: params.status,
+    });
+    this.syncDuration.observe({ domain: params.domain }, params.durationSeconds);
+    if (params.items) {
+      this.syncItemsUpsertedTotal.inc({ domain: params.domain }, params.items);
+    }
+  }
+
+  /** Atraso do domínio em segundos: agora − último sucesso (doc 18 §3). */
+  setSyncLag(tenantId: string, domain: string, segundos: number): void {
+    this.syncLagSeconds.set({ tenant: tenantId, domain }, segundos);
   }
 
   /** Uma chamada à API SG concluída (com sucesso ou não). */

@@ -205,6 +205,12 @@ describe('isolamento multi-tenant (integração)', () => {
         'grava no próprio tenant — ver "cofre de credencial" em sg-integration.int-spec',
       [`POST ${API_PREFIX}/tenant/erp-connection/test`]:
         'testa a conexão do próprio tenant — ver "wizard de conexão" em sg-integration.int-spec',
+      [`POST ${API_PREFIX}/tenant/sync/resync`]:
+        'enfileira no próprio tenant — ver "painel" em sync.int-spec',
+      [`POST ${API_PREFIX}/tenant/sync/backfill`]:
+        'carga histórica do próprio tenant — ver "backfill" em sync.int-spec',
+      [`DELETE ${API_PREFIX}/tenant/sync/backfill`]:
+        'cancela a carga do próprio tenant — ver "backfill" em sync.int-spec',
     };
 
     const rotas = (): RotaRegistrada[] => listarRotas(app);

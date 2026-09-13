@@ -39,6 +39,7 @@ describe('AppConfigService', () => {
     expect(config.version).toBe('sha-abc123');
     expect(config.sg).toEqual({
       maxRps: 4,
+      pageSize: 500,
       timeoutMs: 60_000,
       heavyTimeoutMs: 180_000,
       mock: false,

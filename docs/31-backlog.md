@@ -180,21 +180,57 @@ Decisões e descobertas da implementação:
 - O contrato nightly **pula com aviso** quando faltam os secrets, em vez de falhar: job vermelho
   por falta de credencial ensina a equipe a ignorar vermelho.
 
-## Épico E5 — Sincronização (Fase 6)
+## Épico E5 — Sincronização (Fase 6) — **P0 concluído**
 | ID | História | Pri | Cx | Depende | CA |
 |---|---|---|---|---|---|
-| E5-01 | Watermarks + scheduler + locks por (tenant,domínio) | P0 | M | E4 | sem execução dupla |
-| E5-02 | Sync dimensões (todas as leves) | P0 | M | E5-01 | upsert idempotente |
-| E5-03 | Sync produtos incremental (3 datas) + satélites (precos/ofertas/gtins) | P0 | G | E5-02 | watermark por tipo |
-| E5-04 | Sync vendas hoje + finalizadoras hoje (5 min) | P0 | M | E5-02 | lag ≤10 min |
-| E5-05 | Sync dia fechado + consolidação transacional (substitui realtime) | P0 | G | E5-04 | contagens batem; sem duplicar |
-| E5-06 | Sync resumo diário /filiais/vendas + flags | P0 | M | E5-01 | 30d respeitado |
-| E5-07 | Backfill resumível com progresso + janelas noturnas | P0 | G | E5-02..06 | 90 d sem gaps |
-| E5-08 | Agregados (agg_*) recalculados por evento | P0 | M | E5-05 | consistentes com fatos |
+| E5-01 ✅ | Watermarks + scheduler + locks por (tenant,domínio) | P0 | M | E4 | sem execução dupla |
+| E5-02 ✅ | Sync dimensões (todas as leves) | P0 | M | E5-01 | upsert idempotente |
+| E5-03 ◐ | Sync produtos incremental (3 datas) + satélites (precos/ofertas/gtins) | P0 | G | E5-02 | watermark por tipo |
+| E5-04 ✅ | Sync vendas hoje + finalizadoras hoje (5 min) | P0 | M | E5-02 | lag ≤10 min |
+| E5-05 ✅ | Sync dia fechado + consolidação transacional (substitui realtime) | P0 | G | E5-04 | contagens batem; sem duplicar |
+| E5-06 ✅ | Sync resumo diário /filiais/vendas + flags | P0 | M | E5-01 | 30d respeitado |
+| E5-07 ✅ | Backfill resumível com progresso + janelas noturnas | P0 | G | E5-02..06 | 90 d sem gaps |
+| E5-08 ✅ | Agregados (agg_*) recalculados por evento | P0 | M | E5-05 | consistentes com fatos |
 | E5-09 | Sync financeiro (contas, despesas, cartões) | P1 | G | E5-01 | reconciliação semanal |
 | E5-10 | Sync compras (pedidos, entradas) + perdas/trocas/vencimentos/movimentações | P1 | G | E5-01 | janelas ≤30 d |
 | E5-11 | Sync previsão de vendas (+recortes) | P1 | M | E5-01 | mês corrente+próximo |
-| E5-12 | Painel sync-status por tenant | P0 | M | E5-01 | lag/erros visíveis |
+| E5-12 ✅ | Painel sync-status por tenant | P0 | M | E5-01 | lag/erros visíveis |
+
+**E5-03 ficou parcial**: produtos (as três datas de alteração) e GTINs entraram; `/produtos/precos`
+e `/produtos/ofertas` ficam para a Fase 7, junto com as telas que os consomem — schema e job sem
+consumidor envelhecem sem ninguém notar (doc 24 §7).
+
+O que a Fase 6 deixou pronto:
+
+- **Motor de sincronização completo**: marcas d'água por (tenant, domínio, filial), lock
+  distribuído por escopo, histórico de execuções, filas BullMQ com backoff de 1/5/15/60 min e
+  processo de worker separado (mesma imagem, outro comando).
+- **Seis domínios rodando**: conexão (health), cadastros, produtos + GTINs, vendas do dia
+  corrente, consolidação do dia fechado e resumo diário por filial.
+- **Backfill resumível** de até 26 meses, do dia mais recente para trás, com progresso na tela e
+  retomada automática depois de queda ou deploy.
+- **Agregados** de venda por hora e por departamento, recalculados na mesma transação do fato.
+- **Painel de sincronização** com frescor por filial, últimas execuções e ações de
+  ressincronizar/carregar histórico.
+
+Decisões e descobertas da implementação:
+
+- Duas comparações de data estavam invertidas (fatiamento de janela e laço do backfill) e os
+  testes pegaram as duas: a primeira pediria à API períodos futuros, a segunda faria o backfill
+  parar no primeiro dia. Aritmética de data é o lugar onde teste unitário paga sozinho.
+- Um recurso ausente no ERP chegava como 404 e derrubava o job inteiro de cadastros. Passou a ser
+  tratado como "esta instalação não tem" (doc 12 §8), igual a rota fora do contrato — o caso real
+  é um tenant recém-configurado, antes do primeiro token, quando a claim `routes` ainda está
+  vazia e não protege.
+- O BullMQ recusa `:` em id de job; os ids determinísticos (que evitam fila duplicada) passaram a
+  usar `--`.
+- A confirmação do pedido de backfill sumia da tela: o bloco trocava para a barra de progresso e
+  levava a mensagem junto. As mensagens saíram do trecho condicional (bug achado pelo E2E).
+- O worker não tinha como ser raspado pelo Prometheus — e é nele que as métricas de sync nascem.
+  Ganhou `/metrics` e `/healthz` numa porta própria (`WORKER_PORT`).
+- Cada execução registra também o que **não** fez: `skipped` por lock ocupado, por tenant
+  suspenso ou por dia ainda não fechado. Silêncio é a pior resposta para "por que isso não
+  rodou?".
 
 ## Épico E6 — Plataforma transversal
 | ID | História | Pri | Cx | CA |

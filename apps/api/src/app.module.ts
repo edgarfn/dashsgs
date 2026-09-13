@@ -15,6 +15,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { ErpConnectionModule } from './modules/erp-connection/erp-connection.module';
 import { MetaModule } from './modules/meta/meta.module';
 import { PlatformModule } from './modules/platform/platform.module';
+import { SyncModule } from './modules/sync/sync.module';
 import { TenantModule } from './modules/tenant/tenant.module';
 
 /**
@@ -40,6 +41,7 @@ import { TenantModule } from './modules/tenant/tenant.module';
     TenantModule,
     PlatformModule,
     ErpConnectionModule,
+    SyncModule,
   ],
 })
 export class AppModule {}

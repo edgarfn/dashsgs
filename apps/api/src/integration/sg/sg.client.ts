@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { z } from 'zod';
 import { MetricsService } from '../../common/metrics/metrics.service';
+import { AppConfigService } from '../../config';
 import { SgHttpClient, type SgConnectionContext } from './http/sg-http.client';
 import { type PrioridadeChamada } from './http/sg-rate-limiter';
 import { normalizarPagina } from './normalizers';
@@ -10,6 +11,7 @@ import { SgTokenManager } from './sg-token.manager';
 import {
   dimensaoSchema,
   filialSchema,
+  gtinSchema,
   finalizadoraSchema,
   produtoSchema,
   resumoFilialSchema,
@@ -18,6 +20,7 @@ import {
   type SgDimensao,
   type SgFilial,
   type SgFinalizadora,
+  type SgGtin,
   type SgProduto,
   type SgResumoFilial,
   type SgStatus,
@@ -44,7 +47,13 @@ export interface ResultadoColeta<T> {
   itens: T[];
   /** Itens que não bateram com o schema: seguem para quarentena, sem abortar a página. */
   invalidos: number;
+  /** Páginas percorridas — entra no histórico da execução de sync (doc 05 §2). */
+  paginas?: number;
 }
+
+/** Qual das três datas de alteração o filtro de /produtos usa (doc 14 §2). */
+export type FiltroDataProduto =
+  'dataAlteracaoCadastro' | 'dataAlteracaoPreco' | 'dataAlteracaoCusto';
 
 /**
  * Catálogo tipado de operações da API SG (doc 12 §5) — a camada anticorrupção propriamente dita.
@@ -62,6 +71,7 @@ export class SgClient {
     private readonly http: SgHttpClient,
     private readonly tokens: SgTokenManager,
     private readonly metrics: MetricsService,
+    private readonly config: AppConfigService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(SgClient.name);
@@ -113,30 +123,75 @@ export class SgClient {
     contexto: SgCallContext,
     filtro: {
       filial?: number;
-      /** Incremental: a API filtra por data de alteração de cadastro/preço/custo (doc 03). */
+      /**
+       * Varredura incremental: a API tem três datas de alteração (cadastro, preço, custo) e um
+       * seletor para dizer qual delas o filtro usa (doc 14 §2). Sem isso, cada ciclo baixaria o
+       * cadastro inteiro — e o cadastro é a maior coleção do ERP.
+       */
+      filtroDataTipo?: FiltroDataProduto;
       dataAlteracaoInicial?: string;
+      dataAlteracaoFinal?: string;
       itensPorPagina?: number;
     } = {},
   ): Promise<ResultadoColeta<SgProduto>> {
     const itens: SgProduto[] = [];
     let invalidos = 0;
+    let paginas = 0;
 
     for await (const pagina of this.paginar(
       contexto,
       `${BASE}/produtos`,
       {
         filial: filtro.filial,
+        filtroDataTipo: filtro.filtroDataTipo,
         dataAlteracaoInicial: filtro.dataAlteracaoInicial,
+        dataAlteracaoFinal: filtro.dataAlteracaoFinal,
       },
       'GET /produtos',
-      { itensPorPagina: filtro.itensPorPagina ?? 500, chaveItens: 'produtos' },
+      {
+        itensPorPagina: filtro.itensPorPagina ?? this.config.sg.pageSize,
+        chaveItens: 'produtos',
+      },
     )) {
+      paginas += 1;
       const coleta = await this.coletar(contexto, produtoSchema, pagina, 'produtos');
       itens.push(...coleta.itens);
       invalidos += coleta.invalidos;
     }
 
-    return { itens, invalidos };
+    return { itens, invalidos, paginas };
+  }
+
+  /**
+   * Códigos de barras. Não há data de alteração aqui (doc 14 §2): a varredura é integral, em
+   * cadência diária — é o preço de a API não expor delta para este recurso.
+   */
+  async listGtins(
+    contexto: SgCallContext,
+    filtro: { produto?: number; itensPorPagina?: number } = {},
+  ): Promise<ResultadoColeta<SgGtin>> {
+    const itens: SgGtin[] = [];
+    let invalidos = 0;
+    let paginas = 0;
+
+    for await (const pagina of this.paginar(
+      contexto,
+      `${BASE}/produtos/gtins`,
+      { idProduto: filtro.produto },
+      'GET /produtos/gtins',
+      {
+        itensPorPagina: filtro.itensPorPagina ?? this.config.sg.pageSize,
+        chaveItens: 'gtins',
+        prioridade: 'backfill',
+      },
+    )) {
+      paginas += 1;
+      const coleta = await this.coletar(contexto, gtinSchema, pagina, 'gtins');
+      itens.push(...coleta.itens);
+      invalidos += coleta.invalidos;
+    }
+
+    return { itens, invalidos, paginas };
   }
 
   // ---------------------------------------------------------------- vendas

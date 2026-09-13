@@ -83,3 +83,46 @@ resultados de verificação de permissão (avaliar sempre).
   "consolidado".
 - Dia corrente pode divergir do consolidado pós-fechamento — comportamento documentado na UI
   (tooltip) para não parecer bug.
+
+## 8. Estado da implementação (Fase 6)
+
+| Spec | Implementação |
+|---|---|
+| §1 Watermarks por (tenant, domínio, filial) | `apps/api/src/modules/sync/watermark.service.ts` |
+| §1 Idempotência por chave natural | `apps/api/src/modules/sync/upsert-lote.ts` |
+| §2 Cadências | `packages/shared/src/sync.ts` + `queue/sync-scheduler.service.ts` |
+| §2 Tempo real / fechamento | `domains/vendas-hoje.sync.ts` · `domains/vendas-dia.sync.ts` |
+| §2 Produtos incremental (3 datas) | `domains/produtos.sync.ts` |
+| §2 Dimensões | `domains/dimensoes.sync.ts` |
+| §2 Resumo diário + flags | `domains/resumo-filial.sync.ts` |
+| §3 Backfill resumível | `apps/api/src/modules/sync/backfill.service.ts` |
+| §5 Lock por (tenant, domínio) | `apps/api/src/modules/sync/sync-lock.service.ts` |
+| §5 Backoff 1/5/15/60 min + DLQ | `queue/sync.worker.ts` (BullMQ) |
+| §7 Frescor exposto ao usuário | `apps/web/src/app/admin/sincronizacao` + `sync-status.service.ts` |
+| Agregados por evento | `apps/api/src/modules/sync/aggregates.service.ts` |
+
+Decisões tomadas na implementação:
+
+- **Dia de venda é reescrito, não emendado.** Gravar é apagar o (filial, dia) e reinserir, numa
+  transação. Upsert cego deixaria para trás o cupom que o ERP estornou — e faturamento fantasma é
+  pior que um segundo de indisponibilidade do dia no espelho.
+- **A consolidação espera o ERP declarar o fechamento** (`gerouVendasDiaria` no resumo diário).
+  Antes disso, `/vendas?data=D` ainda muda, e um painel que alterna entre dois faturamentos
+  destrói a confiança mais rápido que um painel atrasado.
+- **A marca d'água só anda em sucesso, e nunca para trás.** O backfill processa fatias antigas
+  sem puxar o incremental junto.
+- **Domínio agendado por tick, não por tenant.** Um job repetitivo por domínio acorda, olha quem
+  está ativo e enfileira — tenant novo entra na cadência sem ninguém registrar nada, e o número
+  de agendamentos não cresce com a base.
+- **Recurso que o ERP não tem não é erro.** Rota fora do contrato (ou 404) vira "pulado" com
+  registro, e o resto do cadastro continua: uma rede que não usa agrupamentos não pode ficar sem
+  marcas por causa disso.
+- **O worker expõe `/metrics` numa porta própria** (`WORKER_PORT`): é nele que a sincronização
+  acontece, e métrica que ninguém raspa não existe (doc 18 §2).
+- **Backfill de trás para frente, com concorrência 1.** O dashboard fica utilizável em minutos, e
+  a carga histórica nunca disputa o ERP da loja com o tempo real.
+
+Ainda não implementado deste doc: os grupos de financeiro, compras, notas, verbas e previsão
+(E5-09 a E5-11), o cache de leitura do §6 (entra com o dashboard, na Fase 7) e a reconciliação
+por `quantidadeItens` do §4 — hoje a divergência é detectada pela flag `possuiDivergencia` do
+resumo diário, que já dispara re-sync do dia.

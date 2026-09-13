@@ -216,6 +216,39 @@ infraestrutura de isolamento que as próximas fases consomem:
 - app_audit_log com UPDATE/DELETE revogados de app_rw e triggers que bloqueiam os dois.
 
 As tabelas erp_, agg_ e sync_ descritas acima ainda não existem: entram com os épicos E4–E5.
+
+## 5.2 Estado da implementação (Fases 5 e 6)
+
+| Grupo | Tabelas criadas |
+|---|---|
+| Conexão (E4) | `app_erp_connections` |
+| Sync (E5-01) | `sync_watermarks`, `sync_job_runs`, `sync_api_call_log` |
+| Dimensões (E5-02) | `erp_filiais`, `erp_departamentos_n1..n6`, `erp_marcas`, `erp_classes`, `erp_agrupamentos`, `erp_unidades_medida` |
+| Produtos (E5-03) | `erp_produtos`, `erp_gtins` |
+| Vendas (E5-04/05) | `erp_vendas_cupons`, `erp_venda_itens`, `erp_finalizadora_lancamentos` |
+| Resumo (E5-06) | `erp_filial_venda_resumo` |
+| Agregados (E5-08) | `agg_vendas_hora`, `agg_vendas_dia_dep` |
+
+Todas com RLS estrita (`app_enable_tenant_rls`) e conferidas pelo gate `pnpm db:rls-check`.
+
+Decisões tomadas na implementação:
+
+- **Sem FK contra `app_tenants`** nas tabelas `erp_`/`agg_`/`sync_`, como manda o §4: os ids vêm
+  do ERP e chegam fora de ordem. O isolamento é da RLS; a purga do offboarding (E6-04) apaga por
+  `tenant_id` explicitamente.
+- **Ids de dimensão são texto** (`VARCHAR(20)`): o ERP mistura id numérico (marcas,
+  departamentos) com código (`"UN"`, `"KG"` em unidades de medida). Guardar como número
+  quebraria no primeiro cadastro que usa letra.
+- **Dinheiro em `numeric(14,4)`**, e o valor viaja do mapper até o banco como texto decimal com
+  cast explícito (ver `upsert-lote.ts`) — nenhum float no caminho.
+- **`filial_erp_id = 0`** em `sync_watermarks` é o "sem recorte por filial" que o §2 descreve
+  como `coalesce(filial_erp_id, 0)`: o zero cabe na PK, o NULL não.
+
+Ainda não implementado deste doc: o **particionamento por mês** dos fatos (§4). O gate de drift
+compara migrações com o schema do Prisma, que não modela partições — fazer isso agora exigiria
+tirar as tabelas do controle do ORM. Entra com E6-04 (retenção/purga), que é onde as partições
+começam a pagar. Também faltam os espelhos de financeiro, compras, notas e previsão, que vêm com
+os jobs de E5-09 a E5-11.
 ## 6. Segurança do banco
 
 - RLS em TODAS as tabelas com `tenant_id` (política `tenant_id = current_setting('app.tenant_id')::uuid`),

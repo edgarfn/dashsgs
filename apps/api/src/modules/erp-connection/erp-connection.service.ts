@@ -305,6 +305,111 @@ export class ErpConnectionService {
   }
 
   /**
+   * Health-check não interativo (doc 14 §2, domínio `health`).
+   *
+   * Mesma verificação do botão "Testar conexão", sem ator humano: renova o token, captura as
+   * rotas contratadas e consulta o status do ERP. Não gera trilha de auditoria — auditoria é
+   * registro de ação de pessoa (doc 09 §4); um cron a cada 10 minutos só encheria a trilha e
+   * esconderia o que importa nela.
+   */
+  async verificarSaude(tenantId: string): Promise<{
+    status: 'ok' | 'error';
+    versao: string | null;
+    rotas: number;
+    rotasAdicionadas: string[];
+    rotasRemovidas: string[];
+    motivo?: string;
+  }> {
+    const conexao = await this.exigirConexao(tenantId);
+    const rotasAntes = conexao.routesGranted;
+
+    try {
+      const token = await this.tokens.getToken({
+        conexao: this.contextoDe(conexao),
+        credenciais: () => this.credenciais(tenantId),
+      });
+
+      const status = await this.sg.getStatus({
+        conexao: { ...this.contextoDe(conexao), routesGranted: token.routes },
+        credenciais: () => this.credenciais(tenantId),
+      });
+
+      await this.tenantDb.run(tenantId, (tx) =>
+        tx.erpConnection.update({
+          where: { tenantId },
+          data: {
+            status: 'ok',
+            lastError: null,
+            lastHealthAt: new Date(),
+            lastTokenExpiresAt: token.expiresAt,
+            healthPayload: {
+              versao: status.versao,
+              revisao: status.revisao,
+              razaoSocial: status.razaoSocial,
+              cnpj: status.cnpj,
+            },
+            routesGranted: token.routes,
+            routesCheckedAt: new Date(),
+          },
+        }),
+      );
+
+      const rotasAdicionadas = token.routes.filter((rota) => !rotasAntes.includes(rota));
+      const rotasRemovidas = rotasAntes.filter((rota) => !token.routes.includes(rota));
+
+      // Contrato que muda sozinho altera o que o produto consegue oferecer (doc 12 §2): some do
+      // log de negócio, some do painel — e a Fase 8 transforma isso em alerta ao admin.
+      if (rotasAdicionadas.length > 0 || rotasRemovidas.length > 0) {
+        this.logger.warn(
+          {
+            event: 'erp_routes_changed',
+            tenant_id: tenantId,
+            adicionadas: rotasAdicionadas,
+            removidas: rotasRemovidas,
+          },
+          'erp_routes_changed',
+        );
+      }
+
+      return {
+        status: 'ok',
+        versao: status.versao,
+        rotas: token.routes.length,
+        rotasAdicionadas,
+        rotasRemovidas,
+      };
+    } catch (erro) {
+      const motivo =
+        erro instanceof SgError
+          ? `${erro.falha}${erro.detalhe.mensagemOrigem ? `: ${erro.detalhe.mensagemOrigem}` : ''}`
+          : 'falha inesperada';
+
+      await this.tenantDb.run(tenantId, (tx) =>
+        tx.erpConnection.update({
+          where: { tenantId },
+          data: { status: 'error', lastError: motivo.slice(0, 300), lastHealthAt: new Date() },
+        }),
+      );
+
+      this.logger.error({ event: 'erp_health_failed', tenant_id: tenantId, motivo }, 'erp_health');
+      return {
+        status: 'error',
+        versao: null,
+        rotas: rotasAntes.length,
+        rotasAdicionadas: [],
+        rotasRemovidas: [],
+        motivo,
+      };
+    }
+  }
+
+  /** Conexão pronta para sincronizar? O scheduler pergunta isto antes de enfileirar qualquer job. */
+  async prontaParaSync(tenantId: string): Promise<boolean> {
+    const conexao = await this.buscar(tenantId);
+    return Boolean(conexao) && conexao?.status !== 'error';
+  }
+
+  /**
    * Contexto pronto para os jobs de sincronização (Fase 6) chamarem a API SG em nome do tenant.
    */
   async callContext(tenantId: string): Promise<SgCallContext> {

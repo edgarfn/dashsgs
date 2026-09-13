@@ -39,12 +39,21 @@ SMTP_URL, MAIL_FROM
 # Observabilidade
 OTEL_EXPORTER_OTLP_ENDPOINT, SENTRY_DSN, LOG_LEVEL
 # Integração
-SG_DEFAULT_MAX_RPS=4, SG_HTTP_TIMEOUT_MS=60000, SG_HEAVY_TIMEOUT_MS=180000
+SG_DEFAULT_MAX_RPS=4, SG_PAGE_SIZE=500, SG_HTTP_TIMEOUT_MS=60000, SG_HEAVY_TIMEOUT_MS=180000
+SG_VPN_CIDR=10.66.0.0/16 (faixa do túnel, runbook 22 §7)
+# Sincronização (worker)
+SYNC_CONCURRENCY=4, SYNC_SCHEDULER_ENABLED=true, WORKER_PORT=3002
 # Flags
 FEATURE_ERP_WRITE=false, FEATURE_CLIENT_MODULE=false
 ```
 Segredos via SOPS/age (arquivos `.enc.env` no repo, chave fora) ou secret manager; nunca em
 imagem/compose plano.
+
+O serviço `workers` (compose de staging/produção) roda a **mesma imagem da API** com
+`node dist/worker.js`: sem servidor de API, com as filas BullMQ e o endpoint de métricas. Escalar
+réplicas é seguro — os locks por (tenant, domínio) impedem execução dupla —, mas apenas um
+processo deve subir com `SYNC_SCHEDULER_ENABLED=true`, senão as cadências são registradas em
+duplicidade. `stop_grace_period: 60s` dá tempo de o job corrente terminar antes do SIGKILL.
 
 ## 4. Procedimento de deploy (produção)
 

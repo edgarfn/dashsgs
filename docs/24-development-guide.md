@@ -49,12 +49,31 @@ Notas de ambiente (Fase 2):
 3. Wizard de conexão → backfill → dashboards.
 
 ## 5. Tutorial — primeira sincronização e verificação
+
+A sincronização roda no **processo de worker**, não na API:
+
 ```bash
-pnpm cli sync backfill --tenant rede-exemplo --depth 90d
-pnpm cli sync status --tenant rede-exemplo         # watermarks e lag
-# validar contagens:
-pnpm cli sync verify --tenant rede-exemplo --domain vendas --date 2026-09-01
+pnpm dev:worker          # ou, a partir do build: node apps/api/dist/worker.js
 ```
+
+Com ele de pé e a conexão testada, as cadências começam sozinhas (doc 14 §2). Pela tela,
+Administração → **Sincronização** mostra o frescor por domínio e por filial, permite
+"Sincronizar agora" e dispara a carga de histórico.
+
+```bash
+curl localhost:3002/metrics | grep sync_       # frescor, execuções e profundidade das filas
+curl localhost:3002/healthz                    # o worker responde aqui, não na porta da API
+```
+
+A conferência dos números é por SQL enquanto o dashboard não existe (Fase 7):
+
+```sql
+-- dentro de uma transação com SET LOCAL app.tenant_id = '<uuid>'
+SELECT data, SUM(valor_total) FROM erp_vendas_cupons WHERE cancelada = false GROUP BY data;
+SELECT * FROM sync_watermarks ORDER BY domain;
+```
+
+*(`pnpm cli sync ...` chega com E6-05; até lá, o painel e o SQL acima cobrem o mesmo terreno.)*
 
 ## 6. Padrões de código
 - TypeScript `strict`; ESLint + Prettier (config única no repo); imports absolutos por alias.
@@ -106,6 +125,11 @@ injeção receber `undefined` em runtime.
 | Integração | `pnpm test:integration` | API real contra Postgres, Redis e Mailpit: login, MFA, convites, senha, auditoria |
 | E2E | `pnpm test:e2e` | navegador contra a aplicação de pé (Next → API): login+MFA, recuperação, perfil, cabeçalhos, wizard de conexão ERP |
 | Contrato | `pnpm test:contract` | respostas reais da homologação SG contra nossos schemas (nightly; pula sem credenciais) |
+
+A suíte de integração cobre a sincronização executando os jobs **direto** (sem fila): é o que
+permite afirmar, em segundos, que repetir um dia não duplica linha. A fila em si é exercitada
+pelo teste do endpoint (que enfileira e confere que nada rodou no request) e pelo worker real em
+desenvolvimento.
 
 O E2E pressupõe a aplicação rodando e o banco semeado com senha conhecida:
 

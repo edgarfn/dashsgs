@@ -97,6 +97,14 @@ export default async function HomePage() {
               Conexão ERP
             </Link>
           ) : null}
+          {me.permissions.includes('erp_connection.manage') ? (
+            <Link
+              href="/admin/sincronizacao"
+              className="rounded-lg border border-white/15 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/5"
+            >
+              Sincronização
+            </Link>
+          ) : null}
           {me.user.platformAdmin ? (
             <Link
               href="/plataforma"

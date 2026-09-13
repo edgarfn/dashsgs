@@ -12,8 +12,10 @@ Gerenciar pessoas e papéis, manter a conexão com o ERP saudável, decidir mód
   na auditoria.
 - **Rotas contratadas**: mostramos o que seu contrato SG libera; recursos fora do contrato
   aparecem desabilitados com o motivo.
-- **Status**: última sincronização por domínio, erros recentes, botão "Testar conexão" e
-  "Ressincronizar período".
+- **Status** (Administração → Sincronização): frescor por domínio **e por filial**, últimas
+  execuções com contagem de linhas, botão "Sincronizar agora" e carga de histórico (30 dias a
+  26 meses). Uma loja em dia e outra parada aparecem separadas — é o caso que um "tudo certo"
+  geral esconderia.
 - Boas práticas: peça à SG um usuário **somente leitura**; solicite escrita apenas se contratar
   o módulo de Ações no ERP.
 

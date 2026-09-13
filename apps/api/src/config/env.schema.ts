@@ -77,6 +77,9 @@ export const envSchema = z
 
     // --- Integração SG (doc 12) ---
     SG_DEFAULT_MAX_RPS: z.coerce.number().positive().max(50).default(4),
+    // Máximo aceito por endpoint é pergunta aberta à SG (doc 34 Q4): fica configurável para que
+    // a resposta vire mudança de ambiente, não de código.
+    SG_PAGE_SIZE: z.coerce.number().int().min(10).max(5000).default(500),
     SG_HTTP_TIMEOUT_MS: z.coerce.number().int().min(1000).max(600_000).default(60_000),
     SG_HEAVY_TIMEOUT_MS: z.coerce.number().int().min(1000).max(900_000).default(180_000),
     ALLOW_INSECURE_ERP: boolFromEnv(false),
@@ -87,6 +90,14 @@ export const envSchema = z
       .regex(/^\d{1,3}(\.\d{1,3}){3}\/\d{1,2}$/, 'informe um CIDR IPv4, ex.: 10.66.0.0/16')
       .default('10.66.0.0/16'),
     SG_MOCK: boolFromEnv(false),
+
+    // --- Sincronização (doc 14) ---
+    /** Jobs simultâneos por processo de worker. O teto real é o ERP da loja, não a nossa CPU. */
+    SYNC_CONCURRENCY: z.coerce.number().int().min(1).max(32).default(4),
+    /** Só um processo registra as cadências; os demais apenas consomem a fila. */
+    SYNC_SCHEDULER_ENABLED: boolFromEnv(true),
+    /** Porta onde o worker expõe /metrics e /healthz (ele não atende a API). */
+    WORKER_PORT: z.coerce.number().int().min(1).max(65535).default(3002),
 
     // --- Feature flags ---
     FEATURE_ERP_WRITE: boolFromEnv(false),

@@ -26,6 +26,7 @@ export const FIXTURE_AUTORIZACAO = {
     'GET /filiais/vendas',
     'GET /marcas',
     'GET /departamentos/nivel1',
+    'GET /produtos/gtins',
     'GET /status',
   ],
   expire_time: '2026-09-13 10:30:00',
@@ -154,6 +155,16 @@ export const FIXTURE_PRODUTOS = {
       descricao: 'PRODUTO SEM ID',
       precoVenda1: 1.99,
     },
+  ],
+};
+
+/** GTINs: um normal, um com quantidade por embalagem e um com `idGTIN: false` (drift real). */
+export const FIXTURE_GTINS = {
+  paginacao: { pagina: 1, itensPorPagina: 500, quantidadePaginas: 1, quantidadeItens: 3 },
+  gtins: [
+    { idGTIN: '7891234567890', idProduto: '1001', quantidadePorEmbalagem: 1 },
+    { idGTIN: '7891234567891 ', idProduto: 1002, quantidadePorEmbalagem: '12' },
+    { idGTIN: false, idProduto: 1003, quantidadePorEmbalagem: 1 },
   ],
 };
 

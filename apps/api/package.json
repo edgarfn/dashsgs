@@ -15,7 +15,9 @@
     "test:watch": "jest --config test/jest-unit.json --watch",
     "test:cov": "jest --config test/jest-unit.json --coverage",
     "test:integration": "jest --config test/jest-integration.json --runInBand",
-    "test:contract": "jest --config test/jest-contract.json --runInBand"
+    "test:contract": "jest --config test/jest-contract.json --runInBand",
+    "start:worker": "node dist/worker.js",
+    "dev:worker": "nest start --watch --entryFile worker"
   },
   "dependencies": {
     "@dashsgs/shared": "workspace:*",
@@ -27,6 +29,7 @@
     "@zxcvbn-ts/core": "^3.0.4",
     "@zxcvbn-ts/language-common": "^3.0.4",
     "@zxcvbn-ts/language-pt-br": "^3.0.2",
+    "bullmq": "^6.3.4",
     "cookie-parser": "^1.4.7",
     "express": "^5.1.0",
     "helmet": "^8.0.0",

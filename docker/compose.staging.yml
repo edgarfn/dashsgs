@@ -72,6 +72,31 @@ services:
     security_opt: ['no-new-privileges:true']
     logging: *logging
 
+  # Worker de sincronização (doc 04 §2): mesma imagem da API, outro comando. Fica fora do
+  # caminho HTTP para que um backfill de 26 meses não dispute CPU com o dashboard.
+  workers:
+    image: ${API_IMAGE}
+    command: ['node', 'dist/worker.js']
+    restart: unless-stopped
+    env_file: [../.env.staging]
+    environment:
+      APP_VERSION: ${APP_VERSION}
+      # Só um processo registra as cadências; escalar réplicas não multiplica os agendamentos.
+      SYNC_SCHEDULER_ENABLED: 'true'
+      WORKER_PORT: '3002'
+    depends_on:
+      api-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    networks: [app, data]
+    read_only: true
+    tmpfs: ['/tmp']
+    security_opt: ['no-new-privileges:true']
+    # Desligamento gracioso: o BullMQ espera o job corrente terminar antes de fechar.
+    stop_grace_period: 60s
+    logging: *logging
+
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped

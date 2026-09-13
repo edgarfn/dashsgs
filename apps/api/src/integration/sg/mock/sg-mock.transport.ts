@@ -1,16 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { type SgTransport } from '../http/sg-http.client';
+import { gerarFinalizadorasDoDia, gerarResumoFilial, gerarVendasDoDia } from './gerador';
 import {
   FIXTURE_AUTORIZACAO,
   FIXTURE_DEPARTAMENTOS_N1,
   FIXTURE_FILIAIS,
   FIXTURE_FINALIZADORAS,
+  FIXTURE_GTINS,
   FIXTURE_MARCAS,
   FIXTURE_PRODUTOS,
-  FIXTURE_RESUMO_FILIAL,
   FIXTURE_STATUS,
-  FIXTURE_VENDAS_DIA,
   FIXTURE_VENDAS_HOJE,
 } from './fixtures';
 
@@ -54,13 +54,13 @@ export class SgMockTransport implements SgTransport {
     if (caminho.endsWith('/filiais')) return json(FIXTURE_FILIAIS);
     if (caminho.endsWith('/marcas')) return json(FIXTURE_MARCAS);
     if (caminho.endsWith('/departamentos/nivel1')) return json(FIXTURE_DEPARTAMENTOS_N1);
+    if (caminho.endsWith('/produtos/gtins')) return this.paginado(alvo, FIXTURE_GTINS, 'gtins');
     if (caminho.endsWith('/produtos')) return this.paginado(alvo, FIXTURE_PRODUTOS, 'produtos');
     if (caminho.endsWith('/vendas/hoje')) return this.exigeFilial(alvo, FIXTURE_VENDAS_HOJE);
     if (caminho.endsWith('/finalizadoras/hoje'))
       return this.exigeFilial(alvo, FIXTURE_FINALIZADORAS);
-    if (caminho.endsWith('/vendas/finalizadoras'))
-      return this.vendasDoDia(alvo, FIXTURE_FINALIZADORAS);
-    if (caminho.endsWith('/vendas')) return this.vendasDoDia(alvo, FIXTURE_VENDAS_DIA);
+    if (caminho.endsWith('/vendas/finalizadoras')) return this.finalizadorasDoDia(alvo);
+    if (caminho.endsWith('/vendas')) return this.vendasDoDia(alvo);
 
     // A API usa 400 com mensagem em português também para "não encontrei" (doc 02 §4.8).
     return json({ error: 'Rota nao encontrada' }, 404);
@@ -75,13 +75,22 @@ export class SgMockTransport implements SgTransport {
     return json(FIXTURE_AUTORIZACAO);
   }
 
-  private vendasDoDia(alvo: URL, fixture: unknown): Response {
+  private vendasDoDia(alvo: URL): Response {
     const filial = alvo.searchParams.get('filial');
     const data = alvo.searchParams.get('data');
     if (!filial || !data) {
       return json({ error: 'Parametros obrigatorios: filial, data' }, 400);
     }
-    return json(fixture);
+    return json(gerarVendasDoDia(Number(filial), data));
+  }
+
+  private finalizadorasDoDia(alvo: URL): Response {
+    const filial = alvo.searchParams.get('filial');
+    const data = alvo.searchParams.get('data');
+    if (!filial || !data) {
+      return json({ error: 'Parametros obrigatorios: filial, data' }, 400);
+    }
+    return json(gerarFinalizadorasDoDia(Number(filial), data));
   }
 
   private exigeFilial(alvo: URL, fixture: unknown): Response {
@@ -92,10 +101,18 @@ export class SgMockTransport implements SgTransport {
   }
 
   private resumoFilial(alvo: URL): Response {
-    if (!alvo.searchParams.get('dataInicial') || !alvo.searchParams.get('dataFinal')) {
+    const dataInicial = alvo.searchParams.get('dataInicial');
+    const dataFinal = alvo.searchParams.get('dataFinal');
+    if (!dataInicial || !dataFinal) {
       return json({ error: 'Parametros obrigatorios: dataInicial, dataFinal' }, 400);
     }
-    return json(FIXTURE_RESUMO_FILIAL);
+
+    const filiais = alvo.searchParams.getAll('filiais').map(Number).filter(Boolean);
+    const hoje = new Date().toISOString().slice(0, 10);
+
+    return json(
+      gerarResumoFilial(filiais.length > 0 ? filiais : [1], dataInicial, dataFinal, hoje),
+    );
   }
 
   /** Devolve página vazia a partir da segunda: exercita o laço de paginação de verdade. */

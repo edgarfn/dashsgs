@@ -79,3 +79,22 @@ export async function closeDb(): Promise<void> {
   await client?.$disconnect();
   client = null;
 }
+
+/**
+ * Zera a carga histórica de todos os tenants de teste.
+ *
+ * A tela troca o seletor de profundidade por "Interromper carga" enquanto houver backfill ativo.
+ * Sem este reset, um cenário passaria a depender do que ficou rodando antes dele — inclusive de
+ * uma carga iniciada à mão em desenvolvimento.
+ */
+export async function resetBackfill(): Promise<void> {
+  const db = prisma();
+  const tenants = await db.tenant.findMany({ select: { id: true } });
+
+  for (const tenant of tenants) {
+    await db.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(`SET LOCAL app.tenant_id = '${tenant.id}'`);
+      await tx.syncWatermark.deleteMany({ where: { domain: 'backfill' } });
+    });
+  }
+}
