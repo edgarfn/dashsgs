@@ -6,13 +6,15 @@ Especificação completa de produto, arquitetura e desenvolvimento de um sistema
 
 **Status:** Fases 0–1 (Discovery/Arquitetura) concluídas; **Fases 2 (Foundation)**,
 **3 (Autenticação)**, **4 (Multi-tenant/RLS)**, **5 (Integração com a API SG)** e
-**6 (Sincronização)** implementadas — monorepo com CI, sessões server-side com MFA, RBAC,
-isolamento por tenant provado no banco e na API, a camada anti-corrupção que fala com o ERP
-(cofre de credencial, anti-SSRF, token manager, rate-limit, circuit breaker) e o motor de
-sincronização: watermarks, cadências em fila, consolidação pós-fechamento, backfill resumível,
-agregados e painel de frescor por filial. Próxima: Fase 7 — Dashboard MVP (épico E7). Nenhuma
-linha foi escrita antes da especificação, por decisão de método: primeiro entender 100% da
-capacidade da API, depois construir.
+**6 (Sincronização)** e **7 (Dashboard MVP)** implementadas — monorepo com CI, sessões
+server-side com MFA, RBAC, isolamento por tenant provado no banco e na API, a camada
+anti-corrupção que fala com o ERP (cofre de credencial, anti-SSRF, token manager, rate-limit,
+circuit breaker), o motor de sincronização (watermarks, cadências em fila, consolidação
+pós-fechamento, backfill resumível, agregados) e o dashboard: visão executiva com curva do dia,
+diário de vendas cupom a cupom, comparativos e ruptura de estoque — com selo de frescor e export
+CSV. Próxima: Fase 8 — Alertas & Financeiro (épicos E8/E5-09). Nenhuma linha foi escrita antes
+da especificação, por decisão de método: primeiro entender 100% da capacidade da API, depois
+construir.
 
 ## Começando (dev)
 

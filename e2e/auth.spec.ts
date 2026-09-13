@@ -36,7 +36,8 @@ test.describe('login', () => {
 
     await expectLoggedIn(page);
     await expect(page).toHaveURL('/');
-    await expect(page.getByText('dashboard.view')).toBeVisible();
+    // A home é o painel: quem entra já vê o dia (doc 15 §1).
+    await expect(page.getByRole('heading', { name: /^Hoje \(/ })).toBeVisible();
   });
 
   test('mostra erro genérico para senha errada', async ({ page }) => {

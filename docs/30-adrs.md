@@ -76,3 +76,16 @@ tenant precisar de mais campos, é decisão consciente com DPIA — não default
 Postgres gerenciado assim que houver receita. **Consequências**: operação mínima; limite de
 escala conhecido (vertical + réplicas manuais); gatilho de migração p/ K8s documentado
 (multi-VM, autoscaling ou exigência de cliente).
+
+## ADR-014 — Gráficos do MVP em SVG no servidor (ECharts fica para quando houver interação)
+**Contexto**: o doc 04 escolheu ECharts para a camada de visualização, e o doc 16 §5 fixa um
+orçamento de 250 kB gz no bundle inicial e LCP < 2,5 s em 4G. As telas da Fase 7 desenham uma
+curva de 24 pontos, séries de até 90 barras e rankings de meia dúzia de itens.
+**Opções**: (a) ECharts desde já; (b) SVG renderizado no servidor; (c) imagem gerada no backend.
+**Decisão**: (b) — componentes SVG server-side, sem JavaScript de página, cada gráfico com a
+tabela equivalente num bloco "ver dados" — o requisito de leitor de tela do doc 16 §5.
+**Consequências**: o bundle inicial ficou em ~102 kB gz (contra ~400 kB com ECharts), as telas
+funcionam sem JS e a acessibilidade sai de graça; em troca não há zoom, brush nem tooltip rico.
+**Gatilho de revisão**: a primeira tela que precisar de interação de verdade no gráfico
+(drill-down por clique na série, seleção de intervalo, séries longas com decimação) traz o
+ECharts junto — carregado só naquela rota, não no bundle compartilhado.

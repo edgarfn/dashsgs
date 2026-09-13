@@ -116,3 +116,37 @@ Cada alerta: dedupe diário por chave, canais configuráveis, ack na UI, histór
 - Drill-down consistente: total → filial → departamento → produto → cupom.
 - Estados vazios explicativos (ex.: "aguardando primeiro fechamento sincronizado").
 - Exportações CSV nos relatórios tabulares (permissão `reports.export`).
+
+## 10. Estado da implementação (Fase 7)
+
+| Spec | Implementação |
+|---|---|
+| §1 Visão executiva | `apps/api/src/modules/dashboard/home.service.ts` + `apps/web/src/app/page.tsx` |
+| §2 Vendas — diário | `vendas.service.ts#doDia` + `apps/web/src/app/vendas/page.tsx` |
+| §2 Vendas — comparativos | `vendas.service.ts#comparativo` + `apps/web/src/app/vendas/comparativos` |
+| §4 Estoque (ruptura/negativo/excesso) | `estoque.service.ts` + `apps/web/src/app/estoque/page.tsx` |
+| §9 Frescor e estados | `frescor.service.ts` + `components/dashboard.tsx` |
+| §9 Export CSV | `dashboard.controller.ts#exportarDia` (permissão `reports.export`) |
+| Cache do doc 14 §6 | `cache.service.ts` (60 s no dia corrente, 15 min no histórico) |
+
+Decisões tomadas na implementação:
+
+- **Uma chamada por tela, não por corte.** O doc 23 previa endpoints separados por recorte
+  (`/kpi/sales/daily?groupBy=`); o que existe é um endpoint por tela, devolvendo os cortes que
+  ela mostra. Motivo: cada tela vira uma ida ao servidor e uma chave de cache, em vez de cinco
+  chamadas que precisariam ser reconciliadas no cliente.
+- **Margem é de manager+, e o número some com explicação.** Papel sem acesso recebe `null` e a
+  tela diz por quê. Esconder o cartão faria o usuário achar que o produto não calcula margem.
+- **A comparação do dia é sempre com o mesmo dia da semana.** Sábado com sábado: comparar com
+  "ontem" produziria queda de 40% toda segunda-feira, e o número viraria ruído.
+- **Hoje é provisório e a tela diz isso.** O selo de frescor distingue tempo real de consolidado
+  em todas as telas, como pede o §9 — é o que evita o suporte "o valor mudou sozinho".
+- **O comparativo lê o resumo diário, não os cupons.** Uma linha por filial×dia responde o mesmo
+  que somar dezenas de milhares de cupons, dentro do orçamento de 300 ms do doc 04 §3.1.
+- **Custo da margem por departamento é o custo atual do cadastro.** A API não devolve o custo
+  praticado na venda (doc 33); a limitação está escrita na própria tela, não só aqui.
+
+Ainda não implementado deste doc: metas (§7) e margem por produto (§3) dependem da previsão de
+vendas (E5-11); perdas, trocas, vencimentos e movimentações (§4) dependem de E5-10; financeiro
+(§5) e compras (§6) dependem de E5-09/E5-10; vendedores e ofertas (§2) são P2. Os alertas (§8)
+são a Fase 8.

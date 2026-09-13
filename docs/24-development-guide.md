@@ -65,7 +65,8 @@ curl localhost:3002/metrics | grep sync_       # frescor, execuções e profundi
 curl localhost:3002/healthz                    # o worker responde aqui, não na porta da API
 ```
 
-A conferência dos números é por SQL enquanto o dashboard não existe (Fase 7):
+O dashboard (`/`, `/vendas`, `/estoque`) já mostra esses números; o SQL abaixo serve para
+conferir a conta por fora — é o que se faz quando um cliente diz que o total não bate:
 
 ```sql
 -- dentro de uma transação com SET LOCAL app.tenant_id = '<uuid>'
@@ -123,7 +124,7 @@ injeção receber `undefined` em runtime.
 |---|---|---|
 | Unitária | `pnpm test` | lógica pura: contrato de env, redaction, erros, permissões, cifra, política de senha, cadeia de hash |
 | Integração | `pnpm test:integration` | API real contra Postgres, Redis e Mailpit: login, MFA, convites, senha, auditoria |
-| E2E | `pnpm test:e2e` | navegador contra a aplicação de pé (Next → API): login+MFA, recuperação, perfil, cabeçalhos, wizard de conexão ERP |
+| E2E | `pnpm test:e2e` | navegador contra a aplicação de pé (Next → API): login+MFA, recuperação, perfil, cabeçalhos, wizard de conexão ERP, sincronização e dashboard |
 | Contrato | `pnpm test:contract` | respostas reais da homologação SG contra nossos schemas (nightly; pula sem credenciais) |
 
 A suíte de integração cobre a sincronização executando os jobs **direto** (sem fila): é o que

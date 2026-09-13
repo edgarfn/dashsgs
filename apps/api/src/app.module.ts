@@ -12,6 +12,7 @@ import { PrismaModule } from './common/prisma/prisma.module';
 import { RedisModule } from './common/redis/redis.module';
 import { ConfigModule } from './config';
 import { AuthModule } from './modules/auth/auth.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ErpConnectionModule } from './modules/erp-connection/erp-connection.module';
 import { MetaModule } from './modules/meta/meta.module';
 import { PlatformModule } from './modules/platform/platform.module';
@@ -42,6 +43,7 @@ import { TenantModule } from './modules/tenant/tenant.module';
     PlatformModule,
     ErpConnectionModule,
     SyncModule,
+    DashboardModule,
   ],
 })
 export class AppModule {}

@@ -31,6 +31,20 @@ dados aceitam `?filiais=1,2` (validado contra `filiais_allowed`).
 | GET /tenant/audit?filters | trilha de auditoria | audit.view |
 
 ## Dashboard / dados (leitura; cache conforme doc 14 §6)
+
+**Implementado na Fase 7** (uma chamada por tela — ver doc 15 §10):
+
+| Rota | Retorna | Cache |
+|---|---|---|
+| GET /dashboard/home?filiais&custo | hoje (venda, cupons, ticket, curva, filiais) + último dia fechado + status de fechamento | 60 s |
+| GET /dashboard/vendas/dia?data&filiais&caixa&canceladas&pagina | cupons paginados, totais e formas de pagamento | 60 s (hoje) / 15 min |
+| GET /dashboard/vendas/comparativo?de&ate&filiais&custo | série diária, ranking de filiais, departamentos e dia da semana | 15 min |
+| GET /dashboard/estoque?situacao&curva&filiais&pagina | ruptura / negativo / excesso com cobertura | 15 min |
+| GET /dashboard/vendas/dia/export?… | CSV do diário (`reports.export`) | sem cache |
+| GET /dim/filiais | dimensões para os filtros | — |
+
+**Planejado** (entra com o sync correspondente):
+
 | Rota | Retorna |
 |---|---|
 | GET /kpi/overview?date= | cards da home (hoje + D-1 + meta) |

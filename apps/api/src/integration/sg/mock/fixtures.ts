@@ -284,6 +284,31 @@ export const FIXTURE_FINALIZADORAS = {
   ],
 };
 
+/** Finalizadoras do cupom que `/vendas/hoje` devolve — mesma chave (caixa 1, cupom 100301). */
+export const FIXTURE_FINALIZADORAS_HOJE = {
+  paginacao: { pagina: 1, itensPorPagina: 200, quantidadePaginas: 1, quantidadeItens: 2 },
+  finalizadoras: [
+    {
+      idFilial: 1,
+      data: '2026-09-12',
+      caixa: 1,
+      cupom: 100301,
+      especie: 'PIX',
+      valor: 20,
+      cancelada: ' ',
+    },
+    {
+      idFilial: 1,
+      data: '2026-09-12',
+      caixa: 1,
+      cupom: 100301,
+      especie: 'DINHEIRO',
+      valor: 22.3,
+      cancelada: ' ',
+    },
+  ],
+};
+
 export const FIXTURE_RESUMO_FILIAL = {
   paginacao: { pagina: 1, itensPorPagina: 200, quantidadePaginas: 1, quantidadeItens: 1 },
   vendas: [

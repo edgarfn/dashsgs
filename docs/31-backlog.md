@@ -242,18 +242,55 @@ Decisões e descobertas da implementação:
 | E6-05 | dashsgs-cli (tenant, sync, queue, crypto, breakglass) | P1 | M | runbooks executáveis |
 | E6-06 | Export CSV assíncrono com máscara por papel | P1 | M | limite/permite testados |
 
-## Épico E7 — Dashboard MVP (Fase 7)
+## Épico E7 — Dashboard MVP (Fase 7) — **núcleo entregue**
 | ID | História | Pri | Cx | Depende | CA |
 |---|---|---|---|---|---|
-| E7-01 | Home executiva (cards + curva do dia + ranking + fechamento) | P0 | G | E5-04..08 | snapshot KPIs |
-| E7-02 | Vendas diário (cupons) + comparativos | P0 | G | E5-05 | p95<300ms |
-| E7-03 | Metas (previsão×realizado + projeção) | P0 | M | E5-11 | cálculo diasUteis |
-| E7-04 | Estoque: ruptura + vencimentos + cobertura | P0 | M | E5-03/10 | curva A priorizada |
-| E7-05 | Estados vazios/erro/parcial + selo de frescor | P0 | M | — | doc 16 §3 |
-| E7-06 | Mobile da home + acessibilidade AA | P1 | M | E7-01 | Lighthouse/axe |
+| E7-01 ✅ | Home executiva (cards + curva do dia + ranking + fechamento) | P0 | G | E5-04..08 | snapshot KPIs |
+| E7-02 ✅ | Vendas diário (cupons) + comparativos | P0 | G | E5-05 | p95<300ms |
+| E7-03 ⛔ | Metas (previsão×realizado + projeção) | P0 | M | E5-11 | cálculo diasUteis |
+| E7-04 ◐ | Estoque: ruptura + vencimentos + cobertura | P0 | M | E5-03/10 | curva A priorizada |
+| E7-05 ✅ | Estados vazios/erro/parcial + selo de frescor | P0 | M | — | doc 16 §3 |
+| E7-06 ◐ | Mobile da home + acessibilidade AA | P1 | M | E7-01 | Lighthouse/axe |
 | E7-07 | Margem por nível (dep→produto) | P1 | G | E5-05 | custo configurável |
 | E7-08 | Financeiro (aging, despesas, cartões) + Compras | P1 | G | E5-09/10 | amostras batem |
 | E7-09 | Vendas por vendedor / ofertas | P2 | M | E5-05 | — |
+
+**E7-03 está bloqueado por dado, não por tela**: metas dependem de `/previsaovendas`, que só é
+sincronizado na E5-11. Entregar a tela sem a previsão seria mostrar uma meta inventada.
+**E7-04 saiu parcial** pelo mesmo motivo: ruptura, estoque negativo, excesso e cobertura vêm do
+cadastro de produtos (já sincronizado); vencimentos e perdas dependem da E5-10.
+**E7-06 ficou parcial**: as telas são responsivas e acessíveis por construção (semântica, foco,
+tabela alternativa nos gráficos, nada só por cor), mas a auditoria formal com Lighthouse/axe no
+CI ainda não existe.
+
+O que a Fase 7 deixou pronto:
+
+- **Visão executiva**: venda, cupons e ticket do dia; curva por hora contra a média das quatro
+  semanas anteriores; ranking de filiais; último dia fechado com margem, clientes e comparação
+  com o mesmo dia da semana anterior; status de fechamento por filial.
+- **Vendas**: diário cupom a cupom com filtros de dia, filial, caixa e cancelamento, totais,
+  meios de pagamento e export CSV; comparativos com série diária, ranking de filiais,
+  departamentos e corte por dia da semana.
+- **Estoque**: ruptura priorizada por curva ABC e cobertura, estoque negativo e excesso.
+- **Transversais**: selo de frescor em toda tela (parcial × consolidado), estados vazios que
+  explicam o que falta, filtros que viram link compartilhável e cache por tenant com TTL do
+  doc 14 §6.
+
+Decisões e descobertas da implementação:
+
+- **Gráficos em SVG no servidor** em vez de ECharts (ADR-014): o bundle inicial ficou em ~102 kB
+  gz, contra o teto de 250 kB do doc 16 §5 — e cada gráfico ganhou tabela equivalente de graça.
+- **Um endpoint por tela**, não por corte de dado: menos idas ao servidor e uma chave de cache
+  por pergunta, em vez de cinco respostas para reconciliar no cliente.
+- **Cache com single-flight**: no primeiro acesso da manhã, quando o TTL expira e a rede inteira
+  abre o painel, uma consulta atende todo mundo em vez de N consultas idênticas.
+- Um teste de cache derrubava dois testes seguintes porque apagava os cupons do tenant para
+  provar que a resposta vinha do cache. Passou a **inserir** uma linha e conferir que ela não
+  aparece — mesma prova, sem destruir o estado de quem vem depois.
+- O seed passou a gravar **30 dias de vendas sintéticas**: sem isso, um ambiente novo abre o
+  dashboard vazio e ninguém consegue revisar a tela sem antes montar uma integração.
+- A suíte de isolamento precisou aceitar **422** nas listagens: o diário de vendas exige data, e
+  requisição recusada na validação não chega a consultar nada.
 
 ## Épico E8 — Alertas (Fase 8)
 | ID | História | Pri | Cx | CA |

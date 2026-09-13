@@ -1,176 +1,313 @@
 import Link from 'next/link';
-import type { DependencyHealth } from '@dashsgs/shared';
-import { fetchReadiness } from '@/lib/server/api';
-import { getWebEnv } from '@/lib/server/env';
+import { Alert } from '@/components/ui';
+import {
+  BarrasHorizontais,
+  CardKpi,
+  CurvaDoDia,
+  EstadoVazio,
+  SeloDeFrescor,
+  formatar,
+  type PontoDaCurva,
+} from '@/components/dashboard';
+import { Cabecalho, FiltrosGlobais } from '@/components/navegacao';
+import { apiRequest } from '@/lib/server/api-client';
 import { requireMe } from '@/lib/server/session';
-import { logoutAction } from './(auth)/actions';
 
 export const dynamic = 'force-dynamic';
 
-const STATE_STYLE: Record<string, string> = {
-  ok: 'bg-emerald-500/10 text-emerald-300 ring-emerald-500/30',
-  degraded: 'bg-amber-500/10 text-amber-300 ring-amber-500/30',
-  down: 'bg-rose-500/10 text-rose-300 ring-rose-500/30',
-};
-
-const STATE_LABEL: Record<string, string> = {
-  ok: 'operacional',
-  degraded: 'degradado',
-  down: 'indisponível',
-};
-
-function StateBadge({ state }: { state: string }) {
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset ${
-        STATE_STYLE[state] ?? STATE_STYLE.down
-      }`}
-    >
-      {STATE_LABEL[state] ?? 'desconhecido'}
-    </span>
-  );
+/** A lista de filiais vem do catálogo de dimensões; o filtro só precisa de id e nome. */
+function paraFiltro(filiais: FilialView[] | null) {
+  return (filiais ?? [])
+    .filter((filial) => filial.ativa)
+    .map((filial) => ({ erpId: filial.erpId, nome: filial.nomeFantasia ?? filial.razaoSocial }));
 }
 
-function DependencyRow({ check }: { check: DependencyHealth }) {
-  return (
-    <li className="flex items-center justify-between gap-4 border-t border-white/5 py-3 first:border-t-0">
-      <div>
-        <p className="font-medium text-slate-200">{check.name}</p>
-        {check.detail ? <p className="text-xs text-slate-400">{check.detail}</p> : null}
-      </div>
-      <div className="flex items-center gap-3">
-        {typeof check.latencyMs === 'number' ? (
-          <span className="text-xs tabular-nums text-slate-400">{check.latencyMs} ms</span>
-        ) : null}
-        <StateBadge state={check.state} />
-      </div>
-    </li>
-  );
+interface Frescor {
+  atualizadoEm: string | null;
+  atrasado: boolean;
+  provisorio: boolean;
+}
+
+interface HomeView {
+  hoje: {
+    data: string;
+    venda: number;
+    cupons: number;
+    ticketMedio: number;
+    porFilial: Array<{
+      filialErpId: number;
+      nome: string;
+      venda: number;
+      cupons: number;
+      ticketMedio: number;
+    }>;
+    curva: PontoDaCurva[];
+    frescor: Frescor;
+  };
+  consolidado: {
+    data: string | null;
+    venda: number;
+    clientes: number | null;
+    ticketMedio: number | null;
+    margemPct: number | null;
+    baseDeCusto: string;
+    vendaSemanaAnterior: number | null;
+    variacaoPct: number | null;
+    frescor: Frescor;
+  };
+  fechamento: Array<{
+    filialErpId: number;
+    nome: string;
+    data: string | null;
+    atualizouEstoque: boolean;
+    gerouVendasDiaria: boolean;
+    exportouVendas: boolean;
+    possuiDivergencia: boolean;
+  }>;
+  semDados: boolean;
+}
+
+interface FilialView {
+  erpId: number;
+  razaoSocial: string;
+  nomeFantasia: string | null;
+  ativa: boolean;
 }
 
 /**
- * Home autenticada provisória (Fases 2–3).
+ * Visão executiva (doc 15 §1 / E7-01).
  *
- * A Fase 7 substitui este conteúdo pela home executiva do doc 15; por enquanto ela prova que a
- * sessão funciona ponta a ponta e mostra o estado da plataforma.
+ * O padrão dos cinco segundos: a pessoa abre e já sabe como está o dia, sem clicar em nada. O que
+ * vem antes de tudo é o número de hoje — provisório, e a tela diz isso — seguido da curva, do
+ * ranking de filiais e do último dia fechado, que é o número definitivo.
  */
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const me = await requireMe();
-  const env = getWebEnv();
-  const readiness = await fetchReadiness();
-  const state = readiness.data?.state ?? 'down';
-  const checks = readiness.data?.checks ?? [];
-  const tenant = me.memberships.find((membership) => membership.tenantId === me.activeTenantId);
+  const params = await searchParams;
+  const filiaisParam = typeof params.filiais === 'string' ? params.filiais : undefined;
+  const custo = typeof params.custo === 'string' ? params.custo : 'medio';
+
+  if (!me.permissions.includes('dashboard.view')) {
+    return (
+      <main className="mx-auto w-full max-w-5xl space-y-6 px-6 py-12">
+        <Cabecalho me={me} ativo="home" />
+        <Alert kind="info">
+          Sua conta ainda não tem acesso aos painéis desta rede. Fale com o administrador.
+        </Alert>
+      </main>
+    );
+  }
+
+  const consulta = new URLSearchParams({ custo });
+  if (filiaisParam) consulta.set('filiais', filiaisParam);
+
+  const [resposta, filiais] = await Promise.all([
+    apiRequest<HomeView>('GET', `/dashboard/home?${consulta.toString()}`),
+    apiRequest<FilialView[]>('GET', '/dim/filiais'),
+  ]);
+
+  const home = resposta.data;
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-8 px-6 py-12">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-1">
-          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-            {tenant?.tenantName ?? 'Sem tenant selecionado'}
+    <main className="mx-auto w-full max-w-5xl space-y-8 px-6 py-12">
+      <Cabecalho me={me} ativo="home" />
+
+      {!home ? (
+        <Alert kind="error">
+          Não foi possível carregar os indicadores agora. Tente novamente em alguns instantes.
+        </Alert>
+      ) : null}
+
+      {home?.semDados ? (
+        <EstadoVazio
+          titulo="Ainda não há dados do seu ERP"
+          descricao="Assim que a conexão for testada, a sincronização começa e os primeiros números aparecem aqui em minutos. Para ver meses anteriores, peça a carga de histórico."
+          acao={
+            me.permissions.includes('erp_connection.manage')
+              ? { href: '/admin/sincronizacao', rotulo: 'Ver sincronização' }
+              : undefined
+          }
+        />
+      ) : null}
+
+      {home && !home.semDados ? (
+        <>
+          <FiltrosGlobais filiais={paraFiltro(filiais.data)} selecionadas={filiaisParam}>
+            <div className="space-y-1.5">
+              <label htmlFor="filtro-custo" className="block text-xs text-slate-400">
+                Base de custo (margem)
+              </label>
+              <select
+                id="filtro-custo"
+                name="custo"
+                defaultValue={custo}
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-400/60"
+              >
+                <option value="medio" className="bg-slate-900">
+                  Custo médio
+                </option>
+                <option value="real" className="bg-slate-900">
+                  Custo real
+                </option>
+                <option value="com_encargos" className="bg-slate-900">
+                  Custo com encargos
+                </option>
+                <option value="fiscal_medio" className="bg-slate-900">
+                  Custo fiscal médio
+                </option>
+                <option value="sem_icms" className="bg-slate-900">
+                  Custo sem ICMS
+                </option>
+              </select>
+            </div>
+          </FiltrosGlobais>
+
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+                Hoje ({formatar.dataCompleta(home.hoje.data)})
+              </h2>
+              <SeloDeFrescor frescor={home.hoje.frescor} />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <CardKpi titulo="Venda de hoje" valor={formatar.moeda(home.hoje.venda)} />
+              <CardKpi titulo="Cupons" valor={formatar.inteiro(home.hoje.cupons)} />
+              <CardKpi titulo="Ticket médio" valor={formatar.moeda(home.hoje.ticketMedio)} />
+            </div>
+
+            {home.hoje.frescor.provisorio ? (
+              <p className="text-xs text-slate-500">
+                Os números de hoje são provisórios: o ERP ainda recalcula cancelamentos e estoque no
+                fechamento do dia.
+              </p>
+            ) : null}
+          </section>
+
+          <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
+            <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+              Curva do dia
+            </h2>
+            <CurvaDoDia pontos={home.hoje.curva} />
+          </section>
+
+          {home.hoje.porFilial.length > 1 ? (
+            <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
+              <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+                Venda por filial (hoje)
+              </h2>
+              <BarrasHorizontais
+                itens={home.hoje.porFilial.map((filial) => ({
+                  chave: String(filial.filialErpId),
+                  rotulo: filial.nome,
+                  valor: filial.venda,
+                  detalhe: `${formatar.inteiro(filial.cupons)} cupons · ticket ${formatar.moeda(filial.ticketMedio)}`,
+                  href: `/vendas?filiais=${filial.filialErpId}`,
+                }))}
+              />
+            </section>
+          ) : null}
+
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+                Último dia fechado
+                {home.consolidado.data ? ` (${formatar.dataCompleta(home.consolidado.data)})` : ''}
+              </h2>
+              <SeloDeFrescor frescor={home.consolidado.frescor} />
+            </div>
+
+            {home.consolidado.data ? (
+              <div className="grid gap-4 sm:grid-cols-4">
+                <CardKpi
+                  titulo="Venda"
+                  valor={formatar.moeda(home.consolidado.venda)}
+                  variacaoPct={home.consolidado.variacaoPct}
+                />
+                <CardKpi
+                  titulo="Clientes"
+                  valor={formatar.inteiro(home.consolidado.clientes ?? 0)}
+                />
+                <CardKpi
+                  titulo="Ticket médio"
+                  valor={formatar.moeda(home.consolidado.ticketMedio ?? 0)}
+                />
+                <CardKpi
+                  titulo="Margem bruta"
+                  valor={formatar.percentual(home.consolidado.margemPct)}
+                  detalhe={`base: ${home.consolidado.baseDeCusto.replace('_', ' ')}`}
+                  restrito={home.consolidado.margemPct === null}
+                />
+              </div>
+            ) : (
+              <EstadoVazio
+                titulo="Aguardando o primeiro fechamento"
+                descricao="O dia consolidado aparece depois que o ERP fecha a venda diária. Enquanto isso, os números de hoje já estão acima."
+              />
+            )}
+          </section>
+
+          {home.fechamento.length > 0 ? (
+            <section className="space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-6">
+              <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+                Status do fechamento por filial
+              </h2>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[34rem] text-left text-sm">
+                  <thead className="text-xs uppercase tracking-wider text-slate-500">
+                    <tr>
+                      <th className="py-2 pr-4 font-medium">Filial</th>
+                      <th className="py-2 pr-4 font-medium">Dia</th>
+                      <th className="py-2 pr-4 font-medium">Estoque</th>
+                      <th className="py-2 pr-4 font-medium">Venda diária</th>
+                      <th className="py-2 pr-4 font-medium">Divergência</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 text-slate-300">
+                    {home.fechamento.map((filial) => (
+                      <tr key={filial.filialErpId}>
+                        <td className="py-2 pr-4">{filial.nome}</td>
+                        <td className="py-2 pr-4 tabular-nums">
+                          {filial.data ? formatar.dataCompleta(filial.data) : '—'}
+                        </td>
+                        <td className="py-2 pr-4">
+                          {filial.atualizouEstoque ? '✔ ok' : '• pendente'}
+                        </td>
+                        <td className="py-2 pr-4">
+                          {filial.gerouVendasDiaria ? '✔ gerada' : '• pendente'}
+                        </td>
+                        <td className="py-2 pr-4">
+                          {filial.possuiDivergencia ? (
+                            <span className="text-amber-300">⚠ apontada pelo ERP</span>
+                          ) : (
+                            'sem divergência'
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-slate-500">
+                Divergência apontada pelo ERP costuma indicar fechamento incompleto na loja — trate
+                no ERP; a ressincronização é automática.
+              </p>
+            </section>
+          ) : null}
+
+          <p className="text-xs text-slate-500">
+            Quer o detalhe cupom a cupom?{' '}
+            <Link href="/vendas" className="text-sky-300 underline-offset-4 hover:underline">
+              Abra o diário de vendas
+            </Link>
+            .
           </p>
-          <h1 className="text-2xl font-semibold text-white">Olá, {me.user.name.split(' ')[0]}</h1>
-          <p className="text-sm text-slate-400">
-            {tenant
-              ? `Seu papel: ${tenant.role}`
-              : me.memberships.length > 1
-                ? 'Você participa de mais de uma rede — escolha uma para continuar.'
-                : 'Sua conta ainda não tem acesso a uma rede ativa. Fale com o administrador.'}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Cada atalho aparece só para quem o backend deixaria entrar (doc 07 §1). */}
-          {me.permissions.includes('users.manage') ? (
-            <Link
-              href="/admin/usuarios"
-              className="rounded-lg border border-white/15 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/5"
-            >
-              Usuários
-            </Link>
-          ) : null}
-          {me.permissions.includes('erp_connection.manage') ? (
-            <Link
-              href="/admin/conexao-erp"
-              className="rounded-lg border border-white/15 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/5"
-            >
-              Conexão ERP
-            </Link>
-          ) : null}
-          {me.permissions.includes('erp_connection.manage') ? (
-            <Link
-              href="/admin/sincronizacao"
-              className="rounded-lg border border-white/15 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/5"
-            >
-              Sincronização
-            </Link>
-          ) : null}
-          {me.user.platformAdmin ? (
-            <Link
-              href="/plataforma"
-              className="rounded-lg border border-white/15 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/5"
-            >
-              Plataforma
-            </Link>
-          ) : null}
-          <Link
-            href="/perfil"
-            className="rounded-lg border border-white/15 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/5"
-          >
-            Perfil
-          </Link>
-          <form action={logoutAction}>
-            <button
-              type="submit"
-              className="rounded-lg border border-white/15 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/5"
-            >
-              Sair
-            </button>
-          </form>
-        </div>
-      </header>
-
-      <section className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">
-          Seus acessos
-        </h2>
-        <ul className="mt-3 flex flex-wrap gap-2">
-          {me.permissions.map((permission) => (
-            <li
-              key={permission}
-              className="rounded-full bg-white/5 px-3 py-1 font-mono text-xs text-slate-300"
-            >
-              {permission}
-            </li>
-          ))}
-        </ul>
-        <p className="mt-4 text-sm text-slate-400">
-          Os dashboards do doc 15 entram na Fase 7. Até lá, o produto está construindo a base:
-          identidade, isolamento por tenant e integração com o ERP.
-        </p>
-      </section>
-
-      <section className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">
-            Prontidão da API
-          </h2>
-          <StateBadge state={state} />
-        </div>
-        {checks.length > 0 ? (
-          <ul className="mt-4">
-            {checks.map((check) => (
-              <DependencyRow key={check.name} check={check} />
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-4 text-sm text-slate-400">A API não respondeu ao verificar o estado.</p>
-        )}
-      </section>
-
-      <footer className="text-xs text-slate-500">
-        versão {readiness.data?.version ?? env.appVersion}
-      </footer>
+        </>
+      ) : null}
     </main>
   );
 }

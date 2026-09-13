@@ -6,7 +6,7 @@ import {
   FIXTURE_AUTORIZACAO,
   FIXTURE_DEPARTAMENTOS_N1,
   FIXTURE_FILIAIS,
-  FIXTURE_FINALIZADORAS,
+  FIXTURE_FINALIZADORAS_HOJE,
   FIXTURE_GTINS,
   FIXTURE_MARCAS,
   FIXTURE_PRODUTOS,
@@ -58,7 +58,7 @@ export class SgMockTransport implements SgTransport {
     if (caminho.endsWith('/produtos')) return this.paginado(alvo, FIXTURE_PRODUTOS, 'produtos');
     if (caminho.endsWith('/vendas/hoje')) return this.exigeFilial(alvo, FIXTURE_VENDAS_HOJE);
     if (caminho.endsWith('/finalizadoras/hoje'))
-      return this.exigeFilial(alvo, FIXTURE_FINALIZADORAS);
+      return this.exigeFilial(alvo, FIXTURE_FINALIZADORAS_HOJE);
     if (caminho.endsWith('/vendas/finalizadoras')) return this.finalizadorasDoDia(alvo);
     if (caminho.endsWith('/vendas')) return this.vendasDoDia(alvo);
 

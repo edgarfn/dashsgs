@@ -1,6 +1,10 @@
 import { type SyncDomain, type SyncTrigger } from '@dashsgs/shared';
 import { type SgCallContext } from '../../integration/sg';
 
+// As funções de data vivem em common/datas.ts desde a Fase 7 (o dashboard usa as mesmas).
+// Reexportadas aqui para que os jobs continuem importando de um lugar só.
+export { diaEm, diferencaEmDias, somarDias } from '../../common/datas';
+
 /** Tudo que um job de domínio precisa saber para rodar uma vez. */
 export interface ContextoSync {
   tenantId: string;
@@ -47,29 +51,5 @@ export function somarResultados(partes: ResultadoSync[]): ResultadoSync {
       invalid: (total.invalid ?? 0) + (parte.invalid ?? 0),
     }),
     {},
-  );
-}
-
-/** `YYYY-MM-DD` de uma data, no fuso informado (o do tenant — doc 14 §5). */
-export function diaEm(data: Date, timezone: string): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(data);
-}
-
-/** Soma dias a uma data `YYYY-MM-DD` sem passar por fuso nenhum. */
-export function somarDias(dia: string, dias: number): string {
-  const base = new Date(`${dia}T00:00:00Z`);
-  base.setUTCDate(base.getUTCDate() + dias);
-  return base.toISOString().slice(0, 10);
-}
-
-/** Diferença em dias entre duas datas `YYYY-MM-DD` (fim − início). */
-export function diferencaEmDias(inicio: string, fim: string): number {
-  return Math.round(
-    (Date.parse(`${fim}T00:00:00Z`) - Date.parse(`${inicio}T00:00:00Z`)) / 86_400_000,
   );
 }

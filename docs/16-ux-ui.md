@@ -74,3 +74,25 @@ produto (id/descrição/GTIN), indicador de frescor/sync, menu do usuário (sess
   scrollável.
 - Metas de performance: LCP < 2,5 s em 4G; bundle inicial < 250 kB gz; gráficos com
   virtualização/decimação para séries longas.
+
+## 6. Estado da implementação (Fase 7)
+
+Telas no ar: Visão Geral (`/`), Vendas — Diário (`/vendas`), Vendas — Comparativos
+(`/vendas/comparativos`), Estoque (`/estoque`), além das telas de autenticação, perfil e
+administração entregues nas fases anteriores.
+
+Como os padrões do §3 e do §4 foram resolvidos:
+
+- **Filtros são formulário GET.** Filial, período e base de custo viram query string — o link
+  fica compartilhável, como pede o §4, e a tela funciona sem JavaScript de página.
+- **Estados vazios explicam e apontam o próximo passo**: "Ainda não há dados do seu ERP" leva
+  para a tela de sincronização; "Sem dias fechados no período" sugere a carga de histórico.
+- **Selo de frescor em toda tela**, com a distinção entre parcial (dia corrente) e consolidado.
+- **Gráficos em SVG server-side** com tabela alternativa recolhível (ADR-014): sem
+  informação só por cor, com `<title>` em cada ponto e rótulo textual nas variações (▲/▼).
+- **Bundle inicial em ~102 kB gz**, contra o teto de 250 kB do §5.
+
+Ainda não implementado deste doc: menu lateral completo (a navegação atual é por abas no topo,
+suficiente para quatro seções), busca global de produto, densidade compacta, tema claro e as
+telas dos módulos que dependem de sync ainda não implementado (financeiro, compras, metas,
+alertas, ações no ERP).
