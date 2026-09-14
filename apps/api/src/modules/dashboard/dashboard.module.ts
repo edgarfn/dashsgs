@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { DashboardCache } from './cache.service';
 import { DashboardController } from './dashboard.controller';
+import { ComprasService } from './compras.service';
 import { EstoqueService } from './estoque.service';
+import { FinanceiroService } from './financeiro.service';
 import { FrescorService } from './frescor.service';
 import { HomeService } from './home.service';
 import { VendasService } from './vendas.service';
@@ -15,7 +17,15 @@ import { VendasService } from './vendas.service';
  */
 @Module({
   controllers: [DashboardController],
-  providers: [FrescorService, DashboardCache, HomeService, VendasService, EstoqueService],
+  providers: [
+    FrescorService,
+    DashboardCache,
+    HomeService,
+    VendasService,
+    EstoqueService,
+    FinanceiroService,
+    ComprasService,
+  ],
   exports: [FrescorService],
 })
 export class DashboardModule {}

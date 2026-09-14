@@ -3,7 +3,9 @@ import { SgModule } from '../../integration/sg/sg.module';
 import { ErpConnectionModule } from '../erp-connection/erp-connection.module';
 import { AggregatesService } from './aggregates.service';
 import { BackfillService } from './backfill.service';
+import { ComprasSync } from './domains/compras.sync';
 import { DimensoesSync } from './domains/dimensoes.sync';
+import { FinanceiroSync } from './domains/financeiro.sync';
 import { ProdutosSync } from './domains/produtos.sync';
 import { ResumoFilialSync } from './domains/resumo-filial.sync';
 import { VendasDiaSync } from './domains/vendas-dia.sync';
@@ -40,6 +42,8 @@ import { WatermarkService } from './watermark.service';
     VendasHojeSync,
     VendasDiaSync,
     ResumoFilialSync,
+    FinanceiroSync,
+    ComprasSync,
     SyncService,
     BackfillService,
     SyncStatusService,

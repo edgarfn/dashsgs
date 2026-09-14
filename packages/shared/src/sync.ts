@@ -12,6 +12,8 @@ export const SYNC_DOMAINS = [
   'vendas_hoje',
   'vendas_dia',
   'resumo_filial',
+  'financeiro',
+  'compras',
   'backfill',
 ] as const;
 
@@ -72,6 +74,21 @@ export const SYNC_DOMAIN_INFO: Record<SyncDomain, SyncDomainInfo> = {
     cadenciaSegundos: 1_800,
     porFilial: true,
     sloAtrasoSegundos: 86_400,
+  },
+  financeiro: {
+    label: 'Financeiro',
+    descricao: 'Contas a pagar e receber, despesas e transações de cartão.',
+    // De hora em hora: o aging muda quando alguém baixa um título, não a cada minuto.
+    cadenciaSegundos: 3_600,
+    porFilial: false,
+    sloAtrasoSegundos: 14_400,
+  },
+  compras: {
+    label: 'Compras',
+    descricao: 'Pedidos ao fornecedor e notas de entrada.',
+    cadenciaSegundos: 3_600,
+    porFilial: false,
+    sloAtrasoSegundos: 14_400,
   },
   backfill: {
     label: 'Carga histórica',

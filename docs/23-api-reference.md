@@ -40,6 +40,8 @@ dados aceitam `?filiais=1,2` (validado contra `filiais_allowed`).
 | GET /dashboard/vendas/dia?data&filiais&caixa&canceladas&pagina | cupons paginados, totais e formas de pagamento | 60 s (hoje) / 15 min |
 | GET /dashboard/vendas/comparativo?de&ate&filiais&custo | série diária, ranking de filiais, departamentos e dia da semana | 15 min |
 | GET /dashboard/estoque?situacao&curva&filiais&pagina | ruptura / negativo / excesso com cobertura | 15 min |
+| GET /dashboard/financeiro?de&ate&filiais | aging, fluxo previsto, despesas e cartões (manager+) | 15 min |
+| GET /dashboard/compras?de&ate&filiais | pedidos por situação, lead time, pendentes e entradas | 15 min |
 | GET /dashboard/vendas/dia/export?… | CSV do diário (`reports.export`) | sem cache |
 | GET /dim/filiais | dimensões para os filtros | — |
 

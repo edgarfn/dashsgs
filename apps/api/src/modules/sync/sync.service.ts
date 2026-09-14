@@ -6,7 +6,9 @@ import { MetricsService } from '../../common/metrics/metrics.service';
 import { TenantDatabase } from '../../common/tenant';
 import { SgError } from '../../integration/sg';
 import { ErpConnectionService } from '../erp-connection/erp-connection.service';
+import { ComprasSync } from './domains/compras.sync';
 import { DimensoesSync } from './domains/dimensoes.sync';
+import { FinanceiroSync } from './domains/financeiro.sync';
 import { ProdutosSync } from './domains/produtos.sync';
 import { ResumoFilialSync } from './domains/resumo-filial.sync';
 import { VendasDiaSync } from './domains/vendas-dia.sync';
@@ -63,6 +65,8 @@ export class SyncService {
     vendasHoje: VendasHojeSync,
     vendasDia: VendasDiaSync,
     resumoFilial: ResumoFilialSync,
+    financeiro: FinanceiroSync,
+    compras: ComprasSync,
   ) {
     this.logger.setContext(SyncService.name);
     this.jobs = {
@@ -75,6 +79,8 @@ export class SyncService {
       vendas_hoje: vendasHoje,
       vendas_dia: vendasDia,
       resumo_filial: resumoFilial,
+      financeiro,
+      compras,
     };
   }
 

@@ -101,7 +101,8 @@ test.describe('Alertas — Regras', () => {
 
     // Regras sem dado aparecem separadas, com o motivo — não somem da tela.
     await expect(page.getByRole('heading', { name: 'Aguardando dados' })).toBeVisible();
-    await expect(page.getByText(/depende de sincronização financeira/).first()).toBeVisible();
+    // Com o financeiro sincronizado, o que resta aguardando é previsão, perdas e vencimentos.
+    await expect(page.getByText(/depende de sincronização de vencimentos/).first()).toBeVisible();
   });
 
   test('desligar um aviso impede que ele volte a disparar', async ({ page }) => {

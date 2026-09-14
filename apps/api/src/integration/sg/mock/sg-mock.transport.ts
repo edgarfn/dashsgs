@@ -6,8 +6,15 @@ import {
   FIXTURE_AUTORIZACAO,
   FIXTURE_DEPARTAMENTOS_N1,
   FIXTURE_FILIAIS,
+  FIXTURE_CARTOES,
+  FIXTURE_CONTAS_PAGAR,
+  FIXTURE_CONTAS_RECEBER,
+  FIXTURE_DESPESAS,
+  FIXTURE_ENTRADAS,
   FIXTURE_FINALIZADORAS_HOJE,
   FIXTURE_GTINS,
+  FIXTURE_PEDIDOS_COMPRA,
+  FIXTURE_TIPOS_DESPESA,
   FIXTURE_MARCAS,
   FIXTURE_PRODUTOS,
   FIXTURE_STATUS,
@@ -54,6 +61,14 @@ export class SgMockTransport implements SgTransport {
     if (caminho.endsWith('/filiais')) return json(FIXTURE_FILIAIS);
     if (caminho.endsWith('/marcas')) return json(FIXTURE_MARCAS);
     if (caminho.endsWith('/departamentos/nivel1')) return json(FIXTURE_DEPARTAMENTOS_N1);
+    if (caminho.endsWith('/contas/pagar')) return this.comPeriodo(alvo, FIXTURE_CONTAS_PAGAR);
+    if (caminho.endsWith('/contas/receber')) return this.comPeriodo(alvo, FIXTURE_CONTAS_RECEBER);
+    if (caminho.endsWith('/despesas/tipos')) return json(FIXTURE_TIPOS_DESPESA);
+    if (caminho.endsWith('/despesas')) return this.comPeriodo(alvo, FIXTURE_DESPESAS);
+    // Array puro, sem envelope: a inconsistência documentada no doc 02 §3.
+    if (caminho.endsWith('/vendascartoes')) return this.comPeriodo(alvo, FIXTURE_CARTOES);
+    if (caminho.endsWith('/pedidoscompra')) return this.comPeriodo(alvo, FIXTURE_PEDIDOS_COMPRA);
+    if (caminho.endsWith('/entradas')) return this.comPeriodo(alvo, FIXTURE_ENTRADAS);
     if (caminho.endsWith('/produtos/gtins')) return this.paginado(alvo, FIXTURE_GTINS, 'gtins');
     if (caminho.endsWith('/produtos')) return this.paginado(alvo, FIXTURE_PRODUTOS, 'produtos');
     if (caminho.endsWith('/vendas/hoje')) return this.exigeFilial(alvo, FIXTURE_VENDAS_HOJE);
@@ -96,6 +111,16 @@ export class SgMockTransport implements SgTransport {
   private exigeFilial(alvo: URL, fixture: unknown): Response {
     if (!alvo.searchParams.get('filial')) {
       return json({ error: 'Parametros obrigatorios: filial' }, 400);
+    }
+    return json(fixture);
+  }
+
+  /** Endpoints financeiros exigem o período — sem ele a API responde 400 (doc 03). */
+  private comPeriodo(alvo: URL, fixture: unknown): Response {
+    const inicial = alvo.searchParams.get('dataInicial');
+    const final = alvo.searchParams.get('dataFinal');
+    if (!inicial || !final) {
+      return json({ error: 'Parametros obrigatorios: dataInicial, dataFinal' }, 400);
     }
     return json(fixture);
   }

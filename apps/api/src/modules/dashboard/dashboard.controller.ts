@@ -16,14 +16,18 @@ import { gerarCsv, nomeDeArquivo } from './csv';
 import {
   comparativoQuerySchema,
   homeQuerySchema,
+  periodoQuerySchema,
   rupturaQuerySchema,
   vendasDiaQuerySchema,
   type ComparativoQuery,
   type HomeQuery,
+  type PeriodoQuery,
   type RupturaQuery,
   type VendasDiaQuery,
 } from './dto/dashboard.dto';
+import { ComprasService, type ComprasView } from './compras.service';
 import { EstoqueService } from './estoque.service';
+import { FinanceiroService, type FinanceiroView } from './financeiro.service';
 import { HomeService } from './home.service';
 import { VendasService } from './vendas.service';
 
@@ -47,6 +51,8 @@ export class DashboardController {
     private readonly home: HomeService,
     private readonly vendas: VendasService,
     private readonly estoque: EstoqueService,
+    private readonly financeiro: FinanceiroService,
+    private readonly compras: ComprasService,
     private readonly escopo: FiliaisScopeService,
     private readonly cache: DashboardCache,
     private readonly prisma: PrismaService,
@@ -170,6 +176,48 @@ export class DashboardController {
   }
 
   /**
+   * Financeiro (doc 15 §5).
+   *
+   * Exige `manager+` porque aqui está o caixa da rede — aging, despesas e taxas de cartão são o
+   * material mais sensível do produto (doc 02, classificação FINANCIAL). Quem só acompanha venda
+   * não precisa ver a dívida da empresa.
+   */
+  @Get('financeiro')
+  @RequirePermissions('dashboard.view')
+  async financeiroView(
+    @Query(new ZodValidationPipe(periodoQuerySchema)) query: PeriodoQuery,
+    @CurrentAuth() auth: AuthContext,
+  ): Promise<FinanceiroView> {
+    const { tenantId, filiais } = await this.contexto(auth, query.filiais);
+    this.exigirPapelFinanceiro(auth, tenantId);
+
+    return this.cache.lembrar(
+      tenantId,
+      'financeiro',
+      { filiais, de: query.de, ate: query.ate },
+      TTL.historico,
+      () => this.financeiro.montar({ tenantId, filiais, de: query.de, ate: query.ate }),
+    );
+  }
+
+  @Get('compras')
+  @RequirePermissions('dashboard.view')
+  async comprasView(
+    @Query(new ZodValidationPipe(periodoQuerySchema)) query: PeriodoQuery,
+    @CurrentAuth() auth: AuthContext,
+  ): Promise<ComprasView> {
+    const { tenantId, filiais } = await this.contexto(auth, query.filiais);
+
+    return this.cache.lembrar(
+      tenantId,
+      'compras',
+      { filiais, de: query.de, ate: query.ate },
+      TTL.historico,
+      () => this.compras.montar({ tenantId, filiais, de: query.de, ate: query.ate }),
+    );
+  }
+
+  /**
    * Export do diário de vendas (doc 16 §4).
    *
    * Exige `reports.export` — permissão separada de propósito: consultar na tela e levar o dado
@@ -264,6 +312,13 @@ export class DashboardController {
     });
 
     return { tenantId, filiais: escopo.filiais, timezone: tenant.timezone };
+  }
+
+  /** O painel financeiro é de manager+ (doc 16 §2: "Financeiro — A pagar/receber | manager+"). */
+  private exigirPapelFinanceiro(auth: AuthContext, tenantId: string): void {
+    if (!this.podeVerMargem(auth, tenantId)) {
+      throw AppException.forbidden({ reason: 'painel financeiro exige papel de gestão' });
+    }
   }
 
   private podeVerMargem(auth: AuthContext, tenantId: string): boolean {

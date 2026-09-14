@@ -276,6 +276,92 @@ const integracaoParada: Avaliador = async ({ tx, tenantId, hoje, params }) => {
   ];
 };
 
+// ---------------------------------------------------------------- financeiro
+/**
+ * Contas a pagar vencendo na janela configurada (doc 15 §8).
+ *
+ * Some o que vence e avisa **uma vez por dia**, com o total: a pessoa do financeiro quer saber
+ * "quanto sai esta semana", não receber um e-mail por boleto.
+ */
+const contaAVencer: Avaliador = async ({ tx, hoje, params }) => {
+  const dias = params.dias ?? 3;
+  const valorMinimo = params.valorMinimo ?? 0;
+  const limite = somarDias(hoje, dias);
+
+  const linhas = await tx.$queryRaw<Array<{ parcelas: number; total: number | null }>>(Prisma.sql`
+    SELECT COUNT(*)::int AS parcelas, SUM(COALESCE(saldo, valor_documento))::float8 AS total
+    FROM erp_conta_pagar_parcelas
+    WHERE paga = false
+      AND data_vencimento IS NOT NULL
+      AND data_vencimento BETWEEN ${hoje}::date AND ${limite}::date`);
+
+  const resultado = linhas[0];
+  const total = Number(resultado?.total ?? 0);
+  if (!resultado || resultado.parcelas === 0 || total < valorMinimo) return [];
+
+  const formatado = total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  return [
+    {
+      filialErpId: null,
+      dedupeKey: `${hoje}:${dias}`,
+      resumo: `${resultado.parcelas} ${resultado.parcelas === 1 ? 'parcela vence' : 'parcelas vencem'} em até ${dias} ${dias === 1 ? 'dia' : 'dias'}, somando ${formatado}`,
+      payload: {
+        parcelas: resultado.parcelas,
+        total,
+        dias,
+        link: '/financeiro',
+      },
+    },
+  ];
+};
+
+/**
+ * Transações de cartão sem baixa depois do prazo.
+ *
+ * É dinheiro que a operadora deveria ter repassado e o ERP não registrou — o tipo de problema que
+ * passa meses despercebido porque ninguém confere transação a transação.
+ */
+const cartaoNaoConciliado: Avaliador = async ({ tx, hoje, params }) => {
+  const dias = params.dias ?? 7;
+  const limite = somarDias(hoje, -dias);
+
+  const linhas = await tx.$queryRaw<
+    Array<{ filial_erp_id: number; transacoes: number; total: number | null }>
+  >(Prisma.sql`
+    SELECT filial_erp_id, COUNT(*)::int AS transacoes, SUM(valor_bruto)::float8 AS total
+    FROM erp_cartao_vendas
+    WHERE baixada = false
+      AND data_venda IS NOT NULL
+      AND data_venda <= ${limite}::date
+    GROUP BY filial_erp_id
+    ORDER BY total DESC`);
+
+  const nomes = await nomesDeFilial(
+    tx,
+    linhas.map((linha) => linha.filial_erp_id),
+  );
+
+  return linhas.map((linha) => {
+    const total = Number(linha.total ?? 0);
+    const filial = nomes.get(linha.filial_erp_id) ?? `filial ${linha.filial_erp_id}`;
+    const formatado = total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+    return {
+      filialErpId: linha.filial_erp_id,
+      dedupeKey: `${hoje}:${linha.filial_erp_id}`,
+      resumo: `${linha.transacoes} ${linha.transacoes === 1 ? 'transação de cartão' : 'transações de cartão'} sem baixa há mais de ${dias} dias na ${filial} (${formatado})`,
+      payload: {
+        transacoes: linha.transacoes,
+        total,
+        dias,
+        filial,
+        link: `/financeiro?aba=cartoes&filiais=${linha.filial_erp_id}`,
+      },
+    };
+  });
+};
+
 /** Registro de avaliadores. Tipo sem entrada aqui simplesmente não é avaliado (ainda). */
 export const AVALIADORES: Partial<Record<AlertType, Avaliador>> = {
   ruptura_curva_a: ruptura,
@@ -283,4 +369,6 @@ export const AVALIADORES: Partial<Record<AlertType, Avaliador>> = {
   divergencia_fechamento: divergenciaFechamento,
   queda_de_venda: quedaDeVenda,
   integracao_parada: integracaoParada,
+  conta_a_vencer: contaAVencer,
+  cartao_nao_conciliado: cartaoNaoConciliado,
 };

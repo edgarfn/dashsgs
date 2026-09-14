@@ -27,6 +27,13 @@ export const FIXTURE_AUTORIZACAO = {
     'GET /marcas',
     'GET /departamentos/nivel1',
     'GET /produtos/gtins',
+    'GET /contas/pagar',
+    'GET /contas/receber',
+    'GET /despesas',
+    'GET /despesas/tipos',
+    'GET /vendascartoes',
+    'GET /pedidoscompra',
+    'GET /entradas',
     'GET /status',
   ],
   expire_time: '2026-09-13 10:30:00',
@@ -347,3 +354,261 @@ export const FIXTURE_ARRAY_PURO = [
   { id: 1, descricao: 'ITEM EM ARRAY PURO' },
   { id: '2 ', descricao: 'OUTRO ITEM' },
 ];
+
+/** Contas a pagar: título com parcelas, uma paga e duas em aberto (uma delas vencendo). */
+export const FIXTURE_CONTAS_PAGAR = {
+  paginacao: { pagina: 1, itensPorPagina: 200, quantidadePaginas: 1, quantidadeItens: 2 },
+  contas: [
+    {
+      id: 9001,
+      idFilial: 1,
+      idFornecedor: 501,
+      documento: 'NF 12345 ',
+      dataEmissao: '2026-08-20',
+      valorTotal: '4.500,00',
+      observacao: 'Compra de mercearia',
+      parcelas: [
+        {
+          ordem: 1,
+          dataVencimento: '2026-09-05',
+          dataPagamento: '2026-09-05',
+          valorDocumento: 1500,
+          valorPago: 1500,
+          saldo: 0,
+          status: 'Paga',
+          tipoLancamento: 'DUPLICATA',
+        },
+        {
+          ordem: 2,
+          dataVencimento: '2026-09-20',
+          dataPagamento: '',
+          valorDocumento: 1500,
+          valorPago: 0,
+          saldo: 1500,
+          status: 'Nao paga',
+          tipoLancamento: 'DUPLICATA',
+        },
+        {
+          ordem: 3,
+          dataVencimento: '2026-10-05',
+          dataPagamento: '0000-00-00',
+          valorDocumento: 1500,
+          valorPago: 0,
+          saldo: 1500,
+          status: 'Nao paga',
+          tipoLancamento: 'DUPLICATA',
+        },
+      ],
+    },
+    {
+      id: '9002 ',
+      idFilial: 2,
+      idFornecedor: 502,
+      documento: 'NF 12346',
+      dataEmissao: '2026-07-15',
+      valorTotal: 980.5,
+      parcelas: [
+        {
+          ordem: 1,
+          dataVencimento: '2026-08-30',
+          dataPagamento: '',
+          valorDocumento: 980.5,
+          valorPago: 0,
+          saldo: 980.5,
+          status: 'Nao paga',
+        },
+      ],
+    },
+  ],
+};
+
+export const FIXTURE_CONTAS_RECEBER = {
+  paginacao: { pagina: 1, itensPorPagina: 200, quantidadePaginas: 1, quantidadeItens: 1 },
+  contas: [
+    {
+      id: 7001,
+      idFilial: 1,
+      idCliente: 4711,
+      documento: 'CRED 778',
+      dataEmissao: '2026-09-01',
+      valorTotal: 320,
+      parcelas: [
+        {
+          ordem: 1,
+          dataVencimento: '2026-09-30',
+          dataPagamento: '',
+          valorDocumento: 320,
+          valorPago: 0,
+          saldo: 320,
+          juros: 0,
+          desconto: 0,
+          status: 'Nao paga',
+        },
+      ],
+    },
+  ],
+};
+
+/** Tipos de despesa com a classificação que separa fixo de variável (doc 15 §5). */
+export const FIXTURE_TIPOS_DESPESA = {
+  ordenacao: { pagina: 1, itensPorPagina: 100, quantidadePaginas: 1, quantidadeItens: 3 },
+  tipos: [
+    { id: '10', descricao: 'ENERGIA ELETRICA', classificacao: 'FIXA', tipoCusto: 'OPERACIONAL' },
+    { id: 11, descricao: 'FRETE  ', classificacao: 'VARIAVEL', tipoCusto: 'OPERACIONAL' },
+    { id: 12, descricao: 'MANUTENCAO', classificacao: 'VARIAVEL', tipoCusto: 'ADMINISTRATIVO' },
+  ],
+};
+
+export const FIXTURE_DESPESAS = {
+  paginacao: { pagina: 1, itensPorPagina: 200, quantidadePaginas: 1, quantidadeItens: 3 },
+  despesas: [
+    {
+      idFilial: 1,
+      dataDespesa: '2026-09-10',
+      sequencia: 1,
+      idTipoDespesa: '10',
+      idFornecedor: 601,
+      dataEmissao: '2026-09-08',
+      valor: '1.240,75',
+      classificacao: 'FIXA',
+      usuario: 'OPERADOR01',
+      observacao: 'Conta de luz',
+    },
+    {
+      idFilial: 1,
+      dataDespesa: '2026-09-11',
+      sequencia: 1,
+      idTipoDespesa: 11,
+      idFornecedor: 602,
+      valor: 380,
+      classificacao: 'VARIAVEL',
+      usuario: 'OPERADOR02',
+    },
+    {
+      idFilial: 2,
+      dataDespesa: '2026-09-11',
+      sequencia: 1,
+      idTipoDespesa: '12',
+      valor: 150.9,
+      classificacao: 'VARIAVEL',
+    },
+  ],
+};
+
+/** Cartões: **array puro**, sem envelope — a inconsistência documentada no doc 02 §3. */
+export const FIXTURE_CARTOES = [
+  {
+    chaveVenda: 'CV-0001',
+    idFilial: 1,
+    nsu: '889900',
+    dataVenda: '2026-09-10',
+    dataVencimento: '2026-10-10',
+    valorBruto: 250.4,
+    taxa: 2.99,
+    tipoVenda: 'CREDITO',
+    formaPagamento: 'CARTAO',
+    descricaoBandeira: 'VISA',
+    descricaoAdquirente: 'CIELO',
+    parcela: 1,
+    baixada: 'S',
+  },
+  {
+    chaveVenda: 'CV-0002 ',
+    idFilial: 1,
+    nsu: '889901',
+    dataVenda: '2026-09-11',
+    dataVencimento: '2026-10-11',
+    valorBruto: '1.100,00',
+    taxa: 1.49,
+    tipoVenda: 'DEBITO',
+    formaPagamento: 'CARTAO',
+    descricaoBandeira: 'MASTERCARD',
+    descricaoAdquirente: 'REDE',
+    parcela: 1,
+    baixada: ' ',
+  },
+  {
+    chaveVenda: 'CV-0003',
+    idFilial: 2,
+    nsu: '889902',
+    dataVenda: '2026-09-01',
+    dataVencimento: '2026-10-01',
+    valorBruto: 640,
+    taxa: 3.49,
+    tipoVenda: 'CREDITO',
+    formaPagamento: 'CARTAO',
+    descricaoBandeira: 'ELO',
+    descricaoAdquirente: 'CIELO',
+    parcela: 3,
+    baixada: ' ',
+  },
+];
+
+export const FIXTURE_PEDIDOS_COMPRA = {
+  paginacao: { pagina: 1, itensPorPagina: 200, quantidadePaginas: 1, quantidadeItens: 3 },
+  pedidos: [
+    {
+      id: 3001,
+      idFilial: 1,
+      idFornecedor: 501,
+      idComprador: 21,
+      dataPedido: '2026-09-01',
+      dataPrevisao: '2026-09-05',
+      dataAtendimento: '2026-09-06',
+      situacao: 'atendido',
+      valorTotal: 12450.9,
+      valorFrete: 320,
+    },
+    {
+      id: 3002,
+      idFilial: 1,
+      idFornecedor: 502,
+      idComprador: 21,
+      dataPedido: '2026-08-20',
+      dataPrevisao: '2026-08-28',
+      dataAtendimento: '',
+      situacao: 'pendente',
+      valorTotal: 5400,
+      valorFrete: 0,
+    },
+    {
+      id: '3003 ',
+      idFilial: 2,
+      idFornecedor: 503,
+      idComprador: 22,
+      dataPedido: '2026-09-09',
+      dataPrevisao: '2026-09-16',
+      dataAtendimento: '',
+      situacao: 'parcial',
+      valorTotal: 2300.55,
+    },
+  ],
+};
+
+export const FIXTURE_ENTRADAS = {
+  paginacao: { pagina: 1, itensPorPagina: 200, quantidadePaginas: 1, quantidadeItens: 2 },
+  entradas: [
+    {
+      id: 8001,
+      idFilial: 1,
+      idFornecedor: 501,
+      numero: '12345',
+      serie: '1',
+      dataEmissao: '2026-09-04',
+      dataEntrada: '2026-09-06',
+      valorTotal: 12450.9,
+      situacao: 'normal',
+    },
+    {
+      id: 8002,
+      idFilial: 2,
+      idFornecedor: 503,
+      numero: '998',
+      serie: '1',
+      dataEmissao: '2026-09-10',
+      dataEntrada: '2026-09-11',
+      valorTotal: 2300.55,
+      situacao: 'normal',
+    },
+  ],
+};

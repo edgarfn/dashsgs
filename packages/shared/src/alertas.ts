@@ -116,21 +116,19 @@ export const ALERT_TYPE_INFO: Record<AlertType, AlertTypeInfo> = {
   },
   conta_a_vencer: {
     label: 'Conta a vencer',
-    descricao: 'Parcelas a pagar vencendo nos próximos dias acima do limiar.',
+    descricao: 'Parcelas a pagar vencendo nos próximos dias, somadas acima do limiar.',
     severidadePadrao: 'media',
     parametrosPadrao: { dias: 3, valorMinimo: 0 },
     audienciaPadrao: 'administracao',
-    disponivel: false,
-    dependencia: 'sincronização financeira (E5-09)',
+    disponivel: true,
   },
   cartao_nao_conciliado: {
     label: 'Cartão não conciliado',
-    descricao: 'Transações de cartão sem baixa depois do prazo.',
+    descricao: 'Transações de cartão sem baixa no ERP depois do prazo esperado.',
     severidadePadrao: 'media',
     parametrosPadrao: { dias: 7 },
     audienciaPadrao: 'administracao',
-    disponivel: false,
-    dependencia: 'sincronização financeira (E5-09)',
+    disponivel: true,
   },
 };
 

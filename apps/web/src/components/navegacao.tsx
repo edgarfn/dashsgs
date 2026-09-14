@@ -26,6 +26,18 @@ export function Cabecalho({ me, ativo }: { me: MeResponse; ativo?: string }) {
       visivel: me.permissions.includes('dashboard.view'),
     },
     {
+      href: '/financeiro',
+      rotulo: 'Financeiro',
+      chave: 'financeiro',
+      visivel: me.permissions.includes('dashboard.view'),
+    },
+    {
+      href: '/compras',
+      rotulo: 'Compras',
+      chave: 'compras',
+      visivel: me.permissions.includes('dashboard.view'),
+    },
+    {
       href: '/alertas',
       rotulo: 'Alertas',
       chave: 'alertas',

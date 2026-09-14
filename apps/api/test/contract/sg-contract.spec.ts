@@ -1,9 +1,14 @@
 import {
   autorizacaoResponseSchema,
+  cartaoVendaSchema,
+  contaPagarSchema,
+  despesaSchema,
   dimensaoSchema,
   filialSchema,
+  pedidoCompraSchema,
   produtoSchema,
   statusSchema,
+  tipoDespesaSchema,
 } from '../../src/integration/sg/types';
 import { normalizarPagina } from '../../src/integration/sg/normalizers';
 
@@ -150,6 +155,48 @@ descreve('contrato com a API SG (homologação)', () => {
         recurso: 'produtos',
         invalidos: 0,
       });
+    },
+    TIMEOUT,
+  );
+
+  /**
+   * Financeiro e compras entraram com os nomes de campo deduzidos do doc 03/05 — a coleção não
+   * traz o exemplo de resposta de todos eles. Este é o teste que confirma ou desmente: se um
+   * campo mudou de nome, o schema recusa o item e o número de inválidos aparece aqui, de noite,
+   * e não no primeiro cliente que abrir a tela de aging.
+   */
+  it(
+    'financeiro e compras batem com os schemas (nomes de campo ainda não confirmados pela SG)',
+    async () => {
+      const de = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+      const ate = new Date(Date.now() + 60 * 86_400_000).toISOString().slice(0, 10);
+
+      const recursos = [
+        { rota: 'contas/pagar', schema: contaPagarSchema, chave: 'contas' },
+        { rota: 'despesas/tipos', schema: tipoDespesaSchema, chave: 'tipos' },
+        { rota: 'despesas', schema: despesaSchema, chave: 'despesas' },
+        { rota: 'vendascartoes', schema: cartaoVendaSchema, chave: undefined },
+        { rota: 'pedidoscompra', schema: pedidoCompraSchema, chave: 'pedidos' },
+      ] as const;
+
+      for (const recurso of recursos) {
+        const { status, corpo } = await chamar(`/integracao/sgsistemas/v1/${recurso.rota}`, {
+          dataInicial: de,
+          dataFinal: ate,
+        });
+
+        // Rota fora do contrato de homologação não é falha do schema: é escopo do usuário.
+        if (status === 401 || status === 403) continue;
+        expect({ rota: recurso.rota, status }).toEqual({ rota: recurso.rota, status: 200 });
+
+        const pagina = normalizarPagina(corpo, recurso.chave);
+        const invalidos = pagina.itens.filter((item) => !recurso.schema.safeParse(item).success);
+
+        expect({ rota: recurso.rota, invalidos: invalidos.length }).toEqual({
+          rota: recurso.rota,
+          invalidos: 0,
+        });
+      }
     },
     TIMEOUT,
   );

@@ -160,9 +160,10 @@ são a Fase 8.
 | Divergência de fechamento | ✅ (divergência do ERP **ou** venda diária não gerada até a hora limite) |
 | Queda de venda | ✅ (comparação com o mesmo dia da semana, 4 semanas) |
 | Integração parada | ✅ (conexão em erro ou sync atrasado) |
+| Conta a vencer | ✅ soma as parcelas que vencem na janela e avisa uma vez por dia |
+| Cartão não conciliado | ✅ por filial, transações sem baixa além do prazo |
 | Vencimento próximo · Perda anormal | ⛔ dependem da sincronização de vencimentos e perdas (E5-10) |
 | Meta em risco | ⛔ depende da previsão de vendas (E5-11) |
-| Conta a vencer · Cartão não conciliado | ⛔ dependem da sincronização financeira (E5-09) |
 
 As regras indisponíveis **existem** no catálogo e aparecem na tela desligadas, com a dependência
 escrita. Some da tela seria pior: o cliente concluiria que o produto não cobre aquilo.
@@ -180,3 +181,34 @@ Decisões tomadas na implementação:
   precisa disparar justamente quando o sync não está funcionando, então não pode depender dele.
 - **Queda de venda só depois da hora de corte.** Às 9h toda loja está abaixo da média do dia; um
   alerta que dispara todo dia cedo é um alerta que ninguém lê.
+
+## 12. Estado da implementação do financeiro e de compras (Fase 8)
+
+| Spec | Implementação |
+|---|---|
+| §5 Aging a pagar/receber | `dashboard/financeiro.service.ts` (faixas em SQL sobre a parcela) |
+| §5 Fluxo previsto (13 semanas) | idem, `DATE_TRUNC('week')` sobre o que está em aberto |
+| §5 Despesas por tipo, fixas × variáveis | idem + `erp_tipos_despesa` |
+| §5 Cartões: volume, taxa efetiva, não conciliados | idem (`erp_cartao_vendas`) |
+| §6 Pedidos por situação, lead time, pendentes antigos | `dashboard/compras.service.ts` |
+| §6 Entradas do período | idem (`erp_notas_entrada`) |
+
+Decisões tomadas na implementação:
+
+- **O aging é de parcela, não de título.** Um título com três parcelas pode ter uma vencida e duas
+  a vencer; somar pelo título esconderia exatamente o que a tela existe para mostrar.
+- **A taxa de cartão é média ponderada pelo volume.** A média simples daria o mesmo peso a uma
+  transação de R$ 5 e a uma de R$ 5.000 — e é assim que se conclui que a taxa é o dobro do que é.
+- **Lead time do pedido ao atendimento**, não à previsão: a previsão é promessa do fornecedor, e o
+  que o comprador precisa saber é quanto ela costuma valer.
+- **A janela do sync financeiro olha para trás e para frente** (45 dias / 90 dias): o aging precisa
+  do que vai vencer, e a reconciliação precisa do título que foi baixado depois de emitido.
+- **O painel financeiro é de manager+.** Venda todo mundo vê; dívida, custo fixo e taxa de cartão
+  são material de gestão (doc 02, classificação FINANCIAL).
+- **Fill rate por fornecedor (§6) ficou de fora**: depende de `/pedidoscompra/produtos`, que só
+  entra quando houver tela de detalhe do pedido.
+
+Nomes de campo dos endpoints financeiros: a coleção não traz exemplo de resposta de todos eles, e
+os schemas foram escritos a partir do doc 03/05. O **contrato noturno** cobre os cinco recursos e é
+quem confirma ou desmente contra a homologação — item [NECESSITA CONFIRMAÇÃO] até a primeira
+execução com credencial.

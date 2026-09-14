@@ -9,18 +9,32 @@ import { normalizarPagina } from './normalizers';
 import { SgError } from './sg-errors';
 import { SgTokenManager } from './sg-token.manager';
 import {
+  cartaoVendaSchema,
+  contaPagarSchema,
+  contaReceberSchema,
+  despesaSchema,
   dimensaoSchema,
   filialSchema,
   gtinSchema,
+  notaEntradaSchema,
+  pedidoCompraSchema,
+  tipoDespesaSchema,
   finalizadoraSchema,
   produtoSchema,
   resumoFilialSchema,
   statusSchema,
   vendaCupomSchema,
   type SgDimensao,
+  type SgCartaoVenda,
+  type SgContaPagar,
+  type SgContaReceber,
+  type SgDespesa,
   type SgFilial,
   type SgFinalizadora,
   type SgGtin,
+  type SgNotaEntrada,
+  type SgPedidoCompra,
+  type SgTipoDespesa,
   type SgProduto,
   type SgResumoFilial,
   type SgStatus,
@@ -294,7 +308,150 @@ export class SgClient {
     return { itens, invalidos };
   }
 
+  // ---------------------------------------------------------------- financeiro
+  /**
+   * Contas a pagar do período (doc 03 §Financeiro).
+   *
+   * Título com parcelas aninhadas. As datas são obrigatórias na API; a janela é do chamador,
+   * porque aqui o recorte útil é por vencimento futuro (fluxo de caixa), não por dia fechado.
+   */
+  async getContasPagar(
+    contexto: SgCallContext,
+    params: { dataInicial: string; dataFinal: string; filial?: number },
+  ): Promise<ResultadoColeta<SgContaPagar>> {
+    return this.coletarPaginado(
+      contexto,
+      `${BASE}/contas/pagar`,
+      { dataInicial: params.dataInicial, dataFinal: params.dataFinal, filial: params.filial },
+      'GET /contas/pagar',
+      contaPagarSchema,
+      'contas_pagar',
+      'contas',
+    );
+  }
+
+  async getContasReceber(
+    contexto: SgCallContext,
+    params: { dataInicial: string; dataFinal: string; filial?: number },
+  ): Promise<ResultadoColeta<SgContaReceber>> {
+    return this.coletarPaginado(
+      contexto,
+      `${BASE}/contas/receber`,
+      { dataInicial: params.dataInicial, dataFinal: params.dataFinal, filial: params.filial },
+      'GET /contas/receber',
+      contaReceberSchema,
+      'contas_receber',
+      'contas',
+    );
+  }
+
+  /** Tipos de despesa: dimensão pequena, sem filtro de data. */
+  async listTiposDespesa(contexto: SgCallContext): Promise<ResultadoColeta<SgTipoDespesa>> {
+    const corpo = await this.get(contexto, `${BASE}/despesas/tipos`, {}, 'GET /despesas/tipos');
+    return this.coletar(
+      contexto,
+      tipoDespesaSchema,
+      normalizarPagina(corpo, 'tipos').itens,
+      'tipos_despesa',
+    );
+  }
+
+  async getDespesas(
+    contexto: SgCallContext,
+    params: { dataInicial: string; dataFinal: string; filial?: number },
+  ): Promise<ResultadoColeta<SgDespesa>> {
+    return this.coletarPaginado(
+      contexto,
+      `${BASE}/despesas`,
+      { dataInicial: params.dataInicial, dataFinal: params.dataFinal, filial: params.filial },
+      'GET /despesas',
+      despesaSchema,
+      'despesas',
+      'despesas',
+    );
+  }
+
+  /** Transações de cartão. Este endpoint devolve array puro — o normalizador já cobre o caso. */
+  async getCartoes(
+    contexto: SgCallContext,
+    params: { dataInicial: string; dataFinal: string; filial?: number },
+  ): Promise<ResultadoColeta<SgCartaoVenda>> {
+    return this.coletarPaginado(
+      contexto,
+      `${BASE}/vendascartoes`,
+      { dataInicial: params.dataInicial, dataFinal: params.dataFinal, filial: params.filial },
+      'GET /vendascartoes',
+      cartaoVendaSchema,
+      'cartoes',
+    );
+  }
+
+  // ---------------------------------------------------------------- compras
+  async getPedidosCompra(
+    contexto: SgCallContext,
+    params: { dataInicial: string; dataFinal: string; filial?: number },
+  ): Promise<ResultadoColeta<SgPedidoCompra>> {
+    return this.coletarPaginado(
+      contexto,
+      `${BASE}/pedidoscompra`,
+      { dataInicial: params.dataInicial, dataFinal: params.dataFinal, filial: params.filial },
+      'GET /pedidoscompra',
+      pedidoCompraSchema,
+      'pedidos_compra',
+      'pedidos',
+    );
+  }
+
+  async getEntradas(
+    contexto: SgCallContext,
+    params: { dataInicial: string; dataFinal: string; filial?: number },
+  ): Promise<ResultadoColeta<SgNotaEntrada>> {
+    return this.coletarPaginado(
+      contexto,
+      `${BASE}/entradas`,
+      { dataInicial: params.dataInicial, dataFinal: params.dataFinal, filial: params.filial },
+      'GET /entradas',
+      notaEntradaSchema,
+      'entradas',
+      'entradas',
+    );
+  }
+
   // ---------------------------------------------------------------- infraestrutura interna
+  /**
+   * Percorre todas as páginas de um recurso e valida cada item.
+   *
+   * Os recursos financeiros e de compras seguem todos o mesmo molde — período obrigatório,
+   * envelope paginado (ou array puro, em cartões) e um schema por recurso —, então o laço mora
+   * aqui em vez de repetido em cada operação.
+   */
+  private async coletarPaginado<S extends z.ZodTypeAny>(
+    contexto: SgCallContext,
+    caminho: string,
+    query: Record<string, unknown>,
+    rota: string,
+    schema: S,
+    dominio: string,
+    chaveItens?: string,
+  ): Promise<ResultadoColeta<z.infer<S>>> {
+    const itens: Array<z.infer<S>> = [];
+    let invalidos = 0;
+    let paginas = 0;
+
+    for await (const pagina of this.paginar(contexto, caminho, query, rota, {
+      itensPorPagina: this.config.sg.pageSize,
+      chaveItens,
+      prioridade: 'backfill',
+    })) {
+      paginas += 1;
+      const coleta = await this.coletar(contexto, schema, pagina, dominio);
+      itens.push(...coleta.itens);
+      invalidos += coleta.invalidos;
+    }
+
+    return { itens, invalidos, paginas };
+  }
+
   /**
    * Itera as páginas de um recurso tolerando os três formatos de envelope da API
    * (`paginacao`, `ordenacao` ou array puro — doc 02 §3).

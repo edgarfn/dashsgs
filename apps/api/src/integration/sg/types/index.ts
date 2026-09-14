@@ -357,6 +357,232 @@ export const resumoFilialSchema = z
   }));
 export type SgResumoFilial = z.infer<typeof resumoFilialSchema>;
 
+// ---------------------------------------------------------------- financeiro
+/**
+ * Contas a pagar e a receber (doc 03 §Financeiro).
+ *
+ * Título e parcelas vêm aninhados, como em vendas/itens. O nome exato de cada campo ainda é
+ * [NECESSITA CONFIRMAÇÃO] contra a homologação — o teste de contrato noturno é quem responde.
+ * Enquanto isso, o schema é tolerante: campo que não bater vira `null`, e item que não bater vai
+ * para a quarentena com métrica, em vez de derrubar a sincronização.
+ */
+const parcelaSchema = z
+  .object({
+    ordem: sgInteiro,
+    dataVencimento: sgData,
+    dataPagamento: sgData,
+    valorDocumento: sgNumero,
+    valorPago: sgNumero,
+    saldo: sgNumero,
+    juros: sgNumero,
+    desconto: sgNumero,
+    status: sgTexto(30),
+    tipoLancamento: sgTexto(40),
+  })
+  .passthrough()
+  .transform((bruto) => ({
+    ordem: bruto.ordem ?? 0,
+    dataVencimento: bruto.dataVencimento,
+    dataPagamento: bruto.dataPagamento,
+    valorDocumento: bruto.valorDocumento,
+    valorPago: bruto.valorPago,
+    saldo: bruto.saldo,
+    juros: bruto.juros,
+    desconto: bruto.desconto,
+    /** A API marca o status em texto; o produto guarda o booleano, que é o que a tela pergunta. */
+    paga:
+      (bruto.status ?? '').toLowerCase().startsWith('pag') || (bruto.dataPagamento ?? '') !== '',
+    tipoLancamento: bruto.tipoLancamento,
+  }));
+
+export const contaPagarSchema = z
+  .object({
+    id: sgId,
+    idFilial: sgInteiro,
+    idFornecedor: sgInteiro,
+    documento: sgTexto(40),
+    dataEmissao: sgData,
+    valorTotal: sgNumero,
+    observacao: sgTexto(300),
+    parcelas: z.array(parcelaSchema).default([]),
+  })
+  .passthrough()
+  .transform((bruto) => ({
+    erpId: Number(bruto.id),
+    filialErpId: bruto.idFilial,
+    fornecedorErpId: bruto.idFornecedor,
+    documento: bruto.documento,
+    dataEmissao: bruto.dataEmissao,
+    valorTotal: bruto.valorTotal,
+    observacao: bruto.observacao,
+    parcelas: bruto.parcelas,
+  }));
+export type SgContaPagar = z.infer<typeof contaPagarSchema>;
+
+export const contaReceberSchema = z
+  .object({
+    id: sgId,
+    idFilial: sgInteiro,
+    idCliente: sgInteiro,
+    documento: sgTexto(40),
+    dataEmissao: sgData,
+    valorTotal: sgNumero,
+    parcelas: z.array(parcelaSchema).default([]),
+  })
+  .passthrough()
+  .transform((bruto) => ({
+    erpId: Number(bruto.id),
+    filialErpId: bruto.idFilial,
+    /** Id de cliente só é persistido com o módulo Clientes ligado (doc 10 §1). */
+    clienteErpId: bruto.idCliente,
+    documento: bruto.documento,
+    dataEmissao: bruto.dataEmissao,
+    valorTotal: bruto.valorTotal,
+    parcelas: bruto.parcelas,
+  }));
+export type SgContaReceber = z.infer<typeof contaReceberSchema>;
+
+export const tipoDespesaSchema = z
+  .object({
+    id: sgId,
+    descricao: sgTexto(160),
+    classificacao: sgTexto(40),
+    tipoCusto: sgTexto(40),
+    departamentalizacaoNivel1: sgId.optional(),
+  })
+  .passthrough()
+  .transform((bruto) => ({
+    erpId: bruto.id,
+    descricao: bruto.descricao ?? `(sem descrição) ${bruto.id}`,
+    classificacao: bruto.classificacao,
+    tipoCusto: bruto.tipoCusto,
+    dep1ErpId: bruto.departamentalizacaoNivel1 ?? null,
+  }));
+export type SgTipoDespesa = z.infer<typeof tipoDespesaSchema>;
+
+export const despesaSchema = z
+  .object({
+    idFilial: sgInteiro,
+    dataDespesa: sgData,
+    sequencia: sgInteiro,
+    idTipoDespesa: sgId.optional(),
+    idFornecedor: sgInteiro,
+    dataEmissao: sgData,
+    valor: sgNumero,
+    classificacao: sgTexto(40),
+    usuario: sgTexto(60),
+    observacao: sgTexto(300),
+  })
+  .passthrough()
+  .transform((bruto) => ({
+    filialErpId: bruto.idFilial ?? 0,
+    dataDespesa: bruto.dataDespesa,
+    sequencia: bruto.sequencia ?? 0,
+    tipoDespesaErpId: bruto.idTipoDespesa ?? null,
+    fornecedorErpId: bruto.idFornecedor,
+    dataEmissao: bruto.dataEmissao,
+    valor: bruto.valor ?? 0,
+    classificacao: bruto.classificacao,
+    /** Usuário do ERP é dado de colaborador (doc 02): entra no espelho, não vai para a tela. */
+    usuarioErp: bruto.usuario,
+    observacao: bruto.observacao,
+  }))
+  .refine((valor) => valor.dataDespesa !== null, { message: 'despesa sem data' });
+export type SgDespesa = z.infer<typeof despesaSchema>;
+
+/** Transação de cartão. Este endpoint devolve **array puro**, sem envelope (doc 02 §3). */
+export const cartaoVendaSchema = z
+  .object({
+    chaveVenda: sgTexto(60),
+    idFilial: sgInteiro,
+    nsu: sgTexto(40),
+    dataVenda: sgData,
+    dataVencimento: sgData,
+    valorBruto: sgNumero,
+    taxa: sgNumero,
+    tipoVenda: sgTexto(40),
+    formaPagamento: sgTexto(40),
+    descricaoBandeira: sgTexto(60),
+    descricaoAdquirente: sgTexto(60),
+    parcela: sgInteiro,
+    baixada: sgBooleano,
+  })
+  .passthrough()
+  .transform((bruto) => ({
+    chaveVenda: bruto.chaveVenda,
+    filialErpId: bruto.idFilial ?? 0,
+    nsu: bruto.nsu,
+    dataVenda: bruto.dataVenda,
+    dataVencimento: bruto.dataVencimento,
+    valorBruto: bruto.valorBruto ?? 0,
+    taxaPct: bruto.taxa,
+    tipoVenda: bruto.tipoVenda,
+    formaPagamento: bruto.formaPagamento,
+    bandeira: bruto.descricaoBandeira,
+    adquirente: bruto.descricaoAdquirente,
+    parcela: bruto.parcela,
+    baixada: bruto.baixada,
+  }))
+  .refine((valor) => valor.chaveVenda !== null, { message: 'transação sem chave' });
+export type SgCartaoVenda = z.infer<typeof cartaoVendaSchema>;
+
+// ---------------------------------------------------------------- compras
+export const pedidoCompraSchema = z
+  .object({
+    id: sgId,
+    idFilial: sgInteiro,
+    idFornecedor: sgInteiro,
+    idComprador: sgInteiro,
+    dataPedido: sgData,
+    dataPrevisao: sgData,
+    dataAtendimento: sgData,
+    situacao: sgTexto(30),
+    valorTotal: sgNumero,
+    valorFrete: sgNumero,
+  })
+  .passthrough()
+  .transform((bruto) => ({
+    erpId: Number(bruto.id),
+    filialErpId: bruto.idFilial,
+    fornecedorErpId: bruto.idFornecedor,
+    compradorErpId: bruto.idComprador,
+    dataPedido: bruto.dataPedido,
+    dataPrevisao: bruto.dataPrevisao,
+    dataAtendimento: bruto.dataAtendimento,
+    situacao: bruto.situacao,
+    valorTotal: bruto.valorTotal,
+    valorFrete: bruto.valorFrete,
+  }));
+export type SgPedidoCompra = z.infer<typeof pedidoCompraSchema>;
+
+export const notaEntradaSchema = z
+  .object({
+    id: sgId,
+    idFilial: sgInteiro,
+    idFornecedor: sgInteiro,
+    numero: sgTexto(20),
+    serie: sgTexto(10),
+    dataEmissao: sgData,
+    dataEntrada: sgData,
+    valorTotal: sgNumero,
+    situacao: sgTexto(30),
+  })
+  .passthrough()
+  .transform((bruto) => ({
+    erpId: Number(bruto.id),
+    filialErpId: bruto.idFilial,
+    fornecedorErpId: bruto.idFornecedor,
+    numero: bruto.numero,
+    serie: bruto.serie,
+    dataEmissao: bruto.dataEmissao,
+    dataEntrada: bruto.dataEntrada,
+    valorTotal: bruto.valorTotal,
+    situacao: bruto.situacao,
+    // A chave da NF-e (44 dígitos) é SECURITY_SENSITIVE no doc 05 e não entra no espelho enquanto
+    // nenhuma tela precisar dela: campo que não existe não vaza.
+  }));
+export type SgNotaEntrada = z.infer<typeof notaEntradaSchema>;
+
 // ---------------------------------------------------------------- erro da API
 export const sgErroSchema = z
   .object({ error: z.string() })

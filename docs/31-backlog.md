@@ -191,8 +191,8 @@ Decisões e descobertas da implementação:
 | E5-06 ✅ | Sync resumo diário /filiais/vendas + flags | P0 | M | E5-01 | 30d respeitado |
 | E5-07 ✅ | Backfill resumível com progresso + janelas noturnas | P0 | G | E5-02..06 | 90 d sem gaps |
 | E5-08 ✅ | Agregados (agg_*) recalculados por evento | P0 | M | E5-05 | consistentes com fatos |
-| E5-09 | Sync financeiro (contas, despesas, cartões) | P1 | G | E5-01 | reconciliação semanal |
-| E5-10 | Sync compras (pedidos, entradas) + perdas/trocas/vencimentos/movimentações | P1 | G | E5-01 | janelas ≤30 d |
+| E5-09 ✅ | Sync financeiro (contas, despesas, cartões) | P1 | G | E5-01 | reconciliação semanal |
+| E5-10 ◐ | Sync compras (pedidos, entradas) + perdas/trocas/vencimentos/movimentações | P1 | G | E5-01 | janelas ≤30 d |
 | E5-11 | Sync previsão de vendas (+recortes) | P1 | M | E5-01 | mês corrente+próximo |
 | E5-12 ✅ | Painel sync-status por tenant | P0 | M | E5-01 | lag/erros visíveis |
 
@@ -252,7 +252,7 @@ Decisões e descobertas da implementação:
 | E7-05 ✅ | Estados vazios/erro/parcial + selo de frescor | P0 | M | — | doc 16 §3 |
 | E7-06 ◐ | Mobile da home + acessibilidade AA | P1 | M | E7-01 | Lighthouse/axe |
 | E7-07 | Margem por nível (dep→produto) | P1 | G | E5-05 | custo configurável |
-| E7-08 | Financeiro (aging, despesas, cartões) + Compras | P1 | G | E5-09/10 | amostras batem |
+| E7-08 ✅ | Financeiro (aging, despesas, cartões) + Compras | P1 | G | E5-09/10 | amostras batem |
 | E7-09 | Vendas por vendedor / ofertas | P2 | M | E5-05 | — |
 
 **E7-03 está bloqueado por dado, não por tela**: metas dependem de `/previsaovendas`, que só é
@@ -298,14 +298,42 @@ Decisões e descobertas da implementação:
 | E8-01 ✅ | Motor de regras + dedupe + eventos | P0 | G | E2E ≤5 min |
 | E8-02 ✅ | Canais e-mail + feed com ack | P0 | M | template acessível |
 | E8-03 ◐ | Regras padrão doc 15 §8 (seed por tenant) | P0 | M | disparos testados |
+| E5-09 ✅ | Sync financeiro — habilita 2 regras do §8 | P1 | G | reconciliação |
+| E7-08 ✅ | Telas Financeiro e Compras | P1 | G | amostras batem |
 | E8-04 ✅ | UI de configuração de regras | P1 | M | validação params |
 | E8-05 ✅ | Alerta de integração (credencial/lag) p/ admin do tenant | P0 | P | — |
 
-**E8-03 ficou parcial por dependência de dado**: cinco das dez regras do doc 15 §8 avaliam hoje
-(ruptura curva A, estoque negativo, divergência de fechamento, queda de venda e integração
-parada). As outras cinco existem no catálogo, aparecem na tela desligadas com a dependência
-escrita, e ligam sozinhas quando E5-09 (financeiro), E5-10 (vencimentos/perdas) e E5-11
-(previsão) entrarem.
+**E8-03 continua parcial por dependência de dado**: **sete** das dez regras do doc 15 §8 avaliam
+hoje — ruptura curva A, estoque negativo, divergência de fechamento, queda de venda, integração
+parada e, com a chegada de E5-09, conta a vencer e cartão não conciliado. As três restantes
+(vencimento próximo, perda anormal e meta em risco) aparecem na tela desligadas com a dependência
+escrita, e ligam sozinhas quando o resto de E5-10 e a E5-11 entrarem.
+
+### Fechamento da Fase 8 — financeiro e compras
+
+- **Sync financeiro (E5-09)**: contas a pagar e a receber com parcelas, despesas com seus tipos, e
+  transações de cartão. Janela de −45 a +90 dias, cadência de 1 h.
+- **Sync de compras (E5-10 parcial)**: pedidos e notas de entrada, janela de 60 dias.
+- **Telas (E7-08)**: Financeiro com aging dos dois lados, fluxo previsto de 13 semanas, despesas
+  por tipo (fixas × variáveis) e cartões com taxa efetiva e não conciliados; Compras com pedidos
+  por situação, lead time médio e p90, pedidos parados e entradas do período.
+- **Duas regras de alerta novas** ligadas pelo dado que chegou: conta a vencer e cartão não
+  conciliado.
+
+Decisões e descobertas:
+
+- **Aging por parcela, não por título** — é onde mora o vencimento. E **taxa de cartão ponderada
+  pelo volume**: a média simples faria uma transação de R$ 5 pesar como uma de R$ 5.000, e o teste
+  de integração fixa esse comportamento com um caso em que as duas contas divergem (2% × 6%).
+- O driver do Prisma manda número como `int8`, e o Postgres não tem operador `date - bigint`: a
+  consulta de pedidos parados precisou de cast explícito. Apareceu como 500 no teste, não no
+  cliente.
+- Crase dentro de template literal abre interpolação — um comentário SQL com `date - bigint`
+  quebrou a compilação inteira. Comentário em SQL embutido não leva crase.
+- **Os nomes de campo dos endpoints financeiros ainda não estão confirmados pela SG.** Os schemas
+  vieram do doc 03/05 e o teste de contrato noturno passou a cobrir os cinco recursos: se um campo
+  tiver outro nome, o item cai na quarentena e o job noturno acusa — em vez de a tela de aging
+  aparecer vazia para o primeiro cliente.
 
 O que a Fase 8 deixou pronto (parte de alertas):
 

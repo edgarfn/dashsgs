@@ -6,15 +6,16 @@ Especificação completa de produto, arquitetura e desenvolvimento de um sistema
 
 **Status:** Fases 0–1 (Discovery/Arquitetura) concluídas; **Fases 2 (Foundation)**,
 **3 (Autenticação)**, **4 (Multi-tenant/RLS)**, **5 (Integração com a API SG)** e
-**6 (Sincronização)**, **7 (Dashboard MVP)** e o motor de **alertas** da Fase 8 implementados — monorepo com CI, sessões
+**6 (Sincronização)**, **7 (Dashboard MVP)** e **8 (Alertas & Financeiro)** implementadas — monorepo com CI, sessões
 server-side com MFA, RBAC, isolamento por tenant provado no banco e na API, a camada
 anti-corrupção que fala com o ERP (cofre de credencial, anti-SSRF, token manager, rate-limit,
 circuit breaker), o motor de sincronização (watermarks, cadências em fila, consolidação
 pós-fechamento, backfill resumível, agregados) e o dashboard: visão executiva com curva do dia,
 diário de vendas cupom a cupom, comparativos e ruptura de estoque — com selo de frescor e export
-CSV — e os alertas que avisam o cliente sozinhos (ruptura de curva A, estoque negativo,
-divergência de fechamento, queda de venda e integração parada), com feed, reconhecimento e
-e-mail. Em andamento na Fase 8: a parte financeira (sync E5-09 e telas E7-08). Nenhuma linha foi escrita antes
+CSV —, os painéis de financeiro (aging, fluxo previsto, despesas e taxas de cartão) e compras
+(situação dos pedidos, lead time, pedidos parados), e os alertas que avisam o cliente sozinhos:
+sete regras ativas, com feed, reconhecimento e e-mail. Próxima: Fase 9 — Security Hardening
+(pentest, CSP final, retenções e checklist ASVS). Nenhuma linha foi escrita antes
 da especificação, por decisão de método: primeiro entender 100% da capacidade da API, depois
 construir.
 

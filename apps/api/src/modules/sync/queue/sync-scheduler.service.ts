@@ -17,6 +17,8 @@ const PRIORIDADE: Record<SyncDomain, number> = {
   resumo_filial: 3,
   produtos: 4,
   dimensoes: 5,
+  financeiro: 6,
+  compras: 6,
   backfill: 9,
 };
 

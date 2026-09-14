@@ -67,6 +67,26 @@ export const comparativoQuerySchema = z
   );
 export type ComparativoQuery = z.infer<typeof comparativoQuerySchema>;
 
+/** Financeiro e Compras compartilham o filtro: período + filiais. */
+export const periodoQuerySchema = z
+  .object({
+    de: dia,
+    ate: dia,
+    filiais,
+  })
+  .strict()
+  .refine((valor) => valor.de <= valor.ate, {
+    message: 'o início do período precisa vir antes do fim',
+    path: ['de'],
+  })
+  .refine(
+    (valor) =>
+      (Date.parse(`${valor.ate}T00:00:00Z`) - Date.parse(`${valor.de}T00:00:00Z`)) / 86_400_000 <=
+      366,
+    { message: 'período máximo de 366 dias', path: ['ate'] },
+  );
+export type PeriodoQuery = z.infer<typeof periodoQuerySchema>;
+
 export const rupturaQuerySchema = z
   .object({
     filiais,

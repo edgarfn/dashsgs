@@ -100,6 +100,8 @@ resultados de verificação de permissão (avaliar sempre).
 | §5 Backoff 1/5/15/60 min + DLQ | `queue/sync.worker.ts` (BullMQ) |
 | §7 Frescor exposto ao usuário | `apps/web/src/app/admin/sincronizacao` + `sync-status.service.ts` |
 | Agregados por evento | `apps/api/src/modules/sync/aggregates.service.ts` |
+| §2 Financeiro (contas, despesas, cartões) | `domains/financeiro.sync.ts` — janela −45/+90 dias, cadência de 1 h |
+| §2 Compras (pedidos, entradas) | `domains/compras.sync.ts` — janela de 60 dias, cadência de 1 h |
 
 Decisões tomadas na implementação:
 
@@ -122,7 +124,7 @@ Decisões tomadas na implementação:
 - **Backfill de trás para frente, com concorrência 1.** O dashboard fica utilizável em minutos, e
   a carga histórica nunca disputa o ERP da loja com o tempo real.
 
-Ainda não implementado deste doc: os grupos de financeiro, compras, notas, verbas e previsão
-(E5-09 a E5-11), o cache de leitura do §6 (entra com o dashboard, na Fase 7) e a reconciliação
-por `quantidadeItens` do §4 — hoje a divergência é detectada pela flag `possuiDivergencia` do
-resumo diário, que já dispara re-sync do dia.
+Ainda não implementado deste doc: perdas, trocas, vencimentos e movimentações (resto de E5-10),
+notas de saída/NFS, verbas e previsão de vendas (E5-11), e a reconciliação por `quantidadeItens`
+do §4 — hoje a divergência é detectada pela flag `possuiDivergencia` do resumo diário, que já
+dispara re-sync do dia.

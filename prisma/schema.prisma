@@ -902,3 +902,200 @@ model Notification {
   @@index([tenantId, alertEventId])
   @@map("app_notifications")
 }
+
+// ============================================================================
+// Espelho do ERP — financeiro (doc 05 §3)
+//
+// Título e parcela são tabelas separadas porque é assim que o ERP entrega e é assim que o
+// aging pergunta: o vencimento mora na parcela, não no título.
+// ============================================================================
+
+model ErpContaPagar {
+  tenantId String @map("tenant_id") @db.Uuid
+  erpId    Int    @map("erp_id")
+
+  filialErpId     Int?      @map("filial_erp_id")
+  fornecedorErpId Int?      @map("fornecedor_erp_id")
+  documento       String?   @db.VarChar(40)
+  dataEmissao     DateTime? @map("data_emissao") @db.Date
+  valorTotal      Decimal?  @map("valor_total") @db.Decimal(14, 4)
+  observacao      String?   @db.VarChar(300)
+  syncedAt        DateTime  @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  parcelas ErpContaPagarParcela[]
+
+  @@id([tenantId, erpId])
+  @@index([tenantId, dataEmissao])
+  @@map("erp_contas_pagar")
+}
+
+/// Parcela: a unidade do fluxo de caixa. `status` vem do ERP (paga / não paga).
+model ErpContaPagarParcela {
+  tenantId   String @map("tenant_id") @db.Uuid
+  contaErpId Int    @map("conta_erp_id")
+  ordem      Int
+
+  dataVencimento DateTime? @map("data_vencimento") @db.Date
+  dataPagamento  DateTime? @map("data_pagamento") @db.Date
+  valorDocumento Decimal?  @map("valor_documento") @db.Decimal(14, 4)
+  valorPago      Decimal?  @map("valor_pago") @db.Decimal(14, 4)
+  saldo          Decimal?  @db.Decimal(14, 4)
+  paga           Boolean   @default(false)
+  tipoLancamento String?   @map("tipo_lancamento") @db.VarChar(40)
+  syncedAt       DateTime  @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  conta ErpContaPagar @relation(fields: [tenantId, contaErpId], references: [tenantId, erpId], onDelete: Cascade)
+
+  @@id([tenantId, contaErpId, ordem])
+  @@index([tenantId, paga, dataVencimento])
+  @@map("erp_conta_pagar_parcelas")
+}
+
+model ErpContaReceber {
+  tenantId String @map("tenant_id") @db.Uuid
+  erpId    Int    @map("erp_id")
+
+  filialErpId  Int?      @map("filial_erp_id")
+  clienteErpId Int?      @map("cliente_erp_id")
+  documento    String?   @db.VarChar(40)
+  dataEmissao  DateTime? @map("data_emissao") @db.Date
+  valorTotal   Decimal?  @map("valor_total") @db.Decimal(14, 4)
+  syncedAt     DateTime  @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  parcelas ErpContaReceberParcela[]
+
+  @@id([tenantId, erpId])
+  @@index([tenantId, dataEmissao])
+  @@map("erp_contas_receber")
+}
+
+model ErpContaReceberParcela {
+  tenantId   String @map("tenant_id") @db.Uuid
+  contaErpId Int    @map("conta_erp_id")
+  ordem      Int
+
+  dataVencimento DateTime? @map("data_vencimento") @db.Date
+  dataPagamento  DateTime? @map("data_pagamento") @db.Date
+  valorDocumento Decimal?  @map("valor_documento") @db.Decimal(14, 4)
+  valorPago      Decimal?  @map("valor_pago") @db.Decimal(14, 4)
+  saldo          Decimal?  @db.Decimal(14, 4)
+  juros          Decimal?  @db.Decimal(14, 4)
+  desconto       Decimal?  @db.Decimal(14, 4)
+  paga           Boolean   @default(false)
+  syncedAt       DateTime  @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  conta ErpContaReceber @relation(fields: [tenantId, contaErpId], references: [tenantId, erpId], onDelete: Cascade)
+
+  @@id([tenantId, contaErpId, ordem])
+  @@index([tenantId, paga, dataVencimento])
+  @@map("erp_conta_receber_parcelas")
+}
+
+/// Tipos de despesa: é o corte que separa custo fixo de variável no painel (doc 15 §5).
+model ErpTipoDespesa {
+  tenantId String @map("tenant_id") @db.Uuid
+  erpId    String @map("erp_id") @db.VarChar(20)
+
+  descricao     String  @db.VarChar(160)
+  classificacao String? @db.VarChar(40)
+  tipoCusto     String? @map("tipo_custo") @db.VarChar(40)
+  dep1ErpId     String? @map("dep1_erp_id") @db.VarChar(20)
+
+  syncedAt DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  @@id([tenantId, erpId])
+  @@map("erp_tipos_despesa")
+}
+
+model ErpDespesa {
+  tenantId    String   @map("tenant_id") @db.Uuid
+  filialErpId Int      @map("filial_erp_id")
+  dataDespesa DateTime @map("data_despesa") @db.Date
+  sequencia   Int
+
+  tipoDespesaErpId String?   @map("tipo_despesa_erp_id") @db.VarChar(20)
+  fornecedorErpId  Int?      @map("fornecedor_erp_id")
+  dataEmissao      DateTime? @map("data_emissao") @db.Date
+  valor            Decimal   @db.Decimal(14, 4)
+  classificacao    String?   @db.VarChar(40)
+  /// Usuário do ERP que lançou — é dado de colaborador (doc 02 §PERSONAL_DATA), fica sem uso na UI.
+  usuarioErp       String?   @map("usuario_erp") @db.VarChar(60)
+  observacao       String?   @db.VarChar(300)
+  syncedAt         DateTime  @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  @@id([tenantId, filialErpId, dataDespesa, sequencia])
+  @@index([tenantId, dataDespesa])
+  @@index([tenantId, tipoDespesaErpId])
+  @@map("erp_despesas")
+}
+
+/// Transações de cartão: uma linha por NSU. A chave natural é a `chaveVenda` do ERP.
+model ErpCartaoVenda {
+  tenantId   String @map("tenant_id") @db.Uuid
+  chaveVenda String @map("chave_venda") @db.VarChar(60)
+
+  filialErpId    Int       @map("filial_erp_id")
+  nsu            String?   @db.VarChar(40)
+  dataVenda      DateTime? @map("data_venda") @db.Date
+  dataVencimento DateTime? @map("data_vencimento") @db.Date
+  valorBruto     Decimal   @map("valor_bruto") @db.Decimal(14, 4)
+  taxaPct        Decimal?  @map("taxa_pct") @db.Decimal(7, 4)
+  tipoVenda      String?   @map("tipo_venda") @db.VarChar(40)
+  formaPagamento String?   @map("forma_pagamento") @db.VarChar(40)
+  bandeira       String?   @db.VarChar(60)
+  adquirente     String?   @db.VarChar(60)
+  parcela        Int?
+  /// Baixada = conciliada no ERP. O que fica em aberto por dias vira alerta (doc 15 §8).
+  baixada        Boolean   @default(false)
+  syncedAt       DateTime  @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  @@id([tenantId, chaveVenda])
+  @@index([tenantId, dataVenda])
+  @@index([tenantId, baixada, dataVenda])
+  @@map("erp_cartao_vendas")
+}
+
+// ============================================================================
+// Espelho do ERP — compras (doc 05 §3)
+// ============================================================================
+
+model ErpPedidoCompra {
+  tenantId String @map("tenant_id") @db.Uuid
+  erpId    Int    @map("erp_id")
+
+  filialErpId     Int?      @map("filial_erp_id")
+  fornecedorErpId Int?      @map("fornecedor_erp_id")
+  compradorErpId  Int?      @map("comprador_erp_id")
+  dataPedido      DateTime? @map("data_pedido") @db.Date
+  dataPrevisao    DateTime? @map("data_previsao") @db.Date
+  dataAtendimento DateTime? @map("data_atendimento") @db.Date
+  /// atendido · pendente · parcial · semAceite · geradoNovoPedido (doc 03).
+  situacao        String?   @db.VarChar(30)
+  valorTotal      Decimal?  @map("valor_total") @db.Decimal(14, 4)
+  valorFrete      Decimal?  @map("valor_frete") @db.Decimal(14, 4)
+  syncedAt        DateTime  @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  @@id([tenantId, erpId])
+  @@index([tenantId, situacao, dataPedido])
+  @@index([tenantId, dataPedido])
+  @@map("erp_pedidos_compra")
+}
+
+model ErpNotaEntrada {
+  tenantId String @map("tenant_id") @db.Uuid
+  erpId    Int    @map("erp_id")
+
+  filialErpId     Int?      @map("filial_erp_id")
+  fornecedorErpId Int?      @map("fornecedor_erp_id")
+  numero          String?   @db.VarChar(20)
+  serie           String?   @db.VarChar(10)
+  dataEmissao     DateTime? @map("data_emissao") @db.Date
+  dataEntrada     DateTime? @map("data_entrada") @db.Date
+  valorTotal      Decimal?  @map("valor_total") @db.Decimal(14, 4)
+  situacao        String?   @db.VarChar(30)
+  syncedAt        DateTime  @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  @@id([tenantId, erpId])
+  @@index([tenantId, dataEntrada])
+  @@map("erp_notas_entrada")
+}

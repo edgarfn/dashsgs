@@ -136,9 +136,10 @@ describe('alertas (integração)', () => {
       expect(lista.map((regra) => regra.type)).toContain('ruptura_curva_a');
 
       // Regra sem avaliador nasce desligada: ligar algo que não roda seria promessa falsa.
-      const semDado = lista.find((regra) => regra.type === 'conta_a_vencer');
+      // 'meta_em_risco' depende da previsão de vendas (E5-11), que ainda não é sincronizada.
+      const semDado = lista.find((regra) => regra.type === 'meta_em_risco');
       expect(semDado?.enabled).toBe(false);
-      expect(semDado?.dependencia).toContain('financeira');
+      expect(semDado?.dependencia).toContain('previsão');
     });
 
     it('semear de novo não duplica nem sobrescreve o ajuste do cliente', async () => {

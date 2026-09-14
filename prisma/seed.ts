@@ -325,6 +325,215 @@ async function seedVendas(tenantId: string): Promise<void> {
   );
 }
 
+/**
+ * Financeiro e compras sintéticos (Fase 8).
+ *
+ * O painel financeiro sem dado é uma tela de zeros que não dá para revisar. Aqui entram títulos
+ * em todas as faixas do aging (inclusive vencido), despesas fixas e variáveis, transações de
+ * cartão com e sem baixa, e pedidos de compra em cada situação — inclusive um parado há semanas,
+ * que é o caso que a tela existe para mostrar.
+ */
+async function seedFinanceiro(tenantId: string): Promise<void> {
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.$executeRawUnsafe(`SET LOCAL app.tenant_id = '${tenantId}'`);
+
+      await tx.erpContaPagarParcela.deleteMany({});
+      await tx.erpContaPagar.deleteMany({});
+      await tx.erpContaReceberParcela.deleteMany({});
+      await tx.erpContaReceber.deleteMany({});
+      await tx.erpDespesa.deleteMany({});
+      await tx.erpTipoDespesa.deleteMany({});
+      await tx.erpCartaoVenda.deleteMany({});
+      await tx.erpPedidoCompra.deleteMany({});
+      await tx.erpNotaEntrada.deleteMany({});
+
+      // Uma parcela por faixa do aging: vencida, esta semana, este mês, no trimestre e além.
+      const vencimentos = [-12, 3, 20, 60, 120];
+
+      for (const [indice, offset] of vencimentos.entries()) {
+        const filial = FILIAIS[indice % FILIAIS.length]!.erpId;
+        const valor = 1500 + indice * 850;
+
+        await tx.erpContaPagar.create({
+          data: {
+            tenantId,
+            erpId: 9000 + indice,
+            filialErpId: filial,
+            fornecedorErpId: 500 + indice,
+            documento: `NF ${12000 + indice}`,
+            dataEmissao: new Date(`${diaISO(40)}T00:00:00Z`),
+            valorTotal: valor,
+          },
+        });
+        await tx.erpContaPagarParcela.create({
+          data: {
+            tenantId,
+            contaErpId: 9000 + indice,
+            ordem: 1,
+            dataVencimento: new Date(`${diaISO(-offset)}T00:00:00Z`),
+            valorDocumento: valor,
+            saldo: valor,
+            paga: false,
+            tipoLancamento: 'DUPLICATA',
+          },
+        });
+
+        await tx.erpContaReceber.create({
+          data: {
+            tenantId,
+            erpId: 7000 + indice,
+            filialErpId: filial,
+            documento: `CRED ${700 + indice}`,
+            dataEmissao: new Date(`${diaISO(30)}T00:00:00Z`),
+            valorTotal: valor / 3,
+          },
+        });
+        await tx.erpContaReceberParcela.create({
+          data: {
+            tenantId,
+            contaErpId: 7000 + indice,
+            ordem: 1,
+            dataVencimento: new Date(`${diaISO(-offset)}T00:00:00Z`),
+            valorDocumento: valor / 3,
+            saldo: valor / 3,
+            paga: false,
+          },
+        });
+      }
+
+      // Uma parcela já paga: o aging só conta o que está em aberto.
+      await tx.erpContaPagar.create({
+        data: {
+          tenantId,
+          erpId: 9900,
+          filialErpId: 1,
+          documento: 'NF 11999',
+          dataEmissao: new Date(`${diaISO(60)}T00:00:00Z`),
+          valorTotal: 4200,
+        },
+      });
+      await tx.erpContaPagarParcela.create({
+        data: {
+          tenantId,
+          contaErpId: 9900,
+          ordem: 1,
+          dataVencimento: new Date(`${diaISO(20)}T00:00:00Z`),
+          dataPagamento: new Date(`${diaISO(20)}T00:00:00Z`),
+          valorDocumento: 4200,
+          valorPago: 4200,
+          saldo: 0,
+          paga: true,
+        },
+      });
+
+      const tipos = [
+        { erpId: '10', descricao: 'ENERGIA ELETRICA', classificacao: 'FIXA' },
+        { erpId: '11', descricao: 'FRETE', classificacao: 'VARIAVEL' },
+        { erpId: '12', descricao: 'MANUTENCAO', classificacao: 'VARIAVEL' },
+        { erpId: '13', descricao: 'ALUGUEL', classificacao: 'FIXA' },
+      ];
+      for (const tipo of tipos) {
+        await tx.erpTipoDespesa.create({
+          data: { tenantId, ...tipo, tipoCusto: 'OPERACIONAL' },
+        });
+      }
+
+      for (let offset = 0; offset < 28; offset += 1) {
+        const tipo = tipos[offset % tipos.length]!;
+        const filial = FILIAIS[offset % FILIAIS.length]!.erpId;
+        await tx.erpDespesa.create({
+          data: {
+            tenantId,
+            filialErpId: filial,
+            dataDespesa: new Date(`${diaISO(offset)}T00:00:00Z`),
+            sequencia: 1,
+            tipoDespesaErpId: tipo.erpId,
+            valor: 220 + ((offset * 37) % 900),
+            classificacao: tipo.classificacao,
+            usuarioErp: 'OPERADOR01',
+          },
+        });
+      }
+
+      const bandeiras = [
+        { bandeira: 'VISA', adquirente: 'CIELO', taxa: 2.99 },
+        { bandeira: 'MASTERCARD', adquirente: 'REDE', taxa: 2.49 },
+        { bandeira: 'ELO', adquirente: 'CIELO', taxa: 3.49 },
+        { bandeira: 'PIX', adquirente: 'BANCO', taxa: 0.4 },
+      ];
+      for (let offset = 0; offset < 30; offset += 1) {
+        const cartao = bandeiras[offset % bandeiras.length]!;
+        const filial = FILIAIS[offset % FILIAIS.length]!.erpId;
+        // Os mais antigos ficam sem baixa: é o que vira alerta de conciliação.
+        const baixada = offset < 20;
+
+        await tx.erpCartaoVenda.create({
+          data: {
+            tenantId,
+            chaveVenda: `CV-${String(offset).padStart(5, '0')}`,
+            filialErpId: filial,
+            nsu: String(880000 + offset),
+            dataVenda: new Date(`${diaISO(offset)}T00:00:00Z`),
+            dataVencimento: new Date(`${diaISO(offset - 30)}T00:00:00Z`),
+            valorBruto: 180 + ((offset * 53) % 1200),
+            taxaPct: cartao.taxa,
+            tipoVenda: offset % 3 === 0 ? 'DEBITO' : 'CREDITO',
+            formaPagamento: 'CARTAO',
+            bandeira: cartao.bandeira,
+            adquirente: cartao.adquirente,
+            parcela: 1,
+            baixada,
+          },
+        });
+      }
+
+      const situacoes = ['atendido', 'pendente', 'parcial', 'semAceite'];
+      for (let indice = 0; indice < 12; indice += 1) {
+        const situacao = situacoes[indice % situacoes.length]!;
+        const atendido = situacao === 'atendido';
+        const diasAtras = 5 + indice * 4;
+
+        await tx.erpPedidoCompra.create({
+          data: {
+            tenantId,
+            erpId: 3000 + indice,
+            filialErpId: FILIAIS[indice % FILIAIS.length]!.erpId,
+            fornecedorErpId: 500 + (indice % 4),
+            compradorErpId: 20 + (indice % 2),
+            dataPedido: new Date(`${diaISO(diasAtras)}T00:00:00Z`),
+            dataPrevisao: new Date(`${diaISO(diasAtras - 7)}T00:00:00Z`),
+            dataAtendimento: atendido
+              ? new Date(`${diaISO(diasAtras - 5 - (indice % 4))}T00:00:00Z`)
+              : null,
+            situacao,
+            valorTotal: 3000 + indice * 750,
+            valorFrete: indice % 3 === 0 ? 180 : 0,
+          },
+        });
+
+        if (atendido) {
+          await tx.erpNotaEntrada.create({
+            data: {
+              tenantId,
+              erpId: 8000 + indice,
+              filialErpId: FILIAIS[indice % FILIAIS.length]!.erpId,
+              fornecedorErpId: 500 + (indice % 4),
+              numero: String(12000 + indice),
+              serie: '1',
+              dataEmissao: new Date(`${diaISO(diasAtras - 4)}T00:00:00Z`),
+              dataEntrada: new Date(`${diaISO(diasAtras - 3)}T00:00:00Z`),
+              valorTotal: 3000 + indice * 750,
+              situacao: 'normal',
+            },
+          });
+        }
+      }
+    },
+    { timeout: 120_000, maxWait: 20_000 },
+  );
+}
+
 async function main(): Promise<void> {
   const password = process.env.SEED_PASSWORD ?? generatePassword();
   const passwordHash = await hash(password, ARGON2_OPTIONS);
@@ -341,6 +550,7 @@ async function main(): Promise<void> {
   // Só o tenant demo recebe movimento: o vizinho existe para provar isolamento, e um tenant
   // vazio ao lado de um cheio é justamente o contraste que denuncia vazamento.
   await seedVendas(demo.id);
+  await seedFinanceiro(demo.id);
 
   // Conta de operação da plataforma: papel global, sem membership em tenant nenhum (doc 07 §2).
   await prisma.user.upsert({
@@ -362,6 +572,7 @@ async function main(): Promise<void> {
     `  tenant : ${vizinho.name} (${vizinho.slug}) — ${FILIAIS.length} filiais (sem movimento)`,
   );
   console.log(`  vendas : ${DIAS_DE_HISTORICO} dias sintéticos no tenant demo`);
+  console.log('  financ.: contas, despesas, cartões e pedidos de compra sintéticos');
   for (const user of [...DEMO_USERS, ...VIZINHO_USERS]) {
     const recorte = user.filiais.length > 0 ? ` — filiais ${user.filiais.join(', ')}` : '';
     console.log(`  usuário: ${user.email} — papel ${user.role}${recorte}`);
