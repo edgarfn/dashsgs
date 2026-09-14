@@ -4,6 +4,7 @@ import { Worker, type Job } from 'bullmq';
 import IORedis, { type Redis } from 'ioredis';
 import { PinoLogger } from 'nestjs-pino';
 import { MetricsService } from '../../../common/metrics/metrics.service';
+import { AlertEngine } from '../../alertas/alert-engine.service';
 import { AppConfigService } from '../../../config';
 import { BackfillService } from '../backfill.service';
 import { SyncService } from '../sync.service';
@@ -46,6 +47,7 @@ export class SyncWorker implements OnModuleInit, OnApplicationShutdown {
     private readonly backfill: BackfillService,
     private readonly scheduler: SyncSchedulerService,
     private readonly filas: SyncQueueService,
+    private readonly alertas: AlertEngine,
     private readonly metrics: MetricsService,
     private readonly logger: PinoLogger,
   ) {
@@ -116,6 +118,11 @@ export class SyncWorker implements OnModuleInit, OnApplicationShutdown {
 
   private async processarSync(job: Job<JobSync>): Promise<unknown> {
     const dados = job.data;
+
+    if (dados.tipo === 'alertas') {
+      // O motor varre todos os tenants: são consultas ao espelho, rápidas e sem ERP no caminho.
+      return this.alertas.avaliarTodos();
+    }
 
     if (dados.tipo === 'tick') {
       const enfileirados = await this.scheduler.processarTick(dados.domain);

@@ -19,6 +19,17 @@ Gerenciar pessoas e papéis, manter a conexão com o ERP saudável, decidir mód
 - Boas práticas: peça à SG um usuário **somente leitura**; solicite escrita apenas se contratar
   o módulo de Ações no ERP.
 
+## 1.1 Alertas (Alertas → Regras)
+- Cada aviso mostra **o que observa**, **quem recebe** e o **limiar** ajustável; a verificação
+  roda a cada 5 minutos.
+- Ligar/desligar e calibrar limiar é de owner, admin e gerente (`alerts.manage`); reconhecer no
+  feed é de quem opera (`alerts.ack`).
+- "Avaliar agora" roda as regras na hora — útil depois de ajustar um limiar.
+- Um mesmo problema gera **um** aviso por dia e por filial. Ele volta no dia seguinte enquanto
+  não for resolvido no ERP.
+- Avisos que dependem de dado ainda não sincronizado (financeiro, vencimentos, metas) aparecem
+  na seção "Aguardando dados" e ligam sozinhos quando a sincronização correspondente entrar.
+
 ## 2. Usuários e papéis (Administração → Usuários)
 - Convide por e-mail escolhendo papel (owner, admin, manager, analyst, viewer, auditor — ver
   tabela de permissões na tela) e, opcionalmente, **filiais permitidas**.

@@ -67,6 +67,13 @@ interface HomeView {
   semDados: boolean;
 }
 
+/** Contagens do feed (`GET /alertas`): os nomes vêm da API, não são reinventados aqui. */
+interface AlertasAbertos {
+  abertos: number;
+  reconhecidos: number;
+  criticos: number;
+}
+
 interface FilialView {
   erpId: number;
   razaoSocial: string;
@@ -105,10 +112,16 @@ export default async function HomePage({
   const consulta = new URLSearchParams({ custo });
   if (filiaisParam) consulta.set('filiais', filiaisParam);
 
-  const [resposta, filiais] = await Promise.all([
+  const [resposta, filiais, alertas] = await Promise.all([
     apiRequest<HomeView>('GET', `/dashboard/home?${consulta.toString()}`),
     apiRequest<FilialView[]>('GET', '/dim/filiais'),
+    // O feed só é consultado para quem recebe alerta — quem não recebe não precisa do número.
+    me.permissions.includes('alerts.ack')
+      ? apiRequest<{ contagens: AlertasAbertos }>('GET', '/alertas?status=open&itensPorPagina=5')
+      : Promise.resolve({ data: null }),
   ]);
+
+  const abertos = alertas.data?.contagens;
 
   const home = resposta.data;
 
@@ -119,6 +132,19 @@ export default async function HomePage({
       {!home ? (
         <Alert kind="error">
           Não foi possível carregar os indicadores agora. Tente novamente em alguns instantes.
+        </Alert>
+      ) : null}
+
+      {abertos && abertos.abertos > 0 ? (
+        <Alert kind={abertos.criticos > 0 ? 'error' : 'info'}>
+          {abertos.abertos === 1 ? 'Há 1 alerta aberto' : `Há ${abertos.abertos} alertas abertos`}
+          {abertos.criticos > 0
+            ? ` — ${abertos.criticos} ${abertos.criticos === 1 ? 'crítico' : 'críticos'}`
+            : ''}
+          .{' '}
+          <Link href="/alertas" className="underline underline-offset-4">
+            Ver alertas
+          </Link>
         </Alert>
       ) : null}
 

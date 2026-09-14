@@ -98,3 +98,24 @@ export async function resetBackfill(): Promise<void> {
     });
   }
 }
+
+/**
+ * Zera alertas e regras dos tenants de teste.
+ *
+ * As regras voltam com os padrões do doc 15 §8 na primeira leitura da tela, e os eventos são
+ * recriados pela avaliação — assim cada cenário começa do mesmo ponto, sem herdar o alerta que
+ * o anterior reconheceu (ou o limiar que ele mexeu).
+ */
+export async function limparAlertas(): Promise<void> {
+  const db = prisma();
+  const tenants = await db.tenant.findMany({ select: { id: true } });
+
+  for (const tenant of tenants) {
+    await db.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(`SET LOCAL app.tenant_id = '${tenant.id}'`);
+      await tx.notification.deleteMany({});
+      await tx.alertEvent.deleteMany({});
+      await tx.alertRule.deleteMany({});
+    });
+  }
+}

@@ -33,6 +33,11 @@ export class MetricsService {
   readonly queueDlqDepth: Gauge<'queue'>;
   readonly jobRetriesTotal: Counter<'queue'>;
 
+  // --- Alertas (doc 18 §2 / doc 15 §8): o produto avisando o cliente sozinho.
+  readonly alertEventsTotal: Counter<'tenant' | 'type'>;
+  readonly alertNotificationsTotal: Counter<'tenant' | 'result'>;
+  readonly alertDelivery: Histogram<'type'>;
+
   constructor(private readonly config: AppConfigService) {
     this.registry.setDefaultLabels({ service: 'dashsgs-api', env: this.config.nodeEnv });
     collectDefaultMetrics({ register: this.registry, prefix: 'dashsgs_' });
@@ -152,6 +157,28 @@ export class MetricsService {
       name: 'job_retries_total',
       help: 'Tentativas repetidas de jobs por fila',
       labelNames: ['queue'],
+      registers: [this.registry],
+    });
+
+    this.alertEventsTotal = new Counter({
+      name: 'alert_events_total',
+      help: 'Eventos de alerta criados por tenant e tipo (já deduplicados)',
+      labelNames: ['tenant', 'type'],
+      registers: [this.registry],
+    });
+
+    this.alertNotificationsTotal = new Counter({
+      name: 'alert_notifications_total',
+      help: 'Notificações de alerta por resultado de entrega',
+      labelNames: ['tenant', 'result'],
+      registers: [this.registry],
+    });
+
+    this.alertDelivery = new Histogram({
+      name: 'alert_delivery_seconds',
+      help: 'Tempo entre criar o evento e despachar a notificação (SLO do doc 18 §4)',
+      labelNames: ['type'],
+      buckets: [0.1, 0.5, 1, 3, 10, 30, 60, 300],
       registers: [this.registry],
     });
   }

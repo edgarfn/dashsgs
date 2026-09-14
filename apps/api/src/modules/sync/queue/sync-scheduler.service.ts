@@ -6,6 +6,9 @@ import { TenantDatabase } from '../../../common/tenant';
 import { ErpConnectionService } from '../../erp-connection/erp-connection.service';
 import { SyncQueueService } from './sync-queue.service';
 
+/** Cadência do motor de alertas (doc 15 §8 + SLO de entrega ≤ 5 min do doc 18 §4). */
+const CADENCIA_ALERTAS_SEGUNDOS = 300;
+
 /** Prioridade na fila: menor número sai primeiro (BullMQ). Tempo real na frente, sempre. */
 const PRIORIDADE: Record<SyncDomain, number> = {
   health: 2,
@@ -58,8 +61,19 @@ export class SyncSchedulerService {
       );
     }
 
+    // Alertas não são um domínio de sync, mas têm cadência própria no mesmo agendador.
+    await this.filas.sync.upsertJobScheduler(
+      'tick:alertas',
+      { every: CADENCIA_ALERTAS_SEGUNDOS * 1_000 },
+      {
+        name: 'tick:alertas',
+        data: { tipo: 'alertas', domain: 'health' },
+        opts: { priority: 2 },
+      },
+    );
+
     this.logger.info(
-      { event: 'sync_cadencias_registradas', dominios: SYNC_DOMAINS.length },
+      { event: 'sync_cadencias_registradas', dominios: SYNC_DOMAINS.length, alertas: true },
       'sync_cadencias_registradas',
     );
   }

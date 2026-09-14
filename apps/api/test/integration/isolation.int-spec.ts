@@ -37,6 +37,7 @@ describe('isolamento multi-tenant (integração)', () => {
   let csrfDonoA: string;
   let analistaA: TestAgent;
   let conviteB: { id: string };
+  let alertaB: { id: string };
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -84,6 +85,31 @@ describe('isolamento multi-tenant (integração)', () => {
       },
     });
     conviteB = { id: conviteCriado.id };
+
+    // Um alerta aberto no tenant B: é o alvo das tentativas de reconhecer alerta alheio.
+    alertaB = await tenantDb.run(tenantB.id, async (tx) => {
+      const regra = await tx.alertRule.create({
+        data: {
+          tenantId: tenantB.id,
+          name: 'Ruptura de item curva A',
+          type: 'ruptura_curva_a',
+          severity: 'alta',
+          params: { minimoDeItens: 1 },
+        },
+      });
+
+      return tx.alertEvent.create({
+        data: {
+          tenantId: tenantB.id,
+          ruleId: regra.id,
+          filialErpId: 1,
+          dedupeKey: 'isolamento:1',
+          severity: 'alta',
+          payload: { resumo: `ruptura na ${tenantB.marcas[0]}` },
+        },
+        select: { id: true },
+      });
+    });
   });
 
   beforeEach(async () => {
@@ -211,6 +237,8 @@ describe('isolamento multi-tenant (integração)', () => {
         'carga histórica do próprio tenant — ver "backfill" em sync.int-spec',
       [`DELETE ${API_PREFIX}/tenant/sync/backfill`]:
         'cancela a carga do próprio tenant — ver "backfill" em sync.int-spec',
+      [`POST ${API_PREFIX}/alertas/avaliar`]:
+        'avalia as regras do próprio tenant — ver "avaliação" em alertas.int-spec',
     };
 
     const rotas = (): RotaRegistrada[] => listarRotas(app);
@@ -226,6 +254,7 @@ describe('isolamento multi-tenant (integração)', () => {
       if (nome === 'membershipId') return tenantB.users.dono!.membershipId;
       if (rota.path.includes('/platform/tenants/')) return tenantB.id;
       if (rota.path.includes('/tenant/invites/')) return conviteB.id;
+      if (rota.path.includes('/alertas/')) return alertaB.id;
       throw new Error(`parâmetro :${nome} de ${rota.path} sem valor de tenant B definido`);
     };
 
@@ -233,6 +262,9 @@ describe('isolamento multi-tenant (integração)', () => {
       const mapa: Record<string, Record<string, unknown>> = {
         [`PATCH ${API_PREFIX}/tenant/users/:membershipId`]: { role: 'viewer' },
         [`POST ${API_PREFIX}/platform/tenants/:id/suspend`]: { reason: 'teste de isolamento' },
+        // Sem corpo, a validação recusaria antes de chegar à checagem de dono — e o que este
+        // teste precisa provar é que A não desliga o alerta de B.
+        [`PATCH ${API_PREFIX}/alertas/regras/:id`]: { enabled: false },
       };
       return mapa[chave(rota)];
     };

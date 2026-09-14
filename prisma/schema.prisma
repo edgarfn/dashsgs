@@ -392,12 +392,12 @@ model SyncWatermark {
 
 /// Histórico de execuções — alimenta o painel de sync-status (E5-12) e o diagnóstico do doc 21.
 model SyncJobRun {
-  id          BigInt  @id @default(autoincrement())
-  tenantId    String  @map("tenant_id") @db.Uuid
-  domain      String  @db.VarChar(40)
-  filialErpId Int?    @map("filial_erp_id")
+  id          BigInt @id @default(autoincrement())
+  tenantId    String @map("tenant_id") @db.Uuid
+  domain      String @db.VarChar(40)
+  filialErpId Int?   @map("filial_erp_id")
   /// Origem: cadência automática, backfill ou pedido manual do admin.
-  trigger     String  @default("scheduler") @db.VarChar(20)
+  trigger     String @default("scheduler") @db.VarChar(20)
 
   startedAt  DateTime      @default(now()) @map("started_at") @db.Timestamptz(6)
   finishedAt DateTime?     @map("finished_at") @db.Timestamptz(6)
@@ -439,12 +439,12 @@ model SyncApiCallLog {
 
 /// Nível 1 da departamentalização — o corte que o dashboard usa por padrão (doc 15 §4).
 model ErpDepartamentoN1 {
-  tenantId            String   @map("tenant_id") @db.Uuid
-  erpId               String   @map("erp_id") @db.VarChar(20)
-  descricao           String   @db.VarChar(160)
+  tenantId             String   @map("tenant_id") @db.Uuid
+  erpId                String   @map("erp_id") @db.VarChar(20)
+  descricao            String   @db.VarChar(160)
   /// Encadeamento para o nível seguinte, quando a instalação usa a hierarquia completa.
-  parentNextLevelErpId String? @map("parent_next_level_erp_id") @db.VarChar(20)
-  syncedAt            DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+  parentNextLevelErpId String?  @map("parent_next_level_erp_id") @db.VarChar(20)
+  syncedAt             DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
 
   @@id([tenantId, erpId])
   @@index([tenantId, syncedAt])
@@ -452,11 +452,11 @@ model ErpDepartamentoN1 {
 }
 
 model ErpDepartamentoN2 {
-  tenantId            String   @map("tenant_id") @db.Uuid
-  erpId               String   @map("erp_id") @db.VarChar(20)
-  descricao           String   @db.VarChar(160)
-  parentNextLevelErpId String? @map("parent_next_level_erp_id") @db.VarChar(20)
-  syncedAt            DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+  tenantId             String   @map("tenant_id") @db.Uuid
+  erpId                String   @map("erp_id") @db.VarChar(20)
+  descricao            String   @db.VarChar(160)
+  parentNextLevelErpId String?  @map("parent_next_level_erp_id") @db.VarChar(20)
+  syncedAt             DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
 
   @@id([tenantId, erpId])
   @@index([tenantId, syncedAt])
@@ -464,11 +464,11 @@ model ErpDepartamentoN2 {
 }
 
 model ErpDepartamentoN3 {
-  tenantId            String   @map("tenant_id") @db.Uuid
-  erpId               String   @map("erp_id") @db.VarChar(20)
-  descricao           String   @db.VarChar(160)
-  parentNextLevelErpId String? @map("parent_next_level_erp_id") @db.VarChar(20)
-  syncedAt            DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+  tenantId             String   @map("tenant_id") @db.Uuid
+  erpId                String   @map("erp_id") @db.VarChar(20)
+  descricao            String   @db.VarChar(160)
+  parentNextLevelErpId String?  @map("parent_next_level_erp_id") @db.VarChar(20)
+  syncedAt             DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
 
   @@id([tenantId, erpId])
   @@index([tenantId, syncedAt])
@@ -476,11 +476,11 @@ model ErpDepartamentoN3 {
 }
 
 model ErpDepartamentoN4 {
-  tenantId            String   @map("tenant_id") @db.Uuid
-  erpId               String   @map("erp_id") @db.VarChar(20)
-  descricao           String   @db.VarChar(160)
-  parentNextLevelErpId String? @map("parent_next_level_erp_id") @db.VarChar(20)
-  syncedAt            DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+  tenantId             String   @map("tenant_id") @db.Uuid
+  erpId                String   @map("erp_id") @db.VarChar(20)
+  descricao            String   @db.VarChar(160)
+  parentNextLevelErpId String?  @map("parent_next_level_erp_id") @db.VarChar(20)
+  syncedAt             DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
 
   @@id([tenantId, erpId])
   @@index([tenantId, syncedAt])
@@ -488,11 +488,11 @@ model ErpDepartamentoN4 {
 }
 
 model ErpDepartamentoN5 {
-  tenantId            String   @map("tenant_id") @db.Uuid
-  erpId               String   @map("erp_id") @db.VarChar(20)
-  descricao           String   @db.VarChar(160)
-  parentNextLevelErpId String? @map("parent_next_level_erp_id") @db.VarChar(20)
-  syncedAt            DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+  tenantId             String   @map("tenant_id") @db.Uuid
+  erpId                String   @map("erp_id") @db.VarChar(20)
+  descricao            String   @db.VarChar(160)
+  parentNextLevelErpId String?  @map("parent_next_level_erp_id") @db.VarChar(20)
+  syncedAt             DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
 
   @@id([tenantId, erpId])
   @@index([tenantId, syncedAt])
@@ -500,11 +500,11 @@ model ErpDepartamentoN5 {
 }
 
 model ErpDepartamentoN6 {
-  tenantId            String   @map("tenant_id") @db.Uuid
-  erpId               String   @map("erp_id") @db.VarChar(20)
-  descricao           String   @db.VarChar(160)
-  parentNextLevelErpId String? @map("parent_next_level_erp_id") @db.VarChar(20)
-  syncedAt            DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+  tenantId             String   @map("tenant_id") @db.Uuid
+  erpId                String   @map("erp_id") @db.VarChar(20)
+  descricao            String   @db.VarChar(160)
+  parentNextLevelErpId String?  @map("parent_next_level_erp_id") @db.VarChar(20)
+  syncedAt             DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
 
   @@id([tenantId, erpId])
   @@index([tenantId, syncedAt])
@@ -783,4 +783,122 @@ model AggVendasDiaDep {
   @@id([tenantId, filialErpId, data, dep1ErpId])
   @@index([tenantId, data])
   @@map("agg_vendas_dia_dep")
+}
+
+// ============================================================================
+// Alertas (doc 05 §1 / doc 15 §8) — o que faz o produto ligar para o cliente.
+// ============================================================================
+
+/// Tipos de regra do doc 15 §8. Os que dependem de sync ainda não implementado existem no enum
+/// de propósito: a tela mostra a regra desabilitada com o motivo, em vez de fingir que não existe.
+enum AlertType {
+  ruptura_curva_a
+  estoque_negativo
+  divergencia_fechamento
+  queda_de_venda
+  integracao_parada
+  vencimento_proximo
+  perda_anormal
+  meta_em_risco
+  conta_a_vencer
+  cartao_nao_conciliado
+
+  @@map("alert_type")
+}
+
+enum AlertSeverity {
+  critica
+  alta
+  media
+  baixa
+
+  @@map("alert_severity")
+}
+
+enum AlertEventStatus {
+  open
+  acknowledged
+  resolved
+
+  @@map("alert_event_status")
+}
+
+enum NotificationStatus {
+  pending
+  sent
+  failed
+
+  @@map("notification_status")
+}
+
+/// Regra configurada por tenant. `params` guarda os limiares (doc 15 §8 "condição default").
+model AlertRule {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+
+  name       String        @db.VarChar(120)
+  type       AlertType
+  severity   AlertSeverity
+  /// Limiares ajustáveis; o formato é do tipo da regra (dias, percentual, hora-limite…).
+  params     Json          @default("{}") @db.JsonB
+  /// Canais ligados: o feed é sempre; o e-mail é opcional por regra (doc 15 §8).
+  canalEmail Boolean       @default(true) @map("canal_email")
+  /// Quem recebe: operação da loja ou administração do tenant.
+  audiencia  String        @default("operacao") @db.VarChar(20)
+  enabled    Boolean       @default(true)
+
+  createdBy String?   @map("created_by") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  eventos AlertEvent[]
+
+  @@unique([tenantId, type])
+  @@index([tenantId, enabled])
+  @@map("app_alert_rules")
+}
+
+/// Ocorrência de uma regra. A chave de dedupe é o que impede o mesmo problema de virar
+/// cinquenta e-mails no mesmo dia (doc 15 §8: "dedupe diário por chave").
+model AlertEvent {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  ruleId   String @map("rule_id") @db.Uuid
+
+  filialErpId Int?             @map("filial_erp_id")
+  dedupeKey   String           @map("dedupe_key") @db.VarChar(180)
+  /// Contexto do evento: contagens, valores, ids envolvidos. Sem PII (doc 10 §1).
+  payload     Json             @db.JsonB
+  severity    AlertSeverity
+  status      AlertEventStatus @default(open)
+
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  ackedBy    String?   @map("acked_by") @db.Uuid
+  ackedAt    DateTime? @map("acked_at") @db.Timestamptz(6)
+  resolvedAt DateTime? @map("resolved_at") @db.Timestamptz(6)
+
+  rule AlertRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, ruleId, dedupeKey])
+  @@index([tenantId, status, createdAt])
+  @@map("app_alert_events")
+}
+
+/// Entrega de uma notificação. Existe para responder "o alerta saiu?" sem depender do log do SMTP.
+model Notification {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+
+  userId       String             @map("user_id") @db.Uuid
+  alertEventId String?            @map("alert_event_id") @db.Uuid
+  channel      String             @default("email") @db.VarChar(20)
+  status       NotificationStatus @default(pending)
+  sentAt       DateTime?          @map("sent_at") @db.Timestamptz(6)
+  error        String?            @db.VarChar(300)
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([tenantId, status])
+  @@index([tenantId, alertEventId])
+  @@map("app_notifications")
 }

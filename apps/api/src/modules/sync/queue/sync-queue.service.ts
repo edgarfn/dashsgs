@@ -12,7 +12,12 @@ export const FILA_BACKFILL = 'sync-backfill';
 export const PREFIXO_FILA = 'dashsgs';
 
 export interface JobSync {
-  tipo: 'dominio' | 'tick';
+  /**
+   * `alertas` compartilha a fila do sync por conveniência operacional (um worker, uma fila,
+   * um painel), mas **não** passa pelo SyncService: alerta não depende de conexão com o ERP —
+   * e o alerta mais importante é justamente "a integração parou".
+   */
+  tipo: 'dominio' | 'tick' | 'alertas';
   tenantId?: string;
   domain: SyncDomain;
   filialErpId?: number;

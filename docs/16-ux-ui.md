@@ -78,8 +78,9 @@ produto (id/descrição/GTIN), indicador de frescor/sync, menu do usuário (sess
 ## 6. Estado da implementação (Fase 7)
 
 Telas no ar: Visão Geral (`/`), Vendas — Diário (`/vendas`), Vendas — Comparativos
-(`/vendas/comparativos`), Estoque (`/estoque`), além das telas de autenticação, perfil e
-administração entregues nas fases anteriores.
+(`/vendas/comparativos`), Estoque (`/estoque`), Alertas — Feed (`/alertas`) e Alertas — Regras
+(`/alertas/regras`), além das telas de autenticação, perfil e administração entregues nas fases
+anteriores.
 
 Como os padrões do §3 e do §4 foram resolvidos:
 

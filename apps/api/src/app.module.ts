@@ -11,6 +11,7 @@ import { MetricsModule } from './common/metrics/metrics.module';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { RedisModule } from './common/redis/redis.module';
 import { ConfigModule } from './config';
+import { AlertasModule } from './modules/alertas/alertas.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ErpConnectionModule } from './modules/erp-connection/erp-connection.module';
@@ -44,6 +45,7 @@ import { TenantModule } from './modules/tenant/tenant.module';
     ErpConnectionModule,
     SyncModule,
     DashboardModule,
+    AlertasModule,
   ],
 })
 export class AppModule {}

@@ -25,6 +25,12 @@ export function Cabecalho({ me, ativo }: { me: MeResponse; ativo?: string }) {
       chave: 'estoque',
       visivel: me.permissions.includes('dashboard.view'),
     },
+    {
+      href: '/alertas',
+      rotulo: 'Alertas',
+      chave: 'alertas',
+      visivel: me.permissions.includes('alerts.ack'),
+    },
   ].filter((secao) => secao.visivel);
 
   const administracao = [

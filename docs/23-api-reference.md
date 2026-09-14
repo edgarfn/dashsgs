@@ -67,6 +67,19 @@ dados aceitam `?filiais=1,2` (validado contra `filiais_allowed`).
 | POST /export | job de exportação CSV (async) → GET /export/:id | reports.export |
 
 ## Alertas
+
+**Implementado na Fase 8:**
+
+| Rota | Descrição | Permissão |
+|---|---|---|
+| GET /alertas?status&severidade&filialErpId&pagina | feed com contagens (abertos, reconhecidos, críticos) | alerts.ack |
+| POST /alertas/:id/reconhecer | marca que alguém assumiu o alerta | alerts.ack |
+| GET /alertas/regras | regras do tenant, com limiares e dependências | alerts.manage |
+| PATCH /alertas/regras/:id | liga/desliga, severidade, canal e limiares | alerts.manage |
+| POST /alertas/avaliar | avalia as regras agora, sem esperar a cadência de 5 min | alerts.manage |
+
+**Planejado:**
+
 | Rota | Descrição | Permissão |
 |---|---|---|
 | GET /alerts?status=open | feed | alerts.ack |

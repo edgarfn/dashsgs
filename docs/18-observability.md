@@ -42,6 +42,11 @@ Campos padrão: `ts, level, msg, service, correlation_id, tenant_id?, user_id?, 
 As métricas de sync nascem no **processo de worker**, que expõe `/metrics` e `/healthz` na porta
 `WORKER_PORT` (padrão 3002) — o Prometheus raspa API e worker como alvos separados.
 
+### Alertas (Fase 8)
+- `alert_events_total{tenant,type}` (já deduplicados — é o volume que o cliente sente)
+- `alert_notifications_total{tenant,result}`
+- `alert_delivery_seconds{type}` (evento → despacho da notificação; SLO do §4)
+
 ### Banco/Redis
 - exporters padrão (pg_stat, redis) + `pg_locks`, replication/backup status.
 

@@ -30,9 +30,26 @@ export class MailService implements OnModuleDestroy {
   ) {
     this.logger.setContext(MailService.name);
     this.from = env.MAIL_FROM;
-    this.transporter = createTransport(env.SMTP_URL, {
-      // O servidor de dev (Mailpit) não tem TLS; em produção o SMTP_URL usa smtps:// ou STARTTLS.
+    // A URL é desmontada em opções explícitas de propósito: passar `tls` no segundo argumento
+    // de `createTransport` não configura o transporte — ali é o objeto de padrões da mensagem.
+    const url = new URL(env.SMTP_URL);
+    const seguro = url.protocol === 'smtps:';
+
+    this.transporter = createTransport({
+      host: url.hostname,
+      port: Number(url.port || (seguro ? 465 : 587)),
+      secure: seguro,
+      auth: url.username
+        ? { user: decodeURIComponent(url.username), pass: decodeURIComponent(url.password) }
+        : undefined,
+      // O servidor de dev (Mailpit) não tem TLS; produção exige STARTTLS e certificado válido.
+      requireTLS: this.config.isProduction,
       tls: { rejectUnauthorized: this.config.isProduction },
+      // Pool de conexões: uma rodada de alertas manda dezenas de mensagens seguidas, e abrir uma
+      // conexão SMTP por mensagem custa mais que compor todas elas (doc 18 §4, SLO de entrega).
+      pool: true,
+      maxConnections: 5,
+      maxMessages: 100,
     });
   }
 

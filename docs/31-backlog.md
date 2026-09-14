@@ -292,14 +292,46 @@ Decisões e descobertas da implementação:
 - A suíte de isolamento precisou aceitar **422** nas listagens: o diário de vendas exige data, e
   requisição recusada na validação não chega a consultar nada.
 
-## Épico E8 — Alertas (Fase 8)
+## Épico E8 — Alertas (Fase 8) — **concluído**
 | ID | História | Pri | Cx | CA |
 |---|---|---|---|---|
-| E8-01 | Motor de regras + dedupe + eventos | P0 | G | E2E ≤5 min |
-| E8-02 | Canais e-mail + feed com ack | P0 | M | template acessível |
-| E8-03 | Regras padrão doc 15 §8 (seed por tenant) | P0 | M | disparos testados |
-| E8-04 | UI de configuração de regras | P1 | M | validação params |
-| E8-05 | Alerta de integração (credencial/lag) p/ admin do tenant | P0 | P | — |
+| E8-01 ✅ | Motor de regras + dedupe + eventos | P0 | G | E2E ≤5 min |
+| E8-02 ✅ | Canais e-mail + feed com ack | P0 | M | template acessível |
+| E8-03 ◐ | Regras padrão doc 15 §8 (seed por tenant) | P0 | M | disparos testados |
+| E8-04 ✅ | UI de configuração de regras | P1 | M | validação params |
+| E8-05 ✅ | Alerta de integração (credencial/lag) p/ admin do tenant | P0 | P | — |
+
+**E8-03 ficou parcial por dependência de dado**: cinco das dez regras do doc 15 §8 avaliam hoje
+(ruptura curva A, estoque negativo, divergência de fechamento, queda de venda e integração
+parada). As outras cinco existem no catálogo, aparecem na tela desligadas com a dependência
+escrita, e ligam sozinhas quando E5-09 (financeiro), E5-10 (vencimentos/perdas) e E5-11
+(previsão) entrarem.
+
+O que a Fase 8 deixou pronto (parte de alertas):
+
+- **Motor** que avalia as regras ligadas a cada 5 minutos, deduplica por chave diária e só
+  notifica o que é novo — rodando **fora** do caminho do sync, porque o alerta mais importante é
+  justamente "a integração parou".
+- **Feed** ordenado por severidade, com contagens, filtros, link para o contexto do problema e
+  reconhecimento auditado.
+- **E-mail** por audiência (operação × administração), com registro de entrega por destinatário
+  em `app_notifications` — dá para responder "o cliente foi avisado?" sem depender do log do SMTP.
+- **Tela de avisos** com limiares ajustáveis, liga/desliga por regra e a lista do que aguarda dado.
+- **Métricas** `alert_events_total`, `alert_notifications_total` e `alert_delivery_seconds`.
+
+Decisões e descobertas da implementação:
+
+- A avaliação levava **15 s** para 9 eventos porque cada e-mail abria uma conexão SMTP própria e
+  esperava a anterior. Com transporte em pool e envio paralelo por evento, caiu para **2,6 s**.
+  No caminho apareceu um defeito latente: `tls` estava no segundo argumento de
+  `createTransport`, que é o objeto de **padrões da mensagem** — não configurava o transporte.
+  Agora a URL do SMTP é desmontada em opções explícitas, com `requireTLS` em produção.
+- Testes que ajustavam limiar contaminavam os cenários seguintes; as regras passaram a ser
+  recriadas a cada cenário, sempre a partir dos padrões do doc 15 §8.
+- A home mostrava zero alertas com o feed cheio: o componente lia `contagens.total`, e a API
+  devolve `contagens.abertos`. O contrato agora está tipado com os nomes reais.
+- A suíte de isolamento ganhou um alerta do tenant vizinho como alvo: reconhecer alerta alheio
+  responde 404, e desligar regra alheia também.
 
 ## Épico E9 — Hardening/GA (Fases 9–12)
 E9-01 Pentest + correções (P0/G) · E9-02 CSP final sem unsafe-inline (P0/M) · E9-03 Break-glass

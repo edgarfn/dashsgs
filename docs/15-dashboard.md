@@ -150,3 +150,33 @@ Ainda não implementado deste doc: metas (§7) e margem por produto (§3) depend
 vendas (E5-11); perdas, trocas, vencimentos e movimentações (§4) dependem de E5-10; financeiro
 (§5) e compras (§6) dependem de E5-09/E5-10; vendedores e ofertas (§2) são P2. Os alertas (§8)
 são a Fase 8.
+
+## 11. Estado da implementação dos alertas (Fase 8)
+
+| Regra do §8 | Situação |
+|---|---|
+| Ruptura de item curva A | ✅ avaliada a cada 5 min |
+| Estoque negativo | ✅ |
+| Divergência de fechamento | ✅ (divergência do ERP **ou** venda diária não gerada até a hora limite) |
+| Queda de venda | ✅ (comparação com o mesmo dia da semana, 4 semanas) |
+| Integração parada | ✅ (conexão em erro ou sync atrasado) |
+| Vencimento próximo · Perda anormal | ⛔ dependem da sincronização de vencimentos e perdas (E5-10) |
+| Meta em risco | ⛔ depende da previsão de vendas (E5-11) |
+| Conta a vencer · Cartão não conciliado | ⛔ dependem da sincronização financeira (E5-09) |
+
+As regras indisponíveis **existem** no catálogo e aparecem na tela desligadas, com a dependência
+escrita. Some da tela seria pior: o cliente concluiria que o produto não cobre aquilo.
+
+Decisões tomadas na implementação:
+
+- **Um alerta por problema por filial, não por item.** "37 itens de curva A em ruptura na Loja
+  Centro" é uma frase que alguém age; 37 e-mails com um item cada é o que faz o cliente criar
+  regra no Outlook para mandar tudo à lixeira.
+- **Dedupe diário por chave** (§8): a chave carrega o dia e o escopo. O mesmo problema no mesmo
+  dia é o mesmo alerta; no dia seguinte ele volta, porque continua doendo.
+- **Reconhecer ≠ resolver.** O botão marca que alguém assumiu, e o alerta sai da lista de abertos.
+  Numa rede com vários gerentes olhando o mesmo feed, é o que evita dois resolverem a mesma coisa.
+- **O motor roda fora do caminho do sync.** O alerta mais importante é "a integração parou" — ele
+  precisa disparar justamente quando o sync não está funcionando, então não pode depender dele.
+- **Queda de venda só depois da hora de corte.** Às 9h toda loja está abaixo da média do dia; um
+  alerta que dispara todo dia cedo é um alerta que ninguém lê.

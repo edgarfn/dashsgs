@@ -28,6 +28,7 @@
 | Ver contas a vencer | Financeiro → A Pagar → aging |
 | Conferir taxas de cartão | Financeiro → Cartões |
 | Exportar uma tabela | botão Exportar (CSV) — se não aparecer, peça a permissão ao admin |
+| Ver o que exige ação | Alertas → feed (ordenado por severidade; "Ver contexto" abre a tela do problema) |
 | Receber alertas | Alertas → Regras (admins/gerentes configuram canais) |
 | Silenciar um alerta tratado | Alertas → feed → "Reconhecer" |
 
