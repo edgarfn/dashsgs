@@ -38,6 +38,11 @@ export class MetricsService {
   readonly alertNotificationsTotal: Counter<'tenant' | 'result'>;
   readonly alertDelivery: Histogram<'type'>;
 
+  // --- Retenção (doc 10 §2 / E6-04): o compromisso de apagar também precisa de painel.
+  readonly retentionRowsPurgedTotal: Counter<'policy'>;
+  readonly retentionPendingRows: Gauge<'policy'>;
+  readonly retentionLastRunSeconds: Gauge<string>;
+
   constructor(private readonly config: AppConfigService) {
     this.registry.setDefaultLabels({ service: 'dashsgs-api', env: this.config.nodeEnv });
     collectDefaultMetrics({ register: this.registry, prefix: 'dashsgs_' });
@@ -179,6 +184,28 @@ export class MetricsService {
       help: 'Tempo entre criar o evento e despachar a notificação (SLO do doc 18 §4)',
       labelNames: ['type'],
       buckets: [0.1, 0.5, 1, 3, 10, 30, 60, 300],
+      registers: [this.registry],
+    });
+
+    this.retentionRowsPurgedTotal = new Counter({
+      name: 'retention_rows_purged_total',
+      help: 'Linhas apagadas pela purga de retenção, por política (doc 10 §2)',
+      labelNames: ['policy'],
+      registers: [this.registry],
+    });
+
+    // O alerta operacional mora aqui: qualquer valor > 0 por mais de um dia significa que a
+    // retenção prometida ao cliente não está sendo cumprida.
+    this.retentionPendingRows = new Gauge({
+      name: 'retention_pending_rows',
+      help: 'Linhas fora da retenção ainda presentes, por política',
+      labelNames: ['policy'],
+      registers: [this.registry],
+    });
+
+    this.retentionLastRunSeconds = new Gauge({
+      name: 'retention_last_run_timestamp_seconds',
+      help: 'Momento da última purga de retenção concluída',
       registers: [this.registry],
     });
   }

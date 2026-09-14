@@ -7,6 +7,7 @@ import {
   SeloDeFrescor,
   formatar,
 } from '@/components/dashboard';
+import { classeProporcao } from '@/components/medidas';
 import { Cabecalho, FiltrosGlobais } from '@/components/navegacao';
 import { apiRequest } from '@/lib/server/api-client';
 import { requireMe } from '@/lib/server/session';
@@ -79,7 +80,6 @@ function AgingBlocos({ aging }: { aging: Aging }) {
 
       <ul className="space-y-3">
         {aging.buckets.map((faixa) => {
-          const proporcao = aging.total > 0 ? (faixa.valor / aging.total) * 100 : 0;
           const vencido = faixa.bucket === 'vencido';
 
           return (
@@ -98,8 +98,11 @@ function AgingBlocos({ aging }: { aging: Aging }) {
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-white/5">
                 <div
-                  className={`h-full rounded-full ${vencido ? 'bg-rose-500/70' : 'bg-sky-500/70'}`}
-                  style={{ width: `${Math.max(proporcao, faixa.valor > 0 ? 2 : 0)}%` }}
+                  data-barra
+                  className={`h-full rounded-full medida-largura ${classeProporcao(
+                    faixa.valor,
+                    aging.total,
+                  )} ${vencido ? 'bg-rose-500/70' : 'bg-sky-500/70'}`}
                 />
               </div>
             </li>

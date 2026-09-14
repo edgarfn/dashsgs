@@ -47,6 +47,12 @@ As métricas de sync nascem no **processo de worker**, que expõe `/metrics` e `
 - `alert_notifications_total{tenant,result}`
 - `alert_delivery_seconds{type}` (evento → despacho da notificação; SLO do §4)
 
+### Retenção e privacidade (Fase 9)
+- `retention_pending_rows{policy}` — linhas fora do prazo **ainda presentes**. O valor correto é
+  sempre zero; qualquer outro é retenção prometida e não cumprida (doc 10 §2).
+- `retention_rows_purged_total{policy}` — o que a purga apagou, por política.
+- `retention_last_run_timestamp_seconds` — quando a rodada diária concluiu pela última vez.
+
 ### Banco/Redis
 - exporters padrão (pg_stat, redis) + `pg_locks`, replication/backup status.
 
@@ -84,6 +90,9 @@ Error budget: alertas de burn rate (fast 2%/1 h, slow 5%/6 h).
 | Disco/CPU/RAM | thresholds clássicos por host |
 | Backup falhou | job de backup sem sucesso nas últimas 26 h |
 | Certificado TLS | expira < 15 dias |
+| Retenção não cumprida | `retention_pending_rows` > 0 por 24 h (compromisso do doc 10 §2) |
+| Purga parou | `retention_last_run_timestamp_seconds` mais velho que 36 h |
+| Break-glass demorado | concessão ativa por mais de 8 h, ou ativa fora de janela de incidente |
 
 ## 6. Traces (fase 2)
 

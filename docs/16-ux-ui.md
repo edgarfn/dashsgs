@@ -82,6 +82,18 @@ Telas no ar: Visão Geral (`/`), Vendas — Diário (`/vendas`), Vendas — Comp
 (`/compras`), Alertas — Feed (`/alertas`) e Alertas — Regras (`/alertas/regras`), além das telas
 de autenticação, perfil e administração entregues nas fases anteriores.
 
+A Fase 9 acrescentou duas telas de operação da plataforma: **Retenção e descarte**
+(`/plataforma/retencao`) e **Break-glass** (`/plataforma/break-glass`, com o relatório em
+`/plataforma/break-glass/:id`). Elas não são telas de produto — são as telas que se mostram a um
+auditor —, e por isso privilegiam número em vez de gráfico: a de retenção existe para exibir uma
+coluna de zeros, e a de break-glass para deixar evidente quando **não** está tudo zerado (uma
+concessão ativa aparece em vermelho, com aviso no topo).
+
+Quando uma concessão de break-glass está em vigor, **todas** as telas do produto ganham uma faixa
+vermelha no cabeçalho dizendo de quem é o dado que está sendo visto e que cada tela aberta entra
+no relatório do chamado. É o oposto do padrão do resto do produto (esconder o que não interessa):
+aqui o objetivo é que o operador não consiga esquecer.
+
 Como os padrões do §3 e do §4 foram resolvidos:
 
 - **Filtros são formulário GET.** Filial, período e base de custo viram query string — o link

@@ -1,3 +1,4 @@
+import { API_PREFIX } from '@dashsgs/shared';
 import { Injectable, type CanActivate, type ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request, Response } from 'express';
@@ -62,8 +63,26 @@ export class SessionGuard implements CanActivate {
       throw new AppException('AUTH_MFA_REQUIRED');
     }
 
+    // Sob break-glass, cada requisição a dado do cliente vira uma linha do relatório que o
+    // runbook 22 §11 manda anexar ao ticket. Rotas de autenticação e da própria plataforma
+    // ficam de fora: não leem dado de negócio, e encheriam o relatório de ruído.
+    if (auth.breakGlass && this.tocaDadoDeTenant(request)) {
+      await this.sessions.registrarAcessoBreakGlass(auth, {
+        metodo: request.method,
+        rota: request.route?.path ?? request.path,
+        ip: request.ip ?? null,
+        userAgent: request.get('user-agent') ?? null,
+      });
+    }
+
     // Renovação deslizante da inatividade (doc 06 §Fluxos) — escreve no máximo 1×/min.
     await this.sessions.touch(auth.session.id, auth.session.lastSeenAt);
     return true;
+  }
+
+  private tocaDadoDeTenant(request: Request): boolean {
+    const rota = request.route?.path ?? request.path;
+    const semPrefixo = rota.startsWith(API_PREFIX) ? rota.slice(API_PREFIX.length) : rota;
+    return !semPrefixo.startsWith('/auth') && !semPrefixo.startsWith('/platform');
   }
 }

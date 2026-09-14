@@ -89,3 +89,23 @@ funcionam sem JS e a acessibilidade sai de graça; em troca não há zoom, brush
 **Gatilho de revisão**: a primeira tela que precisar de interação de verdade no gráfico
 (drill-down por clique na série, seleção de intervalo, séries longas com decimação) traz o
 ECharts junto — carregado só naquela rota, não no bundle compartilhado.
+
+## ADR-015 — Medida de barra em classe CSS, não em atributo `style`
+**Contexto**: a CSP de produção (doc 09 §1) não abre exceção para inline, e `style-src` governa
+também o atributo `style`. As barras dos gráficos da Fase 7 levavam `style={{ width: '42%' }}` —
+a declaração é descartada **em silêncio**, a barra fica com 0px e o teste de conteúdo continua
+passando. As 100 violações só apareceram quando a suíte passou a rodar contra o build de
+produção; em `NODE_ENV=development` a CSP permissiva as escondia.
+**Opções**: (a) `unsafe-inline` em `style-src`; (b) `<style>` com nonce por requisição, com uma
+regra por barra; (c) classes utilitárias de percentual na folha estática.
+**Decisão**: (c). `medida-largura`/`medida-altura` escolhem o eixo e `medida-N` publica o
+percentual numa variável CSS; o helper `classeProporcao()` é o único caminho para dizer "esta
+barra vale 42%".
+**Consequências**: a medida sai do HTML e entra na folha, que a CSP libera por origem; funciona
+igual em componente de servidor e de cliente (não depende do nonce da requisição); a folha ganha
+101 regras que gzipam para quase nada. O custo é arredondar para 1% — no máximo ~2px numa barra
+de 200px. (a) foi descartada por devolver ao atacante exatamente o vetor que a CSP existe para
+fechar; (b), por exigir plumbing de nonce até dentro de componente de cliente, para ganhar
+precisão que ninguém enxerga.
+**Gatilho de revisão**: um gráfico que precise de precisão sub-1% — uma régua, um comparativo de
+milésimos — pede o `<style>` com nonce naquela tela.

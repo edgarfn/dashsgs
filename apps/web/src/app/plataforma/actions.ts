@@ -51,6 +51,41 @@ export async function suspendTenantAction(
   return { success: 'Tenant suspenso. Sessões encerradas e logins bloqueados.' };
 }
 
+/**
+ * Offboarding (doc 08 §5): exclusão lógica, com purga física 30 dias depois.
+ *
+ * Pede o slug digitado porque é o último clique antes de um caminho que termina em dado
+ * apagado de verdade — e porque é assim que se separa engano de decisão.
+ */
+export async function offboardTenantAction(
+  _state: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const tenantId = String(formData.get('tenantId') ?? '');
+  const reason = String(formData.get('reason') ?? '').trim();
+  const confirmarSlug = String(formData.get('confirmarSlug') ?? '')
+    .trim()
+    .toLowerCase();
+
+  if (reason.length < 5) return { error: 'Descreva o motivo do desligamento.' };
+  if (!confirmarSlug) return { error: 'Digite o slug do tenant para confirmar.' };
+
+  const response = await apiRequest<{ purgaFisicaEm: string }>(
+    'POST',
+    `/platform/tenants/${encodeURIComponent(tenantId)}/offboard`,
+    { reason, confirmarSlug },
+  );
+  if (!response.ok) return { error: errorMessage(response, 'Não foi possível desligar.') };
+
+  revalidatePath('/plataforma');
+  const purga = response.data?.purgaFisicaEm
+    ? new Date(response.data.purgaFisicaEm).toLocaleDateString('pt-BR')
+    : 'em 30 dias';
+  return {
+    success: `Contrato desligado. Sessões encerradas; a purga física acontece em ${purga}, e até lá dá para reverter.`,
+  };
+}
+
 export async function resumeTenantAction(
   _state: FormState,
   formData: FormData,

@@ -27,6 +27,8 @@ export interface AuthContext {
     tenantStatus: 'active' | 'suspended';
     role: Role;
     filiaisAllowed: number[];
+    /** Vínculo temporário de break-glass, não membership de verdade (doc 07 §4.5). */
+    viaBreakGlass?: boolean;
   }>;
   /** Tenant ativo da sessão (ou o único do usuário). */
   activeTenantId: string | null;
@@ -34,6 +36,11 @@ export interface AuthContext {
   permissions: Permission[];
   /** Algum papel do usuário exige MFA (doc 06 §MFA). */
   mfaRequired: boolean;
+  /**
+   * Concessão de break-glass em vigor, quando o acesso ao tenant ativo vem dela. Presente
+   * apenas para `platform_admin`: é o que transforma cada requisição em linha de relatório.
+   */
+  breakGlass?: { grantId: string; tenantId: string; expiresAt: Date };
 }
 
 declare module 'express' {

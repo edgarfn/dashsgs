@@ -10,6 +10,7 @@ import { RedisModule } from './common/redis/redis.module';
 import { TenantContextModule } from './common/tenant';
 import { ConfigModule } from './config';
 import { AlertasModule } from './modules/alertas/alertas.module';
+import { RetencaoModule } from './modules/retencao/retencao.module';
 import { SyncWorker } from './modules/sync/queue/sync.worker';
 import { SyncModule } from './modules/sync/sync.module';
 
@@ -34,6 +35,7 @@ import { SyncModule } from './modules/sync/sync.module';
     MetricsModule,
     SyncModule,
     AlertasModule,
+    RetencaoModule,
   ],
   providers: [SyncWorker],
 })

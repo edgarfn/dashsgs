@@ -27,6 +27,15 @@ type TenantCreateInput = z.infer<typeof tenantCreateSchema>;
 const suspendSchema = z.object({ reason: z.string().trim().min(5).max(200) }).strict();
 type SuspendInput = z.infer<typeof suspendSchema>;
 
+/** Desligamento pede o slug por extenso: confirmação que não se acerta por distração. */
+const offboardSchema = z
+  .object({
+    reason: z.string().trim().min(5).max(200),
+    confirmarSlug: z.string().trim().toLowerCase().min(2).max(60),
+  })
+  .strict();
+type OffboardInput = z.infer<typeof offboardSchema>;
+
 /**
  * Painel da plataforma (E3-07) — torna executáveis os runbooks 22 §1 e §2.
  *
@@ -62,6 +71,17 @@ export class PlatformController {
     @Identity() identity: RequestIdentity,
   ): Promise<void> {
     await this.platform.suspendTenant(auth, id, body.reason, identity);
+  }
+
+  @Post('tenants/:id/offboard')
+  @HttpCode(200)
+  async offboard(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(offboardSchema)) body: OffboardInput,
+    @CurrentAuth() auth: AuthContext,
+    @Identity() identity: RequestIdentity,
+  ): Promise<{ purgaFisicaEm: string }> {
+    return this.platform.offboardTenant(auth, id, body, identity);
   }
 
   @Post('tenants/:id/resume')

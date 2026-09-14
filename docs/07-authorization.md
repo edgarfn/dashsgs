@@ -70,8 +70,33 @@ consulta (`FiliaisScopeService`), o tenant-context usa `SET LOCAL` em toda leitu
 tenant (`TenantDatabase`), a suíte A→B é gerada do router e `platform_admin` existe como papel
 global, com MFA obrigatório e painel próprio (`/platform/*`, respondendo 404 a quem não opera).
 
-Ainda em aberto: `erp.approve` por flag na membership (chega com o épico E10) e o break-glass
-auditado do §4.5 (E9-03).
+A Fase 9 fechou o **break-glass do §4.5** (E9-03). O desenho segue o runbook 22 §11 e tem cinco
+barreiras, nesta ordem:
+
+1. **Chamado + justificativa escrita** (mínimo de 20 caracteres) — sem motivo, não há pedido.
+2. **Aprovação de uma segunda pessoa**: quem solicita não aprova, e o serviço recusa a
+   auto-aprovação. É a única barreira que uma conta de operação comprometida não vence sozinha.
+3. **Papel mínimo**: a concessão dá `viewer`, `analyst` ou `manager` — nunca `owner` nem
+   `admin`. Acesso excepcional que gerencia usuários ou troca credencial do ERP não é
+   excepcional, é porta dos fundos.
+4. **Prazo curto que expira sozinho** (padrão 2 h, teto 8 h), contado a partir da aprovação.
+5. **Owner do tenant notificado por e-mail na hora da aprovação**, com operador, aprovador,
+   chamado, motivo e horário de expiração — enquanto a janela ainda está aberta e dá para
+   contestar.
+
+Enquanto vale, a concessão entra na resolução da sessão como **vínculo temporário** (é assim que
+um `platform_admin` passa a enxergar dado de tenant, e só assim). Toda requisição a rota de
+produto feita sob a concessão incrementa o contador e grava `breakglass.access` na trilha, com
+método, rota, hora e origem — o relatório que o runbook manda anexar ao ticket. O front mostra
+uma faixa vermelha em todas as telas: o operador não pode esquecer de quem é o dado que está
+vendo.
+
+Implementação: `modules/platform/break-glass.{service,controller}.ts`, tabela
+`app_break_glass_grants`, telas em `/plataforma/break-glass`. Testes: `retencao.int-spec.ts`
+(pedido pendente não abre nada; auto-aprovação recusada; acesso abre, conta e fecha na
+revogação) e `e2e/governanca.spec.ts`.
+
+Ainda em aberto: `erp.approve` por flag na membership (chega com o épico E10).
 
 ## 5. Testes obrigatórios de autorização (ver doc 17)
 

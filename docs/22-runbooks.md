@@ -17,11 +17,17 @@ subcomandos citados abaixo fazem parte do backlog).
 
 ## 3. Offboarding com purge (LGPD)
 1. Owner solicita por escrito → ticket.
-2. `dashsgs-cli tenant export <slug>` → entregar dump cifrado ao owner (link expira 7 dias).
-3. `dashsgs-cli tenant offboard <slug>` → soft delete + agenda purge D+30.
-4. D+30 job de purge físico: espelhos, agregados, usuários exclusivos, cache (flush prefixo),
-   exports. Auditoria de destruição gravada (fora do escopo do purge, com hash do relatório).
-5. Verificação: `dashsgs-cli tenant verify-purge <slug>` (contagens zero em todas as tabelas).
+2. Entregue antes o que o contrato exigir: depois da purga não há de onde tirar. (Export
+   assistido por enquanto; a rota self-service entra com E9-05.)
+3. Em `/plataforma`, "Desligar contrato" na linha do tenant: motivo + slug digitado. É exclusão
+   **lógica** — sessões caem, login fecha, dados ficam.
+4. D+30 a rodada das 3h20 faz a purga física: espelho, agregados, vínculos, cache (flush por
+   prefixo) e contas que ficaram sem nenhum vínculo. O registro do tenant permanece como lápide
+   com `purged_at`, e a `app_audit_log` **não** é apagada: ela é o comprovante.
+5. Comprovante de destruição (LGPD art. 16): evento `tenant.purged` na trilha, com a contagem de
+   linhas por tabela.
+6. Fila de espera e verificação: `/plataforma/retencao`, seção "Offboarding aguardando purga
+   física". Purga antecipada: botão "Executar purga agora" na mesma tela.
 
 ## 4. Re-sincronizar / reconciliar período
 `dashsgs-cli sync run --tenant <slug> --domain vendas --filial 3 --from 2026-08-01 --to 2026-08-31`
@@ -78,7 +84,22 @@ Renovate abre PR → CI completo → staging 24 h → produção. Para patch de 
 fast-track com aprovação dupla e monitoração pós-deploy 1 h.
 
 ## 11. Break-glass (acesso excepcional a dados de tenant)
-1. Ticket com justificativa + aprovação de 2ª pessoa.
-2. `dashsgs-cli breakglass grant --user <admin> --tenant <slug> --ttl 2h` (gera sessão especial
-   auditada; owner do tenant é notificado automaticamente).
-3. Expira sozinho; relatório do que foi acessado anexado ao ticket.
+1. Em `/plataforma/break-glass`, abra o pedido: tenant, chamado, justificativa (o cliente lê
+   este texto), papel mínimo que resolve e duração (padrão 2 h, teto 8 h).
+2. **Outra pessoa da equipe aprova** na mesma tela — o sistema recusa auto-aprovação. Na
+   aprovação, o owner do tenant recebe o e-mail de aviso e o prazo começa a contar.
+3. Trabalhe: todas as telas passam a mostrar uma faixa vermelha, e cada requisição entra no
+   relatório.
+4. **Revogue assim que terminar** — não espere o prazo. O relatório (`Relatório (n acessos)`)
+   lista rota, hora e origem; é ele que vai anexado ao chamado.
+
+O comando de CLI previsto na versão anterior deste runbook virou tela porque a aprovação de
+segunda pessoa exige alguém autenticado, com MFA recente — o que um binário na máquina do
+operador não garante.
+
+## 12. Provar que a retenção está sendo cumprida
+1. Abra `/plataforma/retencao`. A coluna "Fora do prazo" tem de ser uma coluna de zeros.
+2. Se houver número diferente de zero, clique em "Executar purga agora" e confira de novo. Se
+   não zerar, a política não está sendo cumprida — é incidente, não é enfeite.
+3. Em Prometheus, o mesmo dado é `retention_pending_rows`. O alerta operacional dispara com
+   qualquer valor acima de zero por mais de 24 h.

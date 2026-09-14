@@ -9,3 +9,429 @@ html,
 body {
   height: 100%;
 }
+
+/*
+ * Barras de proporção sem atributo `style` (E9-02, doc 09 §1).
+ *
+ * A CSP de produção não traz `unsafe-inline` em `style-src` — e `style-src` também governa o
+ * atributo `style`. Um `style={{ width: '42%' }}` não derruba a página: o navegador descarta a
+ * declaração em silêncio e a barra fica com 0px. O gráfico some, o teste de conteúdo passa, e
+ * quem descobre é o cliente.
+ *
+ * Por isso a medida vem em classe: `medida-N` publica o percentual numa variável e
+ * `medida-largura` / `medida-altura` escolhem o eixo. Arredondar para 1% custa no máximo ~2px
+ * numa barra de 200px — invisível — e em troca o estilo sai do HTML e entra na folha, que a CSP
+ * libera pela origem. As regras ficam fora de `@layer` de propósito: estilo sem camada vence
+ * utilitário em camada, então `medida-largura` prevalece sobre um `w-full` herdado.
+ */
+.medida-largura {
+  width: var(--medida, 0%);
+}
+
+.medida-altura {
+  height: var(--medida, 0%);
+}
+
+.medida-0 {
+  --medida: 0%;
+}
+
+.medida-1 {
+  --medida: 1%;
+}
+
+.medida-2 {
+  --medida: 2%;
+}
+
+.medida-3 {
+  --medida: 3%;
+}
+
+.medida-4 {
+  --medida: 4%;
+}
+
+.medida-5 {
+  --medida: 5%;
+}
+
+.medida-6 {
+  --medida: 6%;
+}
+
+.medida-7 {
+  --medida: 7%;
+}
+
+.medida-8 {
+  --medida: 8%;
+}
+
+.medida-9 {
+  --medida: 9%;
+}
+
+.medida-10 {
+  --medida: 10%;
+}
+
+.medida-11 {
+  --medida: 11%;
+}
+
+.medida-12 {
+  --medida: 12%;
+}
+
+.medida-13 {
+  --medida: 13%;
+}
+
+.medida-14 {
+  --medida: 14%;
+}
+
+.medida-15 {
+  --medida: 15%;
+}
+
+.medida-16 {
+  --medida: 16%;
+}
+
+.medida-17 {
+  --medida: 17%;
+}
+
+.medida-18 {
+  --medida: 18%;
+}
+
+.medida-19 {
+  --medida: 19%;
+}
+
+.medida-20 {
+  --medida: 20%;
+}
+
+.medida-21 {
+  --medida: 21%;
+}
+
+.medida-22 {
+  --medida: 22%;
+}
+
+.medida-23 {
+  --medida: 23%;
+}
+
+.medida-24 {
+  --medida: 24%;
+}
+
+.medida-25 {
+  --medida: 25%;
+}
+
+.medida-26 {
+  --medida: 26%;
+}
+
+.medida-27 {
+  --medida: 27%;
+}
+
+.medida-28 {
+  --medida: 28%;
+}
+
+.medida-29 {
+  --medida: 29%;
+}
+
+.medida-30 {
+  --medida: 30%;
+}
+
+.medida-31 {
+  --medida: 31%;
+}
+
+.medida-32 {
+  --medida: 32%;
+}
+
+.medida-33 {
+  --medida: 33%;
+}
+
+.medida-34 {
+  --medida: 34%;
+}
+
+.medida-35 {
+  --medida: 35%;
+}
+
+.medida-36 {
+  --medida: 36%;
+}
+
+.medida-37 {
+  --medida: 37%;
+}
+
+.medida-38 {
+  --medida: 38%;
+}
+
+.medida-39 {
+  --medida: 39%;
+}
+
+.medida-40 {
+  --medida: 40%;
+}
+
+.medida-41 {
+  --medida: 41%;
+}
+
+.medida-42 {
+  --medida: 42%;
+}
+
+.medida-43 {
+  --medida: 43%;
+}
+
+.medida-44 {
+  --medida: 44%;
+}
+
+.medida-45 {
+  --medida: 45%;
+}
+
+.medida-46 {
+  --medida: 46%;
+}
+
+.medida-47 {
+  --medida: 47%;
+}
+
+.medida-48 {
+  --medida: 48%;
+}
+
+.medida-49 {
+  --medida: 49%;
+}
+
+.medida-50 {
+  --medida: 50%;
+}
+
+.medida-51 {
+  --medida: 51%;
+}
+
+.medida-52 {
+  --medida: 52%;
+}
+
+.medida-53 {
+  --medida: 53%;
+}
+
+.medida-54 {
+  --medida: 54%;
+}
+
+.medida-55 {
+  --medida: 55%;
+}
+
+.medida-56 {
+  --medida: 56%;
+}
+
+.medida-57 {
+  --medida: 57%;
+}
+
+.medida-58 {
+  --medida: 58%;
+}
+
+.medida-59 {
+  --medida: 59%;
+}
+
+.medida-60 {
+  --medida: 60%;
+}
+
+.medida-61 {
+  --medida: 61%;
+}
+
+.medida-62 {
+  --medida: 62%;
+}
+
+.medida-63 {
+  --medida: 63%;
+}
+
+.medida-64 {
+  --medida: 64%;
+}
+
+.medida-65 {
+  --medida: 65%;
+}
+
+.medida-66 {
+  --medida: 66%;
+}
+
+.medida-67 {
+  --medida: 67%;
+}
+
+.medida-68 {
+  --medida: 68%;
+}
+
+.medida-69 {
+  --medida: 69%;
+}
+
+.medida-70 {
+  --medida: 70%;
+}
+
+.medida-71 {
+  --medida: 71%;
+}
+
+.medida-72 {
+  --medida: 72%;
+}
+
+.medida-73 {
+  --medida: 73%;
+}
+
+.medida-74 {
+  --medida: 74%;
+}
+
+.medida-75 {
+  --medida: 75%;
+}
+
+.medida-76 {
+  --medida: 76%;
+}
+
+.medida-77 {
+  --medida: 77%;
+}
+
+.medida-78 {
+  --medida: 78%;
+}
+
+.medida-79 {
+  --medida: 79%;
+}
+
+.medida-80 {
+  --medida: 80%;
+}
+
+.medida-81 {
+  --medida: 81%;
+}
+
+.medida-82 {
+  --medida: 82%;
+}
+
+.medida-83 {
+  --medida: 83%;
+}
+
+.medida-84 {
+  --medida: 84%;
+}
+
+.medida-85 {
+  --medida: 85%;
+}
+
+.medida-86 {
+  --medida: 86%;
+}
+
+.medida-87 {
+  --medida: 87%;
+}
+
+.medida-88 {
+  --medida: 88%;
+}
+
+.medida-89 {
+  --medida: 89%;
+}
+
+.medida-90 {
+  --medida: 90%;
+}
+
+.medida-91 {
+  --medida: 91%;
+}
+
+.medida-92 {
+  --medida: 92%;
+}
+
+.medida-93 {
+  --medida: 93%;
+}
+
+.medida-94 {
+  --medida: 94%;
+}
+
+.medida-95 {
+  --medida: 95%;
+}
+
+.medida-96 {
+  --medida: 96%;
+}
+
+.medida-97 {
+  --medida: 97%;
+}
+
+.medida-98 {
+  --medida: 98%;
+}
+
+.medida-99 {
+  --medida: 99%;
+}
+
+.medida-100 {
+  --medida: 100%;
+}

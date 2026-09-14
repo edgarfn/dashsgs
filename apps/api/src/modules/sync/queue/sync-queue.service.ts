@@ -15,9 +15,10 @@ export interface JobSync {
   /**
    * `alertas` compartilha a fila do sync por conveniência operacional (um worker, uma fila,
    * um painel), mas **não** passa pelo SyncService: alerta não depende de conexão com o ERP —
-   * e o alerta mais importante é justamente "a integração parou".
+   * e o alerta mais importante é justamente "a integração parou". `retencao` entra pelo mesmo
+   * motivo: é trabalho de fundo, diário, que ninguém deve precisar lembrar de disparar.
    */
-  tipo: 'dominio' | 'tick' | 'alertas';
+  tipo: 'dominio' | 'tick' | 'alertas' | 'retencao';
   tenantId?: string;
   domain: SyncDomain;
   filialErpId?: number;

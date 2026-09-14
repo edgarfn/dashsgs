@@ -51,6 +51,20 @@ Padrão: hospedagem em região Brasil [RECOMENDAÇÃO]. Se qualquer suboperador 
 ## 7. Checklist LGPD de lançamento
 [ ] DPA assinado com cada tenant · [ ] DPO designado e canal publicado · [ ] Política de
 privacidade e aviso do app · [ ] ROPA vivo (revisão semestral) · [ ] Inventário de suboperadores ·
-[ ] Processo de incidente testado (doc 27) · [ ] Purge/offboarding testado (runbook 22 §3) ·
-[ ] Treinamento de equipe (acesso mínimo, break-glass) · [ ] Retenções implementadas como jobs ·
+[ ] Processo de incidente testado (doc 27) · [x] Purge/offboarding testado (runbook 22 §3) ·
+[ ] Treinamento de equipe (acesso mínimo, break-glass) · [x] Retenções implementadas como jobs ·
 [ ] RIPD template pronto
+
+Os dois itens marcados fecharam na Fase 9 (E6-04):
+
+- **Retenções como jobs**: 21 políticas executáveis (doc 10 §8), rodada diária às 3h20, com
+  verificação depois da purga. O estado se confere em `/plataforma/retencao` — a resposta certa
+  é uma coluna de zeros — e em `retention_pending_rows` no Prometheus.
+- **Purge/offboarding**: exclusão lógica com confirmação, carência de 30 dias, purga física por
+  introspecção (toda tabela com `tenant_id`, inclusive as criadas depois) e comprovante de
+  destruição na trilha append-only (`tenant.purged`, com linhas por tabela) — que é o registro
+  que o art. 16 pede.
+
+O break-glass do treinamento já existe em código (doc 07 §4.1): pedido com justificativa,
+aprovação de segunda pessoa, prazo curto, aviso ao owner e relatório de acessos. Falta o
+treinamento em si, que é processo, não software.

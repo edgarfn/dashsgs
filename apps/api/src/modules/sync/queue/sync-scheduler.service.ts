@@ -9,6 +9,16 @@ import { SyncQueueService } from './sync-queue.service';
 /** Cadência do motor de alertas (doc 15 §8 + SLO de entrega ≤ 5 min do doc 18 §4). */
 const CADENCIA_ALERTAS_SEGUNDOS = 300;
 
+/**
+ * Retenção uma vez por dia, de madrugada (doc 10 §2 / E6-04).
+ *
+ * Horário fixo, e não "a cada 24 h", porque purga é varredura: cai no vale do ERP e do banco,
+ * longe do expediente da loja. O fuso é o do produto — o cliente é brasileiro, e "3h" tem que
+ * ser 3h para ele, não para o servidor.
+ */
+const CRON_RETENCAO = '20 3 * * *';
+const FUSO_RETENCAO = 'America/Sao_Paulo';
+
 /** Prioridade na fila: menor número sai primeiro (BullMQ). Tempo real na frente, sempre. */
 const PRIORIDADE: Record<SyncDomain, number> = {
   health: 2,
@@ -74,8 +84,23 @@ export class SyncSchedulerService {
       },
     );
 
+    await this.filas.sync.upsertJobScheduler(
+      'tick:retencao',
+      { pattern: CRON_RETENCAO, tz: FUSO_RETENCAO },
+      {
+        name: 'tick:retencao',
+        data: { tipo: 'retencao', domain: 'health' },
+        opts: { priority: 8 },
+      },
+    );
+
     this.logger.info(
-      { event: 'sync_cadencias_registradas', dominios: SYNC_DOMAINS.length, alertas: true },
+      {
+        event: 'sync_cadencias_registradas',
+        dominios: SYNC_DOMAINS.length,
+        alertas: true,
+        retencao: CRON_RETENCAO,
+      },
       'sync_cadencias_registradas',
     );
   }

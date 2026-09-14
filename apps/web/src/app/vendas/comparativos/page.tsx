@@ -7,6 +7,7 @@ import {
   SeloDeFrescor,
   formatar,
 } from '@/components/dashboard';
+import { classeProporcao } from '@/components/medidas';
 import { Cabecalho, FiltrosGlobais } from '@/components/navegacao';
 import { apiRequest } from '@/lib/server/api-client';
 import { requireMe } from '@/lib/server/session';
@@ -65,14 +66,13 @@ function SerieDiaria({ serie }: { serie: ComparativoView['serie'] }) {
     <figure className="space-y-3">
       <div className="flex h-40 items-end gap-[2px] overflow-x-auto">
         {serie.map((ponto) => (
-          <div
-            key={ponto.data}
-            className="flex min-w-[6px] flex-1 items-end"
-            style={{ height: '100%' }}
-          >
+          <div key={ponto.data} className="flex h-full min-w-[6px] flex-1 items-end">
             <div
-              className="w-full rounded-t bg-sky-500/70"
-              style={{ height: `${Math.max(2, (ponto.venda / maximo) * 100)}%` }}
+              data-barra
+              className={`w-full rounded-t bg-sky-500/70 medida-altura ${classeProporcao(
+                ponto.venda,
+                maximo,
+              )}`}
               title={`${formatar.dataCompleta(ponto.data)} — ${formatar.moeda(ponto.venda)}`}
             />
           </div>

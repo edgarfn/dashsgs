@@ -259,6 +259,7 @@ export class AuthService {
         tenantSlug: membership.tenantSlug,
         role: membership.role,
         filiaisAllowed: membership.filiaisAllowed,
+        ...(membership.viaBreakGlass ? { viaBreakGlass: true } : {}),
       })),
       activeTenantId: auth.activeTenantId,
       permissions: auth.permissions,

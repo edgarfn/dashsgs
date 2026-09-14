@@ -6,6 +6,8 @@ import { PinoLogger } from 'nestjs-pino';
 import { MetricsService } from '../../../common/metrics/metrics.service';
 import { AlertEngine } from '../../alertas/alert-engine.service';
 import { AppConfigService } from '../../../config';
+import { OffboardingService } from '../../retencao/offboarding.service';
+import { RetencaoService } from '../../retencao/retencao.service';
 import { BackfillService } from '../backfill.service';
 import { SyncService } from '../sync.service';
 import {
@@ -48,6 +50,8 @@ export class SyncWorker implements OnModuleInit, OnApplicationShutdown {
     private readonly scheduler: SyncSchedulerService,
     private readonly filas: SyncQueueService,
     private readonly alertas: AlertEngine,
+    private readonly retencao: RetencaoService,
+    private readonly offboarding: OffboardingService,
     private readonly metrics: MetricsService,
     private readonly logger: PinoLogger,
   ) {
@@ -122,6 +126,19 @@ export class SyncWorker implements OnModuleInit, OnApplicationShutdown {
     if (dados.tipo === 'alertas') {
       // O motor varre todos os tenants: são consultas ao espelho, rápidas e sem ERP no caminho.
       return this.alertas.avaliarTodos();
+    }
+
+    if (dados.tipo === 'retencao') {
+      // Purga o que venceu, purga quem saiu, e só então recontar: a verificação depois da
+      // purga é o que transforma o gauge em prova de que a retenção foi cumprida hoje.
+      const purga = await this.retencao.purgar();
+      const offboarding = await this.offboarding.purgarPendentes();
+      const pendencias = await this.retencao.verificar();
+      return {
+        removidos: purga.removidos,
+        tenantsPurgados: offboarding.length,
+        pendentes: pendencias.reduce((soma, linha) => soma + linha.pendentes, 0),
+      };
     }
 
     if (dados.tipo === 'tick') {

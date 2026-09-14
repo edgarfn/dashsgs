@@ -3,7 +3,12 @@
 import { useActionState } from 'react';
 import { Alert, Field, SubmitButton } from '@/components/ui';
 import { type FormState } from '../(auth)/actions';
-import { createTenantAction, resumeTenantAction, suspendTenantAction } from './actions';
+import {
+  createTenantAction,
+  offboardTenantAction,
+  resumeTenantAction,
+  suspendTenantAction,
+} from './actions';
 
 export function CreateTenantForm() {
   const [state, action] = useActionState<FormState, FormData>(createTenantAction, {});
@@ -31,6 +36,49 @@ export function CreateTenantForm() {
 
       <SubmitButton>Criar tenant e convidar owner</SubmitButton>
     </form>
+  );
+}
+
+/** Desligamento: exclusão lógica hoje, purga física em 30 dias (doc 08 §5). */
+export function OffboardForm({ tenantId, slug }: { tenantId: string; slug: string }) {
+  const [state, action] = useActionState<FormState, FormData>(offboardTenantAction, {});
+
+  return (
+    <details className="text-sm">
+      <summary className="cursor-pointer text-xs text-slate-500 hover:text-rose-300">
+        Desligar contrato
+      </summary>
+      <form action={action} className="mt-3 flex flex-wrap items-end gap-2">
+        <input type="hidden" name="tenantId" value={tenantId} />
+        {state.error ? (
+          <span className="w-full text-xs text-rose-300" role="alert">
+            {state.error}
+          </span>
+        ) : null}
+        {state.success ? (
+          <span className="w-full text-xs text-emerald-300" role="status">
+            {state.success}
+          </span>
+        ) : null}
+        <div className="w-64">
+          <Field label="Motivo do desligamento" name="reason" required={false} />
+        </div>
+        <div className="w-48">
+          <Field
+            label="Confirme o slug"
+            name="confirmarSlug"
+            required={false}
+            hint={`Digite "${slug}".`}
+          />
+        </div>
+        <button
+          type="submit"
+          className="rounded-lg border border-rose-400/30 px-3 py-2.5 text-sm text-rose-200 transition hover:bg-rose-500/10"
+        >
+          Desligar
+        </button>
+      </form>
+    </details>
   );
 }
 

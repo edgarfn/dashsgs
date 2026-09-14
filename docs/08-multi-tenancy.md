@@ -87,8 +87,36 @@ Dois templates, e não um, porque o fluxo de identidade lê `app_memberships` e 
 **antes** de existir tenant escolhido. O template estrito (dados de tenant) levanta erro sem
 contexto; o de identidade permite a leitura quando não há contexto e isola quando há.
 
-Ainda não implementado deste doc: offboarding com purga física (E6-04), múltiplas conexões por
-tenant e extração de tenant enterprise para banco próprio.
+## 5.2 Offboarding com purga física (Fase 9 — E6-04)
+
+O ciclo do §5 agora é executável de ponta a ponta:
+
+| Passo | Onde |
+|---|---|
+| Exclusão lógica (pede o slug digitado) | `POST /platform/tenants/:id/offboard` · `/plataforma` |
+| Carência de 30 dias | `offboarding.service.ts` — quem está dentro dela não aparece como pendente |
+| Purga física | rodada diária das 3h20, ou botão em `/plataforma/retencao` |
+| Flush de cache | `redis.purgeTenant()`, na mesma transação lógica |
+| Registro de destruição (LGPD art. 16) | evento `tenant.purged` na trilha, com linhas por tabela |
+
+Três decisões que valem explicação:
+
+- **A lista de tabelas vem da introspecção**, não de uma lista escrita à mão: toda tabela com
+  `tenant_id` entra, inclusive as que ainda não existem. Lista à mão envelhece, e o modo de
+  falhar dela é silencioso — o dado de um cliente desligado sobrevive numa tabela que alguém
+  criou depois.
+- **A ordem de exclusão se resolve sozinha**: tenta todas as tabelas, repete as que falharam por
+  referência. Cada rodada apaga ao menos uma folha, então converge — e continua correto quando
+  surgir uma relação nova.
+- **Duas coisas não são apagadas**: `app_audit_log` (é a prova da destruição, e tem retenção
+  própria de 5 anos) e o registro do tenant, que fica como lápide com `purged_at` — sem ele, as
+  linhas da auditoria apontariam para um id inexistente.
+
+Conta de usuário que fica sem nenhum vínculo é marcada como excluída na purga; a remoção física
+dela vem seis meses depois, pela política `usuarios_desligados` (doc 10 §2).
+
+Ainda não implementado deste doc: múltiplas conexões por tenant e extração de tenant enterprise
+para banco próprio.
 
 ## 6. Testes de isolamento obrigatórios (gate de release — doc 17)
 

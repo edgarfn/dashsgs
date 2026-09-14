@@ -239,6 +239,10 @@ describe('isolamento multi-tenant (integração)', () => {
         'cancela a carga do próprio tenant — ver "backfill" em sync.int-spec',
       [`POST ${API_PREFIX}/alertas/avaliar`]:
         'avalia as regras do próprio tenant — ver "avaliação" em alertas.int-spec',
+      [`POST ${API_PREFIX}/platform/retencao/executar`]:
+        'exige platform_admin; não recebe tenant — ver retencao.int-spec',
+      [`POST ${API_PREFIX}/platform/break-glass`]:
+        'exige platform_admin e aprovação de outra pessoa — ver retencao.int-spec',
     };
 
     const rotas = (): RotaRegistrada[] => listarRotas(app);
@@ -253,6 +257,9 @@ describe('isolamento multi-tenant (integração)', () => {
     const valorDoParametro = (rota: RotaRegistrada, nome: string): string => {
       if (nome === 'membershipId') return tenantB.users.dono!.membershipId;
       if (rota.path.includes('/platform/tenants/')) return tenantB.id;
+      // Concessão de break-glass é registro de plataforma: para o dono de A, o id é apenas um
+      // uuid qualquer — e a resposta certa continua sendo "isto não existe para você".
+      if (rota.path.includes('/platform/break-glass/')) return tenantB.id;
       if (rota.path.includes('/tenant/invites/')) return conviteB.id;
       if (rota.path.includes('/alertas/')) return alertaB.id;
       throw new Error(`parâmetro :${nome} de ${rota.path} sem valor de tenant B definido`);
@@ -262,6 +269,10 @@ describe('isolamento multi-tenant (integração)', () => {
       const mapa: Record<string, Record<string, unknown>> = {
         [`PATCH ${API_PREFIX}/tenant/users/:membershipId`]: { role: 'viewer' },
         [`POST ${API_PREFIX}/platform/tenants/:id/suspend`]: { reason: 'teste de isolamento' },
+        [`POST ${API_PREFIX}/platform/tenants/:id/offboard`]: {
+          reason: 'teste de isolamento',
+          confirmarSlug: 'nao-importa',
+        },
         // Sem corpo, a validação recusaria antes de chegar à checagem de dono — e o que este
         // teste precisa provar é que A não desliga o alerta de B.
         [`PATCH ${API_PREFIX}/alertas/regras/:id`]: { enabled: false },

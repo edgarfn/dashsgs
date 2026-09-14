@@ -30,6 +30,20 @@ dados aceitam `?filiais=1,2` (validado contra `filiais_allowed`).
 | GET /tenant/sync-status | watermarks, lag, últimos runs | autenticado |
 | GET /tenant/audit?filters | trilha de auditoria | audit.view |
 
+### Plataforma (conta de operação: `platform_admin` + MFA recente; 404 para os demais)
+
+| Rota | Descrição |
+|---|---|
+| GET/POST /platform/tenants | lista e provisiona contratos |
+| POST /platform/tenants/:id/suspend · /resume | corta e devolve o acesso, sem tocar no dado |
+| POST /platform/tenants/:id/offboard | exclusão lógica; exige o slug digitado; purga física em D+30 |
+| GET /platform/retencao | catálogo do doc 10 §2 + quanto está fora do prazo + fila de offboarding |
+| POST /platform/retencao/executar | antecipa a rodada diária e devolve a verificação pós-purga |
+| GET/POST /platform/break-glass | concessões de acesso excepcional; o POST só cria o pedido |
+| POST /platform/break-glass/:id/aprovar | aprovação de 2ª pessoa (recusa auto-aprovação) |
+| POST /platform/break-glass/:id/revogar | encerra antes do prazo |
+| GET /platform/break-glass/:id/relatorio | rota, hora e origem de cada acesso feito sob a concessão |
+
 ## Dashboard / dados (leitura; cache conforme doc 14 §6)
 
 **Implementado na Fase 7** (uma chamada por tela — ver doc 15 §10):

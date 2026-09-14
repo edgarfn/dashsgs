@@ -18,7 +18,9 @@ Nenhum item [BLOQ] pode estar aberto no go-live.
 
 ## Segurança de aplicação e infra
 - [ ] [BLOQ] TLS A+ (ssllabs), HSTS ativo, headers doc 09 presentes
-- [ ] [BLOQ] CSP sem unsafe-inline em produção
+- [x] [BLOQ] CSP sem unsafe-inline em produção — política estrita fora de `development`;
+      `e2e/seguranca.spec.ts` abre as 10 telas do MVP contra o build de produção e falha com
+      qualquer violação (Fase 9). Falta confirmar no domínio real depois do deploy.
 - [ ] [BLOQ] Pentest externo sem High/Critical abertos
 - [ ] [BLOQ] Secrets fora de git/imagens (gitleaks histórico completo verde)
 - [ ] [BLOQ] Anti-SSRF de base_url ativo; egress allowlist aplicada no firewall
@@ -32,12 +34,16 @@ Nenhum item [BLOQ] pode estar aberto no go-live.
 - [ ] [BLOQ] Redaction de logs testada em produção (busca por padrões de CPF/senha/token nos sinks = zero)
 - [ ] [BLOQ] Módulo Clientes desligado por default; campos vetados ausentes do schema
 - [ ] [BLOQ] DPA assinado com tenants ativos; política de privacidade publicada; DPO designado
-- [ ] Jobs de retenção/purga agendados e testados (verify-purge)
+- [x] Jobs de retenção/purga agendados e testados (verify-purge) — 21 políticas em
+      `modules/retencao/politicas.ts`, rodada diária às 3h20, painel em `/plataforma/retencao`,
+      gauge `retention_pending_rows`. O teste de integração purga e exige verificação zero.
 - [ ] Export com máscara por papel; desmascaramento auditado
 - [ ] ROPA atualizado; RIPD template disponível
 
 ## Auditoria e observabilidade
-- [ ] [BLOQ] app_audit_log append-only (tentativa de UPDATE falha) + hash chain verificada
+- [ ] [BLOQ] app_audit_log append-only (tentativa de UPDATE falha) + hash chain verificada —
+      privilégio revogado + trigger; a **única** exclusão admitida é a da retenção de 5 anos,
+      por `app_purge_audit_log()`, com o prazo fixo dentro do banco (Fase 9)
 - [ ] [BLOQ] Alertas operacionais doc 18 §5 ativos e roteados (teste de disparo)
 - [ ] Painéis Grafana provisionados; SLO board com dados reais
 - [ ] Correlation id fim-a-fim verificado (request→log→Sentry)
@@ -60,3 +66,23 @@ Nenhum item [BLOQ] pode estar aberto no go-live.
 - [ ] Smoke E2E pós-deploy automatizado
 - [ ] Rollback ensaiado no release anterior ao GA
 - [ ] Docs 25/26 acessíveis no app (ajuda)
+
+## Estado em 14/09/2026 (fim da Fase 9)
+
+O que a Fase 9 fechou, e como se confere sem acreditar em ninguém:
+
+| Item | Prova |
+|---|---|
+| CSP sem `unsafe-inline` | `pnpm test:e2e e2e/seguranca.spec.ts` contra `next start` |
+| Retenção executada e verificada | `/plataforma/retencao` com coluna de zeros; `retencao.int-spec.ts` |
+| Offboarding físico com comprovante | evento `tenant.purged` na trilha, com linhas por tabela |
+| Break-glass com 2ª pessoa e relatório | `/plataforma/break-glass`; `retencao.int-spec.ts` |
+| Auditoria append-only com exceção só de vencimento | teste que tenta `DELETE` e exige recusa |
+
+O que **não** pode ser fechado por código e continua aberto para o go-live:
+
+- **Pentest externo (E9-01)**: contratação e correção dos achados. Nada aqui substitui.
+- **DPA, política de privacidade e DPO (E9-04)**: jurídico.
+- **TLS A+, HSTS, firewall, backups e game-day**: dependem do ambiente de produção, que ainda
+  não existe — entram na Fase 10 (observabilidade/SRE) e no go-live.
+- **Billing (E9-05) e status page (E9-06)**: Fase 12, conforme o roadmap.

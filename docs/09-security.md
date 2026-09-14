@@ -106,3 +106,33 @@ Regra absoluta: **nenhum segredo no Git** (gitleaks bloqueia PR e histórico é 
 - Revisão de dependências semanal automatizada (Renovate) com gate de severidade.
 - Tabletop de incidente semestral (doc 27).
 - Checklist ASVS L2 rastreado por release (doc 32 vincula os itens críticos).
+
+## 6. Estado da implementação (Fase 9)
+
+| Controle do §1 | Onde está | Como se verifica |
+|---|---|---|
+| CSP estrita com nonce, sem `unsafe-inline` | `apps/web/src/middleware.ts` | `e2e/seguranca.spec.ts` — o navegador julga cada tela do MVP |
+| Cabeçalhos `nosniff`, `DENY`, `Referrer-Policy` | `apps/web/next.config.mjs` | idem, na mesma suíte |
+| Break-glass auditado (§4.5 do doc 07) | `modules/platform/break-glass.service.ts` | `retencao.int-spec.ts` + `e2e/governanca.spec.ts` |
+| Retenção executada, não só documentada | `modules/retencao/` | `retencao.int-spec.ts`: purgar e depois **verificar zero** |
+| Auditoria append-only | migração da Fase 1 + Fase 9 | teste que tenta `DELETE` e exige exceção do banco |
+
+### A CSP e o atributo `style`
+
+`style-src` governa também o atributo `style` de cada elemento. Sem `unsafe-inline`, um
+`style={{ width: '42%' }}` **não derruba a página**: o navegador descarta a declaração em
+silêncio, a barra do gráfico fica com 0px e o teste de conteúdo continua passando. É o tipo de
+regressão que chega ao cliente antes de chegar ao time.
+
+Duas decisões saíram daí:
+
+1. **A medida virou classe** (`medida-largura` + `medida-N`, em `globals.css`): o estilo sai do
+   HTML e entra na folha, que a CSP libera pela origem. Custa 1% de arredondamento — invisível
+   numa barra de 200px. Ver ADR-015.
+2. **O teste que julga é o navegador**: `e2e/seguranca.spec.ts` abre as dez telas do MVP com a
+   política de produção ligada e falha se o console registrar qualquer violação. Um segundo
+   cenário mede a largura real de uma barra: zero significa estilo bloqueado.
+
+Enquanto a suíte rodou em `NODE_ENV=development`, a CSP permissiva escondia as 100 violações que
+existiam — o número apareceu no primeiro minuto em que os testes rodaram contra o build de
+produção, que é como o CI e o cliente executam.

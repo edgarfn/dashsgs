@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
+import { classeMedida } from '@/components/medidas';
 import { Alert, SubmitButton } from '@/components/ui';
 import { type FormState } from '../../(auth)/actions';
 import { cancelarBackfillAction, iniciarBackfillAction, ressincronizarAction } from './actions';
@@ -57,8 +58,10 @@ export function BackfillForm({ ativo, percentual }: { ativo: boolean; percentual
           <div className="space-y-1">
             <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
               <div
-                className="h-full rounded-full bg-sky-400 transition-all"
-                style={{ width: `${percentual}%` }}
+                data-barra
+                className={`h-full rounded-full bg-sky-400 transition-all medida-largura ${classeMedida(
+                  percentual,
+                )}`}
               />
             </div>
             <p className="text-sm text-slate-400">{percentual}% do histórico carregado.</p>

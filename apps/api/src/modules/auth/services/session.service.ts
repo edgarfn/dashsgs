@@ -13,6 +13,7 @@ import type { Response } from 'express';
 import { AppConfigService, ENV } from '../../../config';
 import { type Env } from '../../../config/env.schema';
 import { HashingService } from '../../../common/crypto';
+import { AuditService } from '../../../common/audit';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { type AuthContext, type RequestIdentity } from '../../../common/auth';
 
@@ -42,6 +43,7 @@ export class SessionService {
     private readonly prisma: PrismaService,
     private readonly hashing: HashingService,
     private readonly config: AppConfigService,
+    private readonly audit: AuditService,
   ) {
     this.csrfSecret = env.CSRF_SECRET;
   }
@@ -153,7 +155,7 @@ export class SessionService {
     const user = session.user;
     if (user.deletedAt || user.status !== 'active') return null;
 
-    const memberships = user.memberships
+    const memberships: AuthContext['memberships'] = user.memberships
       .filter((membership) => !membership.tenant.deletedAt)
       .map((membership) => ({
         tenantId: membership.tenantId,
@@ -163,6 +165,23 @@ export class SessionService {
         role: membership.role as Role,
         filiaisAllowed: membership.filiaisAllowed,
       }));
+
+    // Break-glass (doc 07 §4.5): concessão aprovada e no prazo vira vínculo temporário. É o
+    // único caminho pelo qual uma conta de plataforma enxerga dado de negócio de um cliente —
+    // e ele nasce fechado: sem aprovação de uma segunda pessoa, `approved_at` é nulo e nada
+    // disso acontece.
+    const concessao = user.platformAdmin ? await this.breakGlassAtivo(user.id) : null;
+    if (concessao) {
+      memberships.push({
+        tenantId: concessao.tenantId,
+        tenantName: concessao.tenantName,
+        tenantSlug: concessao.tenantSlug,
+        tenantStatus: 'active',
+        role: concessao.role as Role,
+        filiaisAllowed: [],
+        viaBreakGlass: true,
+      });
+    }
 
     // Tenant suspenso bloqueia o acesso dos membros, mas preserva os dados (doc 08 §5).
     const usable = memberships.filter((membership) => membership.tenantStatus === 'active');
@@ -196,7 +215,85 @@ export class SessionService {
       // Operar a plataforma também exige segundo fator, mesmo sem vínculo com tenant algum.
       mfaRequired:
         user.platformAdmin || memberships.some((membership) => requiresMfa(membership.role)),
+      ...(concessao && activeTenantId === concessao.tenantId
+        ? {
+            breakGlass: {
+              grantId: concessao.id,
+              tenantId: concessao.tenantId,
+              expiresAt: concessao.expiresAt,
+            },
+          }
+        : {}),
     };
+  }
+
+  /**
+   * Concessão de break-glass em vigor para este operador, se houver.
+   *
+   * Uma por vez, a mais recente: acesso excepcional a dois clientes ao mesmo tempo não é
+   * exceção, é rotina — e rotina não passa por aqui.
+   */
+  private async breakGlassAtivo(userId: string): Promise<{
+    id: string;
+    tenantId: string;
+    tenantName: string;
+    tenantSlug: string;
+    role: string;
+    expiresAt: Date;
+  } | null> {
+    const concessao = await this.prisma.breakGlassGrant.findFirst({
+      where: {
+        requestedBy: userId,
+        approvedAt: { not: null },
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+        tenant: { deletedAt: null },
+      },
+      orderBy: { approvedAt: 'desc' },
+      include: { tenant: { select: { id: true, name: true, slug: true } } },
+    });
+
+    if (!concessao?.expiresAt) return null;
+
+    return {
+      id: concessao.id,
+      tenantId: concessao.tenantId,
+      tenantName: concessao.tenant.name,
+      tenantSlug: concessao.tenant.slug,
+      role: concessao.role,
+      expiresAt: concessao.expiresAt,
+    };
+  }
+
+  /**
+   * Contabiliza uma requisição feita sob break-glass (runbook 22 §11, passo 3).
+   *
+   * O relatório anexado ao ticket é exatamente esta soma de linhas: rota a rota, com hora e
+   * origem. Sem isso, "acesso auditado" seria só uma palavra no documento.
+   */
+  async registrarAcessoBreakGlass(
+    auth: AuthContext,
+    alvo: { metodo: string; rota: string; ip: string | null; userAgent: string | null },
+  ): Promise<void> {
+    if (!auth.breakGlass) return;
+
+    await this.prisma.breakGlassGrant.update({
+      where: { id: auth.breakGlass.grantId },
+      data: { accessCount: { increment: 1 } },
+    });
+
+    await this.audit.record({
+      action: 'breakglass.access',
+      resourceType: 'tenant',
+      resourceId: `${alvo.metodo} ${alvo.rota}`,
+      result: 'success',
+      tenantId: auth.breakGlass.tenantId,
+      userId: auth.user.id,
+      sessionId: auth.session.id,
+      ip: alvo.ip,
+      userAgent: alvo.userAgent,
+      changes: { grantId: auth.breakGlass.grantId },
+    });
   }
 
   /** Renovação deslizante — só escreve quando passou tempo suficiente (1 write/min por sessão). */

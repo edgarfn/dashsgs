@@ -114,7 +114,7 @@ test.describe('Painel da plataforma', () => {
 
     const slug = `teste-e2e-${Date.now().toString(36)}`;
     await page.getByLabel('Nome da rede').fill('Rede E2E');
-    await page.getByLabel('Slug').fill(slug);
+    await page.getByLabel('Slug', { exact: true }).fill(slug);
     await page.getByLabel('E-mail do owner').fill(`dono-${slug}@teste.local`);
     await page.getByRole('button', { name: 'Criar tenant e convidar owner' }).click();
 
@@ -127,7 +127,7 @@ test.describe('Painel da plataforma', () => {
     await criado.getByRole('button', { name: 'Suspender' }).click();
     await expect(alerta(page).first()).toContainText('motivo');
 
-    await criado.getByLabel('Motivo').fill('teste de suspensão pelo E2E');
+    await criado.getByLabel('Motivo', { exact: true }).fill('teste de suspensão pelo E2E');
     await criado.getByRole('button', { name: 'Suspender' }).click();
 
     const suspenso = page.locator('li', { hasText: slug });
@@ -149,7 +149,7 @@ test.describe('Painel da plataforma', () => {
     await page.goto('/plataforma');
 
     const demo = page.locator('li', { hasText: '(demo)' });
-    await demo.getByLabel('Motivo').fill('corte temporário pelo E2E');
+    await demo.getByLabel('Motivo', { exact: true }).fill('corte temporário pelo E2E');
     await demo.getByRole('button', { name: 'Suspender' }).click();
     await expect(page.locator('li', { hasText: '(demo)' })).toContainText('suspenso');
 

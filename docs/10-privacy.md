@@ -39,6 +39,9 @@ campos não necessários ANTES de persistir. A API expõe muito mais PII do que 
 | Logs de aplicação | Diagnóstico | Essencial | Loki | 30 dias (app), 90 dias (segurança) | equipe plataforma | Redaction PII/segredos | TTL |
 | Métricas de chamada SG | Capacidade/faturamento | Importante | sync_api_call_log | 30 dias | plataforma | Sem payload | TTL |
 | Backups | Continuidade | Essencial | storage externo | 35 dias (doc 20) | plataforma (break-glass) | Cifrados | Expiração automática |
+| Eventos de alerta | Histórico do que o produto avisou | Importante | app_alert_events | 12 meses (decisão de produto, Fase 9) | papéis do tenant | RLS, sem PII | Purge job |
+| Notificações enviadas | Comprovante de envio | Importante | app_notifications | 6 meses (decisão de produto, Fase 9) | papéis do tenant | RLS | Purge job |
+| Concessões de break-glass | Accountability do acesso excepcional | Essencial | app_break_glass_grants | segue a auditoria (5 anos) | plataforma, auditor | Justificativa, prazo, contagem de acessos | Purge com o tenant |
 
 ## 3. Direitos dos titulares (suporte ao Controlador)
 
@@ -75,3 +78,43 @@ Prazo interno de atendimento ao Controlador: 72 h úteis para gerar o material.
 3. Persistir `senha`, tokens, `mercafacil.cpfcnpj`, gênero e nascimento de consumidores.
 4. Logar payloads com PII.
 5. Usar dados de produção em ambientes de teste (doc 17: dados sintéticos).
+
+## 8. Estado da implementação (Fase 9 — E6-04)
+
+A matriz do §2 deixou de ser só um compromisso escrito: virou um catálogo executável em
+`apps/api/src/modules/retencao/politicas.ts`, com 21 políticas. **A mesma lista** é usada para
+apagar e para conferir — não existe a possibilidade de uma purga que "esqueceu" uma linha da
+tabela, porque quem verifica lê o mesmo arquivo que quem apaga.
+
+| Peça | Onde |
+|---|---|
+| Catálogo (tabela, coluna de data, prazo, origem, motivo) | `modules/retencao/politicas.ts` |
+| Purga em lotes + verificação | `modules/retencao/retencao.service.ts` |
+| Offboarding físico (doc 08 §5) | `modules/retencao/offboarding.service.ts` |
+| Rodada diária (03h20 America/Sao_Paulo) | `sync-scheduler.service.ts` → worker |
+| Painel e botão de antecipar | `/plataforma/retencao` (platform_admin) |
+| Métricas | `retention_pending_rows`, `retention_rows_purged_total`, `retention_last_run_timestamp_seconds` |
+
+**O critério de aceite é "verify-purge zero"**: depois da purga, contar o que deveria ter sido
+apagado tem de dar zero em todas as políticas. É isso que o teste de integração cobra, o que o
+painel mostra e o que o gauge publica — qualquer valor acima de zero por mais de um dia significa
+retenção prometida e não cumprida.
+
+### Decisões tomadas na implementação
+
+- **Mês é calendário, não 30 dias.** 26 meses antes de 31/03 é 31/01. Contar em dias erraria o
+  corte por quase uma semana ao ano — sempre para o lado de guardar mais do que se prometeu.
+- **A retenção de vendas é por contrato** (`app_tenants.retention_sales_months`, padrão 26): o
+  cliente que quiser menos consegue menos, e a purga respeita o número dele.
+- **Linha com data nula nunca vence.** Não dá para provar que expirou o que não tem data; o
+  caminho dessas linhas é o offboarding, não o relógio.
+- **A auditoria continua append-only** — a exceção da retenção mora no banco, não no código: a
+  trigger aceita `DELETE` apenas quando o sinalizador `app.audit_purge` está ligado na transação
+  **e** a linha passou dos cinco anos. Quem liga o sinalizador é `app_purge_audit_log()`, uma
+  função `SECURITY DEFINER` com o prazo fixo dentro dela. O papel da aplicação segue sem
+  privilégio de `DELETE` na tabela: ainda que alguém escreva o comando, o Postgres recusa antes
+  da trigger.
+- **Duas políticas nasceram aqui** (não estavam no §2): eventos de alerta (12 meses) e
+  notificações (6 meses). Foram para a tabela do §2 como decisão de produto da Fase 9.
+- **Clientes e vendedores ficaram de fora do catálogo** porque as tabelas ainda não existem — o
+  módulo Clientes é opt-in e chega depois. Quando chegarem, entram como mais duas linhas.

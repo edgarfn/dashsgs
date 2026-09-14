@@ -153,6 +153,77 @@ export class PlatformService {
     });
   }
 
+  /**
+   * Offboarding (doc 08 §5): exclusão **lógica**. A purga física vem 30 dias depois, pelo job
+   * de retenção — a carência existe para o cliente que se arrepende, para a exportação que o
+   * contrato ainda permite pedir e para o erro de operação que só aparece no dia seguinte.
+   *
+   * Exige digitar o slug. É a diferença entre "cliquei sem querer" e "eu quis".
+   */
+  async offboardTenant(
+    auth: AuthContext,
+    tenantId: string,
+    input: { reason: string; confirmarSlug: string },
+    identity: RequestIdentity,
+  ): Promise<{ purgaFisicaEm: string }> {
+    const tenant = await this.findTenant(tenantId);
+
+    if (input.confirmarSlug !== tenant.slug) {
+      throw new AppException('VALIDATION_ERROR', {
+        message: 'Digite o slug do tenant para confirmar o desligamento.',
+        details: [{ path: 'confirmarSlug', rule: 'match' }],
+      });
+    }
+
+    const membros = await this.prisma.membership.findMany({
+      where: { tenantId: tenant.id },
+      select: { userId: true },
+    });
+    const agora = new Date();
+
+    await this.prisma.$transaction([
+      this.prisma.tenant.update({
+        where: { id: tenant.id },
+        data: {
+          status: 'suspended',
+          suspendedAt: agora,
+          suspensionReason: input.reason,
+          deletedAt: agora,
+        },
+      }),
+      this.prisma.session.updateMany({
+        where: {
+          revokedAt: null,
+          OR: [{ tenantId: tenant.id }, { userId: { in: membros.map((m) => m.userId) } }],
+        },
+        data: { revokedAt: agora },
+      }),
+    ]);
+
+    await this.redis.purgeTenant(tenant.id);
+
+    const purgaFisicaEm = new Date(agora.getTime() + 30 * 86_400_000);
+
+    await this.audit.record({
+      action: 'platform.tenant_offboarded',
+      resourceType: 'tenant',
+      resourceId: tenant.id,
+      result: 'success',
+      tenantId: tenant.id,
+      userId: auth.user.id,
+      sessionId: auth.session.id,
+      ip: identity.ip,
+      userAgent: identity.userAgent,
+      changes: {
+        slug: tenant.slug,
+        motivo: input.reason,
+        purgaFisicaEm: purgaFisicaEm.toISOString(),
+      },
+    });
+
+    return { purgaFisicaEm: purgaFisicaEm.toISOString() };
+  }
+
   async resumeTenant(
     auth: AuthContext,
     tenantId: string,

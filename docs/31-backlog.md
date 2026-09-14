@@ -238,7 +238,7 @@ Decisões e descobertas da implementação:
 | E6-01 ◐ | Auditoria append-only + hash chain + UI consulta (gravação e verificação prontas na Fase 3; falta a tela) | P0 | M | tamper test |
 | E6-02 | Métricas Prometheus + painéis Grafana + alertas doc 18 | P0 | M | SLO board |
 | E6-03 | Backups WAL-G + restore test semanal automatizado | P0 | M | doc 20 §3 |
-| E6-04 | Jobs de retenção/purga (partições, logs, offboarding) | P0 | M | verify-purge zero |
+| E6-04 ✅ | Jobs de retenção/purga (partições, logs, offboarding) | P0 | M | verify-purge zero |
 | E6-05 | dashsgs-cli (tenant, sync, queue, crypto, breakglass) | P1 | M | runbooks executáveis |
 | E6-06 | Export CSV assíncrono com máscara por papel | P1 | M | limite/permite testados |
 
@@ -362,9 +362,10 @@ Decisões e descobertas da implementação:
   responde 404, e desligar regra alheia também.
 
 ## Épico E9 — Hardening/GA (Fases 9–12)
-E9-01 Pentest + correções (P0/G) · E9-02 CSP final sem unsafe-inline (P0/M) · E9-03 Break-glass
-auditado (P1/M) · E9-04 DPA/política/DPO (P0/M, jurídico) · E9-05 Billing/planos (P0/G) ·
-E9-06 Status page (P1/P) · E9-07 Game-day DR (P0/M).
+E9-01 Pentest + correções (P0/G, **externo**) · E9-02 ✅ CSP final sem unsafe-inline (P0/M) ·
+E9-03 ✅ Break-glass auditado (P1/M) · E9-04 DPA/política/DPO (P0/M, **jurídico**) ·
+E9-05 Billing/planos (P0/G, Fase 12) · E9-06 Status page (P1/P, Fase 12) · E9-07 Game-day DR
+(P0/M, Fase 10 — depende de ambiente de produção).
 
 ## Épico E10 — Ações no ERP (Fase 13, P2 no MVP)
 E10-01 Framework de propostas/aprovação (G) · E10-02 Oferta (M) · E10-03 Pedido de compra (G) ·
@@ -375,3 +376,48 @@ E10-07 Verificação pré/pós execução (sem idempotência na API) (M).
 Módulo Clientes opt-in completo · Webhooks de saída · Multi-conexão por tenant ·
 Benchmark anônimo entre tenants (parecer jurídico) · App notificações push · ClickHouse p/
 histórico longo · K8s.
+
+## Fase 9 — Security Hardening (concluída em 14/09/2026)
+
+Entregue: **E9-02** (CSP final), **E9-03** (break-glass auditado) e **E6-04** (retenção, purga e
+offboarding físico). Ficaram de fora, com motivo: **E9-01** (pentest externo) e **E9-04**
+(DPA/DPO) não são trabalho de código; **E9-05** e **E9-06** são Fase 12 pelo roadmap; **E9-07**
+(game-day DR) depende de um ambiente de produção que ainda não existe e entra na Fase 10.
+
+Decisões e descobertas:
+
+- **A CSP estrita estava quebrando 100 estilos e ninguém sabia.** A suíte rodava com
+  `NODE_ENV=development`, onde a política tem `unsafe-inline`; o CI e a produção rodam sem. O
+  atributo `style` é governado por `style-src`, e o modo de falhar é silencioso: a barra do
+  gráfico fica com 0px e o teste de conteúdo passa. A medida virou classe (ADR-015) e o teste
+  passou a ser o navegador — `e2e/seguranca.spec.ts` abre as dez telas do MVP e falha com
+  qualquer violação, mais um cenário que mede a largura real de uma barra.
+- **Retenção: o catálogo que apaga é o mesmo que verifica.** 21 políticas em um arquivo; a purga
+  lê dali e a verificação também. Não existe purga que "esqueceu" uma tabela da lista, porque não
+  há duas listas. O critério de aceite ("verify-purge zero") virou teste, painel e gauge.
+- **Mês é calendário.** 26 meses antes de 31/03 é 31/01; contar em dias erraria quase uma semana
+  por ano, sempre guardando mais do que se prometeu ao cliente.
+- **A exceção da auditoria mora no banco, não no código.** A trilha é append-only por privilégio
+  revogado + trigger. A retenção de 5 anos precisava de uma porta, e ela ficou dentro do Postgres:
+  a trigger só aceita `DELETE` com o sinalizador `app.audit_purge` ligado **e** linha vencida; quem
+  liga o sinalizador é uma função `SECURITY DEFINER` com o prazo fixo dentro dela. A aplicação
+  continua sem privilégio de `DELETE` — se alguém escrever o comando, o banco recusa antes da
+  trigger. O teste de integração tenta apagar linha recente com o sinalizador ligado e exige a
+  recusa.
+- **O offboarding descobre as tabelas por introspecção.** Lista escrita à mão envelhece em
+  silêncio: bastaria alguém criar uma tabela nova depois para o dado de um cliente desligado
+  sobreviver. A ordem de exclusão se resolve por rodadas (tenta todas, repete as que falharam por
+  referência), o que também sobrevive a uma relação nova.
+- **Break-glass com duas pessoas, não com uma.** O runbook 22 §11 pedia aprovação de segunda
+  pessoa; era o requisito mais importante e o mais fácil de deixar passar. O serviço recusa
+  auto-aprovação, o papel máximo concedido é `manager` (nunca owner/admin), o prazo conta a partir
+  da aprovação e o owner do tenant é avisado **na hora**, não depois. O relatório do ticket é a
+  lista de rotas acessadas, gravada requisição a requisição pelo guard de sessão.
+- **Dois defeitos de montagem apareceram no caminho**: o guard da plataforma é instanciado no
+  módulo que declara o controller, então o módulo de retenção precisava do `AuthModule` — e
+  importar isso no worker arrastava o rate limit de requisição, que o worker não tem. A retenção
+  ficou como módulo de núcleo (serviços), e a rota foi para o módulo da plataforma. O worker
+  carrega só o núcleo.
+- **A suíte A→B cobrou as rotas novas**, como era para cobrar: `POST /platform/retencao/executar`
+  e `POST /platform/break-glass` são mutações sem id e precisaram ser classificadas à mão, com o
+  teste que as cobre anotado na lista.

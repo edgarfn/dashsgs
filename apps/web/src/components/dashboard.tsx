@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { classeProporcao } from './medidas';
 
 /**
  * Peças do dashboard (doc 16 §3 e §5).
@@ -266,8 +267,11 @@ export function BarrasHorizontais({
           </div>
           <div className="h-2 w-full overflow-hidden rounded-full bg-white/5">
             <div
-              className="h-full rounded-full bg-sky-500/70"
-              style={{ width: `${Math.max(2, (item.valor / maximo) * 100)}%` }}
+              data-barra
+              className={`h-full rounded-full bg-sky-500/70 medida-largura ${classeProporcao(
+                item.valor,
+                maximo,
+              )}`}
             />
           </div>
           {item.detalhe ? <p className="text-xs text-slate-500">{item.detalhe}</p> : null}

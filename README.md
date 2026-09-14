@@ -6,7 +6,8 @@ Especificação completa de produto, arquitetura e desenvolvimento de um sistema
 
 **Status:** Fases 0–1 (Discovery/Arquitetura) concluídas; **Fases 2 (Foundation)**,
 **3 (Autenticação)**, **4 (Multi-tenant/RLS)**, **5 (Integração com a API SG)** e
-**6 (Sincronização)**, **7 (Dashboard MVP)** e **8 (Alertas & Financeiro)** implementadas — monorepo com CI, sessões
+**6 (Sincronização)**, **7 (Dashboard MVP)**, **8 (Alertas & Financeiro)** e **9 (Security
+Hardening)** implementadas — monorepo com CI, sessões
 server-side com MFA, RBAC, isolamento por tenant provado no banco e na API, a camada
 anti-corrupção que fala com o ERP (cofre de credencial, anti-SSRF, token manager, rate-limit,
 circuit breaker), o motor de sincronização (watermarks, cadências em fila, consolidação
@@ -14,8 +15,12 @@ pós-fechamento, backfill resumível, agregados) e o dashboard: visão executiva
 diário de vendas cupom a cupom, comparativos e ruptura de estoque — com selo de frescor e export
 CSV —, os painéis de financeiro (aging, fluxo previsto, despesas e taxas de cartão) e compras
 (situação dos pedidos, lead time, pedidos parados), e os alertas que avisam o cliente sozinhos:
-sete regras ativas, com feed, reconhecimento e e-mail. Próxima: Fase 9 — Security Hardening
-(pentest, CSP final, retenções e checklist ASVS). Nenhuma linha foi escrita antes
+sete regras ativas, com feed, reconhecimento e e-mail. A Fase 9 fechou a CSP estrita (sem
+`unsafe-inline`, verificada pelo navegador em todas as telas), a **retenção executável** — 21
+políticas do doc 10 §2 que a rodada diária apaga e confere — o offboarding com purga física e
+comprovante de destruição, e o **break-glass** com aprovação de segunda pessoa, prazo curto,
+aviso ao dono do tenant e relatório do que foi acessado. Próxima: Fase 10 — Observabilidade
+e SRE (painéis, backups e game-day). Nenhuma linha foi escrita antes
 da especificação, por decisão de método: primeiro entender 100% da capacidade da API, depois
 construir.
 

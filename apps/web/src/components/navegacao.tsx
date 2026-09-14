@@ -66,6 +66,21 @@ export function Cabecalho({ me, ativo }: { me: MeResponse; ativo?: string }) {
 
   return (
     <header className="space-y-4">
+      {tenant?.viaBreakGlass ? (
+        <p
+          role="status"
+          className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200"
+        >
+          <strong>Acesso excepcional em vigor.</strong> Você está vendo dados de
+          {` ${tenant.tenantName} `}
+          sob break-glass: somente leitura, com prazo, e cada tela aberta entra no relatório do
+          chamado. Encerre assim que terminar.{' '}
+          <Link href="/plataforma/break-glass" className="underline underline-offset-4">
+            Ver concessões
+          </Link>
+        </p>
+      ) : null}
+
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
           <p className="text-xs uppercase tracking-[0.2em] text-slate-500">

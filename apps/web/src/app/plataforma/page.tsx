@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Alert } from '@/components/ui';
 import { apiRequest } from '@/lib/server/api-client';
 import { requireMe } from '@/lib/server/session';
-import { CreateTenantForm, ResumeButton, SuspendForm } from './forms';
+import { CreateTenantForm, OffboardForm, ResumeButton, SuspendForm } from './forms';
 
 export const metadata = { title: 'Plataforma — DashSGS' };
 export const dynamic = 'force-dynamic';
@@ -71,8 +71,23 @@ export default async function PlataformaPage() {
         </Link>
         <h1 className="text-2xl font-semibold text-white">Tenants</h1>
         <p className="text-sm text-slate-400">
-          {lista.length} contrato(s). Criar, suspender e reativar — tudo auditado com ator e motivo.
+          {lista.length} contrato(s). Criar, suspender, reativar e desligar — tudo auditado com ator
+          e motivo.
         </p>
+        <nav className="flex flex-wrap gap-3 pt-2 text-sm">
+          <Link
+            href="/plataforma/retencao"
+            className="text-sky-300 underline-offset-4 hover:underline"
+          >
+            Retenção e descarte
+          </Link>
+          <Link
+            href="/plataforma/break-glass"
+            className="text-sky-300 underline-offset-4 hover:underline"
+          >
+            Break-glass
+          </Link>
+        </nav>
       </header>
 
       <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
@@ -115,6 +130,8 @@ export default async function PlataformaPage() {
               ) : (
                 <ResumeButton tenantId={tenant.id} />
               )}
+
+              <OffboardForm tenantId={tenant.id} slug={tenant.slug} />
             </li>
           ))}
         </ul>

@@ -53,25 +53,31 @@ enum AuditResult {
 
 /// Um contrato DashSGS = uma rede/empresa que usa o ERP SG (doc 08 §1).
 model Tenant {
-  id               String       @id @default(uuid()) @db.Uuid
-  name             String       @db.VarChar(120)
-  slug             String       @unique @db.VarChar(60)
-  status           TenantStatus @default(active)
-  plan             String       @default("beta") @db.VarChar(40)
-  timezone         String       @default("America/Sao_Paulo") @db.VarChar(60)
-  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                   String       @id @default(uuid()) @db.Uuid
+  name                 String       @db.VarChar(120)
+  slug                 String       @unique @db.VarChar(60)
+  status               TenantStatus @default(active)
+  plan                 String       @default("beta") @db.VarChar(40)
+  timezone             String       @default("America/Sao_Paulo") @db.VarChar(60)
+  createdAt            DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
   /// Suspensão preserva os dados e bloqueia acesso/jobs (doc 08 §5, runbook 22 §2).
-  suspendedAt      DateTime?    @map("suspended_at") @db.Timestamptz(6)
-  suspensionReason String?      @map("suspension_reason") @db.VarChar(200)
+  suspendedAt          DateTime?    @map("suspended_at") @db.Timestamptz(6)
+  suspensionReason     String?      @map("suspension_reason") @db.VarChar(200)
   /// Exclusão lógica; a purga física roda no offboarding (doc 08 §5).
-  deletedAt        DateTime?    @map("deleted_at") @db.Timestamptz(6)
+  deletedAt            DateTime?    @map("deleted_at") @db.Timestamptz(6)
+  /// Momento em que a purga física aconteceu — prova de destruição (LGPD art. 16).
+  purgedAt             DateTime?    @map("purged_at") @db.Timestamptz(6)
+  /// Retenção do detalhe de vendas, em meses (doc 10 §2: 26 por padrão, ajustável por
+  /// contrato). Só encurta o que a purga apaga; não afeta os agregados de 5 anos.
+  retentionSalesMonths Int          @default(26) @map("retention_sales_months")
 
   memberships   Membership[]
   sessions      Session[]
   invites       Invite[]
   filiais       ErpFilial[]
   erpConnection ErpConnection?
+  breakGlass    BreakGlassGrant[]
 
   @@index([status])
   @@map("app_tenants")
@@ -128,11 +134,13 @@ model User {
   updatedAt            DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt            DateTime?  @map("deleted_at") @db.Timestamptz(6)
 
-  memberships    Membership[]
-  sessions       Session[]
-  passwordResets PasswordReset[]
-  recoveryCodes  TotpRecoveryCode[]
-  invitesCreated Invite[]           @relation("InvitesCreated")
+  memberships        Membership[]
+  sessions           Session[]
+  passwordResets     PasswordReset[]
+  recoveryCodes      TotpRecoveryCode[]
+  invitesCreated     Invite[]           @relation("InvitesCreated")
+  breakGlassPedido   BreakGlassGrant[]  @relation("BreakGlassSolicitante")
+  breakGlassAprovado BreakGlassGrant[]  @relation("BreakGlassAprovador")
 
   @@map("app_users")
 }
@@ -261,7 +269,42 @@ model AuditLog {
 
   @@index([tenantId, createdAt])
   @@index([userId, createdAt])
+  /// A purga de retenção varre por idade, sem tenant nem usuário no filtro (E6-04).
+  @@index([createdAt])
   @@map("app_audit_log")
+}
+
+/// Acesso excepcional de um `platform_admin` aos dados de um tenant (doc 07 §4.5,
+/// runbook 22 §11). Nasce pendente: quem pede não aprova, e sem aprovação de uma segunda
+/// pessoa a concessão não abre nada. Expira sozinha.
+model BreakGlassGrant {
+  id            String         @id @default(uuid()) @db.Uuid
+  tenantId      String         @map("tenant_id") @db.Uuid
+  requestedBy   String         @map("requested_by") @db.Uuid
+  approvedBy    String?        @map("approved_by") @db.Uuid
+  /// Referência do chamado que justifica o acesso (runbook 22 §11, passo 1).
+  ticket        String         @db.VarChar(60)
+  justification String         @db.VarChar(300)
+  /// Papel concedido, limitado no serviço ao mínimo necessário — nunca owner nem admin.
+  role          MembershipRole @default(viewer)
+  ttlMinutes    Int            @map("ttl_minutes")
+  /// Quantas requisições a dado do tenant correram sob esta concessão (relatório do ticket).
+  accessCount   Int            @default(0) @map("access_count")
+
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  approvedAt DateTime? @map("approved_at") @db.Timestamptz(6)
+  /// Só existe depois da aprovação: é dela que o prazo começa a contar.
+  expiresAt  DateTime? @map("expires_at") @db.Timestamptz(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revokedBy  String?   @map("revoked_by") @db.Uuid
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requester User   @relation("BreakGlassSolicitante", fields: [requestedBy], references: [id], onDelete: Cascade)
+  approver  User?  @relation("BreakGlassAprovador", fields: [approvedBy], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([requestedBy, expiresAt])
+  @@map("app_break_glass_grants")
 }
 
 /// Modo de transporte até o ERP do tenant (doc 12 §1). HTTP público é recusado pelo produto.

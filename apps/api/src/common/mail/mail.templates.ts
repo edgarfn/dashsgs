@@ -129,3 +129,62 @@ export function securityNoticeEmail(params: {
     ),
   };
 }
+
+/**
+ * Aviso de break-glass ao owner do tenant (doc 07 §4.5, runbook 22 §11).
+ *
+ * Chega **quando a janela abre**, não depois que fecha: o dono do dado precisa poder contestar
+ * enquanto o acesso ainda existe. Por isso o e-mail traz o nome de quem entrou, quem aprovou, o
+ * chamado, o motivo escrito e a hora em que o acesso morre sozinho.
+ */
+export function breakGlassNoticeEmail(params: {
+  to: string;
+  tenantName: string;
+  operador: string;
+  aprovador: string;
+  ticket: string;
+  justificativa: string;
+  expiraEm: Date;
+}): MailMessage {
+  const titulo = 'Acesso excepcional aos dados da sua conta';
+  const quando = params.expiraEm.toISOString();
+
+  return {
+    to: params.to,
+    subject: `${titulo} — DashSGS`,
+    text: [
+      `${titulo} (${params.tenantName}).`,
+      '',
+      `Operador: ${params.operador}`,
+      `Aprovado por: ${params.aprovador}`,
+      `Chamado: ${params.ticket}`,
+      `Motivo: ${params.justificativa}`,
+      `O acesso expira automaticamente em ${quando}.`,
+      '',
+      'O acesso é somente leitura, limitado ao prazo acima e registrado requisição a requisição.',
+      'Se você não reconhece este atendimento, responda a este e-mail imediatamente.',
+    ].join('\n'),
+    html: layout(
+      titulo,
+      `<h1 style="margin:0 0 12px;font-size:20px">${escapeHtml(titulo)}</h1>
+       <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#334155">
+         Um operador da plataforma recebeu acesso temporário aos dados de
+         <strong>${escapeHtml(params.tenantName)}</strong> para atender a um chamado.
+       </p>
+       <table style="font-size:14px;line-height:1.7;color:#334155;border-collapse:collapse">
+         <tr><td style="padding-right:12px;color:#64748b">Operador</td><td>${escapeHtml(params.operador)}</td></tr>
+         <tr><td style="padding-right:12px;color:#64748b">Aprovado por</td><td>${escapeHtml(params.aprovador)}</td></tr>
+         <tr><td style="padding-right:12px;color:#64748b">Chamado</td><td>${escapeHtml(params.ticket)}</td></tr>
+         <tr><td style="padding-right:12px;color:#64748b">Motivo</td><td>${escapeHtml(params.justificativa)}</td></tr>
+         <tr><td style="padding-right:12px;color:#64748b">Expira em</td><td>${escapeHtml(quando)}</td></tr>
+       </table>
+       <p style="margin:16px 0 0;font-size:14px;line-height:1.6;color:#334155">
+         O acesso é somente leitura, acaba sozinho no horário acima e fica registrado requisição
+         a requisição.
+       </p>
+       <p style="margin:16px 0 0;font-size:15px;line-height:1.6;color:#b91c1c">
+         Se você não reconhece este atendimento, responda a este e-mail imediatamente.
+       </p>`,
+    ),
+  };
+}

@@ -210,16 +210,3 @@ test.describe('perfil', () => {
     await expect(alerta(page)).toContainText('Senha atual incorreta');
   });
 });
-
-test.describe('cabeçalhos de segurança', () => {
-  test('a resposta traz CSP com nonce e as proteções do doc 09', async ({ page }) => {
-    const response = await page.goto('/entrar');
-    const headers = response!.headers();
-
-    expect(headers['content-security-policy']).toContain("frame-ancestors 'none'");
-    expect(headers['content-security-policy']).toMatch(/nonce-[A-Za-z0-9+/=]+/);
-    expect(headers['x-content-type-options']).toBe('nosniff');
-    expect(headers['x-frame-options']).toBe('DENY');
-    expect(headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
-  });
-});

@@ -28,6 +28,12 @@ export interface MembershipSummary {
   role: Role;
   /** Vazio = todas as filiais do tenant. */
   filiaisAllowed: number[];
+  /**
+   * Vínculo temporário de break-glass (doc 07 §4.5), não membership de verdade. O front usa
+   * para avisar, em toda tela, que quem está ali é a operação da plataforma olhando dado de
+   * um cliente — informação que o operador não pode perder de vista.
+   */
+  viaBreakGlass?: boolean;
 }
 
 export interface SessionSummary {
