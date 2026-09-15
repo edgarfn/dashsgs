@@ -35,6 +35,12 @@ pnpm dev                      # api :3001 · web :3000 · mailpit :8025
 # entre com owner@demo.local (o seed imprime a senha; o papel owner exige cadastrar MFA)
 ```
 
+Para uma senha estável entre execuções, defina `SEED_PASSWORD` no `.env` — sem ela o seed sorteia
+uma nova a cada vez (e a imprime). Rodar `pnpm db:seed` de novo é também o **reset** das contas
+sintéticas: devolve a senha, desliga o MFA e encerra as sessões. É o caminho quando a tela pedir
+um código de 6 dígitos de um autenticador que você nunca cadastrou — sinal de que a suíte E2E
+cadastrou um, e o segredo dela morreu com o teste.
+
 Se a máquina já tiver Postgres/Redis locais, defina `POSTGRES_PORT`/`REDIS_PORT` no `.env` e
 ajuste as URLs. Verificação rápida: `curl localhost:3001/readyz` e `./scripts/smoke.sh`.
 Detalhes, tutoriais e padrões de código no [24-development-guide.md](docs/24-development-guide.md).

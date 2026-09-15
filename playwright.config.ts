@@ -11,6 +11,9 @@ const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
 export default defineConfig({
   testDir: './e2e',
   outputDir: './test-results',
+  // Sem isto, o ambiente fica pior por ter rodado os testes: a última conta que cadastrou MFA
+  // continuaria pedindo um código que só existia dentro do teste.
+  globalTeardown: './e2e/global-teardown.ts',
   // Fluxos de autenticação compartilham contas do seed: em paralelo, um derruba a sessão do outro.
   workers: 1,
   fullyParallel: false,

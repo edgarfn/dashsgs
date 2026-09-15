@@ -50,6 +50,7 @@ Decisões tomadas durante a implementação (não estavam na spec):
 | E2-05 ✅ | Convites por e-mail (fluxo tenant) | P0 | M | E2-01, E3-01 | expira, single-use |
 | E2-06 ✅ | Telas: login, MFA, reset, perfil, sessões ativas | P0 | M | E2-01..04 | E2E Playwright |
 | E2-07 ✅ | Auditoria de eventos de autenticação | P0 | P | E2-01, E6-01 | eventos gravados |
+| E2-08 | Reset de MFA de um membro pelo admin do tenant (auditado, com aviso ao dono da conta) | P1 | P | E2-04 | quem perdeu app e códigos volta a entrar |
 
 ### O que a Fase 3 deixou pronto
 

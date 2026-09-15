@@ -106,3 +106,17 @@ getToken(tenant):
 | Vazamento da senha ERP | Cifra em repouso, chave fora do banco, redaction em logs, sem reexibição, auditoria de leitura |
 | Replay do token SG | TTL curto do próprio token; TLS; token confinado ao backend |
 | Enumeração de usuários | Respostas homogêneas em login/recuperação |
+
+## 6. Perda do segundo fator (lacuna conhecida)
+
+O §MFA prevê **códigos de recuperação** como saída de quem perde o autenticador — e é o que a
+tela "Perdi o acesso ao aplicativo" usa. Não há previsão para quem perde os dois: hoje a conta
+fica sem caminho de volta pela interface, porque nem o admin do tenant nem a operação da
+plataforma têm ação para desligar o MFA de um membro (a tela de usuários apenas **mostra** "MFA
+ativo").
+
+Em desenvolvimento isso aparece com facilidade: a suíte E2E cadastra um TOTP cujo segredo morre
+com o teste. `pnpm db:seed` devolve as contas sintéticas ao primeiro acesso (senha conhecida, MFA
+desligado, sessões encerradas) e o `globalTeardown` do Playwright faz o mesmo ao fim da suíte.
+Nenhum dos dois serve para produção: lá a correção é **E2-08** — reset do MFA de um membro pelo
+admin do tenant, auditado e com aviso ao dono da conta.

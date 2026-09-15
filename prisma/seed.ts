@@ -52,6 +52,34 @@ async function upsertTenant(definition: { slug: string; name: string }) {
   });
 }
 
+/**
+ * Estado inicial de uma conta sintética.
+ *
+ * O segundo fator entra aqui porque `db:seed` existe para deixar o ambiente num estado
+ * **conhecido** — e uma conta com TOTP ativo não está em estado conhecido. A suíte E2E cadastra
+ * um autenticador cujo segredo só existe dentro do teste; quem abrir o navegador depois recebe a
+ * tela pedindo um código de 6 dígitos que ninguém tem, sem caminho de volta pela interface (os
+ * códigos de recuperação também ficaram no teste). Sem esta redefinição, rodar o seed de novo —
+ * que é o que se faz quando o ambiente "está estranho" — não resolvia.
+ *
+ * Vale só para as contas deste arquivo, que são sintéticas por definição.
+ */
+const ESTADO_INICIAL_DA_CONTA = {
+  status: 'active',
+  totpEnabled: false,
+  totpSecretCiphertext: null,
+  totpKeyVersion: null,
+  failedAttempts: 0,
+  lockedUntil: null,
+  deletedAt: null,
+} as const;
+
+/** Resíduo de uso anterior: códigos de recuperação gastos e sessões abertas em outra senha. */
+async function limparResiduoDeAcesso(userId: string): Promise<void> {
+  await prisma.totpRecoveryCode.deleteMany({ where: { userId } });
+  await prisma.session.deleteMany({ where: { userId } });
+}
+
 async function upsertMember(
   tenantId: string,
   passwordHash: string,
@@ -59,9 +87,11 @@ async function upsertMember(
 ) {
   const user = await prisma.user.upsert({
     where: { email: member.email },
-    update: { name: member.name, passwordHash, status: 'active' },
+    update: { name: member.name, passwordHash, ...ESTADO_INICIAL_DA_CONTA },
     create: { email: member.email, name: member.name, passwordHash, status: 'active' },
   });
+
+  await limparResiduoDeAcesso(user.id);
 
   await prisma.membership.upsert({
     where: { userId_tenantId: { userId: user.id, tenantId } },
@@ -535,6 +565,14 @@ async function seedFinanceiro(tenantId: string): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  // O seed redefine senha e desliga o segundo fator das contas sintéticas. Em desenvolvimento é
+  // exatamente o que se quer; num banco de produção seria um incidente.
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'db:seed é de desenvolvimento: ele redefine a senha e desliga o MFA das contas sintéticas.',
+    );
+  }
+
   const password = process.env.SEED_PASSWORD ?? generatePassword();
   const passwordHash = await hash(password, ARGON2_OPTIONS);
 
@@ -553,9 +591,14 @@ async function main(): Promise<void> {
   await seedFinanceiro(demo.id);
 
   // Conta de operação da plataforma: papel global, sem membership em tenant nenhum (doc 07 §2).
-  await prisma.user.upsert({
+  const operacao = await prisma.user.upsert({
     where: { email: PLATFORM_ADMIN.email },
-    update: { name: PLATFORM_ADMIN.name, passwordHash, status: 'active', platformAdmin: true },
+    update: {
+      name: PLATFORM_ADMIN.name,
+      passwordHash,
+      platformAdmin: true,
+      ...ESTADO_INICIAL_DA_CONTA,
+    },
     create: {
       email: PLATFORM_ADMIN.email,
       name: PLATFORM_ADMIN.name,
@@ -564,6 +607,8 @@ async function main(): Promise<void> {
       platformAdmin: true,
     },
   });
+
+  await limparResiduoDeAcesso(operacao.id);
 
   console.log('');
   console.log('Seed concluído (dados sintéticos).');
