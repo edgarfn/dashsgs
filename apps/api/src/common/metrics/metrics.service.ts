@@ -3,6 +3,41 @@ import { Counter, Gauge, Histogram, Registry, collectDefaultMetrics } from 'prom
 import { AppConfigService } from '../../config';
 
 /**
+ * Vocabulário dos rótulos de valor fechado (doc 18 §2).
+ *
+ * Existe porque nome de métrica não é o único jeito de escrever um alerta morto: uma regra que
+ * casa `result="unauthorized"` quando o código emite `credenciais_invalidas` fica silenciosa
+ * para sempre e nunca acusa erro. `scripts/check-observability.mjs` compara cada matcher das
+ * regras do Prometheus com esta tabela e reprova o CI quando um valor não existe.
+ *
+ * Só entram rótulos de cardinalidade fechada. `tenant`, `route`, `endpoint`, `queue` e `policy`
+ * são abertos por natureza — ali o gate confere o nome da métrica e o do rótulo, não o valor.
+ */
+export const VOCABULARIO_METRICAS: Record<string, Record<string, readonly string[]>> = {
+  sync_runs_total: { status: ['success', 'error', 'skipped'] },
+  alert_notifications_total: { result: ['sent', 'failed'] },
+  export_jobs_total: { status: ['ok', 'muito_grande', 'erro'] },
+  // `ok` no sucesso; no erro, a falha classificada do cliente SG (`SgFalha`) — e `erro` para o
+  // que escapa da classificação. A lista está escrita aqui, e não importada de
+  // `integration/sg`, porque `common` não depende de camada acima; quem impede as duas de
+  // divergirem é o teste `metrics-vocabulario.spec.ts`, que compara uma com a outra.
+  sg_token_refresh_total: {
+    result: [
+      'ok',
+      'erro',
+      'credenciais_invalidas',
+      'token_expirado',
+      'rota_nao_contratada',
+      'requisicao_invalida',
+      'nao_encontrado',
+      'erro_servidor',
+      'inalcancavel',
+      'resposta_invalida',
+    ],
+  },
+};
+
+/**
  * Registro de métricas Prometheus (doc 18 §2).
  *
  * Cardinalidade é orçamento: rotulamos rota/método/status — nunca id de recurso, nunca produto.
@@ -15,6 +50,9 @@ export class MetricsService {
   readonly httpRequestDuration: Histogram<'route' | 'method' | 'status'>;
   readonly httpRequestsTotal: Counter<'route' | 'method' | 'status'>;
   readonly httpErrorsTotal: Counter<'route' | 'method' | 'status'>;
+  readonly sessionsActive: Gauge<string>;
+  readonly loginFailuresTotal: Counter<'reason'>;
+  readonly exportJobsTotal: Counter<'status'>;
 
   // --- Integração com a API SG (doc 18 §2) — o núcleo do produto vive aqui.
   readonly sgApiCallsTotal: Counter<'tenant' | 'endpoint' | 'status'>;
@@ -43,6 +81,10 @@ export class MetricsService {
   readonly retentionPendingRows: Gauge<'policy'>;
   readonly retentionLastRunSeconds: Gauge<string>;
 
+  // --- Break-glass (E9-03 / runbook 22 §11): acesso excepcional precisa de alarme, não só de log.
+  readonly breakglassGrantsActive: Gauge<string>;
+  readonly breakglassOldestGrantSeconds: Gauge<string>;
+
   constructor(private readonly config: AppConfigService) {
     this.registry.setDefaultLabels({ service: 'dashsgs-api', env: this.config.nodeEnv });
     collectDefaultMetrics({ register: this.registry, prefix: 'dashsgs_' });
@@ -66,6 +108,31 @@ export class MetricsService {
       name: 'http_errors_total',
       help: 'Total de respostas 5xx da API interna',
       labelNames: ['route', 'method', 'status'],
+      registers: [this.registry],
+    });
+
+    // Amostrada por um processo só (o worker): gauge repetido por réplica de API viraria duas
+    // séries idênticas e a primeira pergunta do painel — "quantos estão logados?" — não teria
+    // resposta única (doc 18 §2 "Aplicação").
+    this.sessionsActive = new Gauge({
+      name: 'sessions_active',
+      help: 'Sessões não revogadas e dentro da validade',
+      registers: [this.registry],
+    });
+
+    // `reason` é o vocabulário fechado da auditoria de authn (doc 06 §5): sem e-mail, sem IP,
+    // sem id — o painel mostra a forma do ataque, não quem o sofreu.
+    this.loginFailuresTotal = new Counter({
+      name: 'login_failures_total',
+      help: 'Tentativas de login recusadas, por motivo',
+      labelNames: ['reason'],
+      registers: [this.registry],
+    });
+
+    this.exportJobsTotal = new Counter({
+      name: 'export_jobs_total',
+      help: 'Exports de relatório por desfecho (doc 15 §9)',
+      labelNames: ['status'],
       registers: [this.registry],
     });
 
@@ -208,6 +275,22 @@ export class MetricsService {
       help: 'Momento da última purga de retenção concluída',
       registers: [this.registry],
     });
+
+    // Sem rótulo de tenant: quem acessou o quê está na auditoria e no relatório do ticket. O
+    // painel só precisa responder "existe acesso excepcional aberto agora?" (doc 18 §5).
+    this.breakglassGrantsActive = new Gauge({
+      name: 'breakglass_grants_active',
+      help: 'Concessões de break-glass aprovadas, não revogadas e dentro do prazo',
+      registers: [this.registry],
+    });
+
+    // O teto do serviço é 8 h. Este gauge passar de 28.800 significa que a porta ficou aberta
+    // além do que o próprio produto permite — invariante violada, não "quase no limite".
+    this.breakglassOldestGrantSeconds = new Gauge({
+      name: 'breakglass_oldest_grant_seconds',
+      help: 'Idade da concessão de break-glass ativa mais antiga (0 quando não há nenhuma)',
+      registers: [this.registry],
+    });
   }
 
   /** Fotografia das filas, amostrada periodicamente pelo worker (doc 18 §2). */
@@ -269,6 +352,16 @@ export class MetricsService {
     this.httpRequestDuration.observe(labels, durationSeconds);
     this.httpRequestsTotal.inc(labels);
     if (status >= 500) this.httpErrorsTotal.inc(labels);
+  }
+
+  /** Recusa de login por motivo — o rótulo vem do vocabulário fechado da auditoria de authn. */
+  observeLoginFailure(reason: string): void {
+    this.loginFailuresTotal.inc({ reason });
+  }
+
+  /** Desfecho de um export: `ok`, `muito_grande` (teto de linhas) ou `erro`. */
+  observeExport(status: 'ok' | 'muito_grande' | 'erro'): void {
+    this.exportJobsTotal.inc({ status });
   }
 
   async scrape(): Promise<string> {

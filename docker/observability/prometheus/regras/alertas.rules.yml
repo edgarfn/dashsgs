@@ -1,0 +1,464 @@
+# DashSGS — alertas operacionais (doc 18 §5) e burn rate do orçamento de erro (doc 18 §4).
+#
+# Regra de ouro deste arquivo: todo alerta aqui tem dono, tem runbook e é acionável às 3 da
+# manhã. Alerta que não se sabe o que fazer com ele vira ruído, e ruído treina a equipe a
+# ignorar o pager — que é como se perde o incidente que importava.
+#
+# `severity: page` acorda alguém. `severity: ticket` entra na fila do dia seguinte.
+# Todo alerta traz `runbook` apontando a seção da doc 22 que resolve.
+
+groups:
+  # =======================================================================================
+  # Um alvo mudo não é silêncio: é cegueira. Este grupo vem primeiro porque, sem ele, todos
+  # os outros param de disparar exatamente quando mais se precisa deles.
+  - name: dashsgs-coleta
+    rules:
+      - alert: AlvoForaDoAr
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          resumo: 'Alvo {{ $labels.job }} ({{ $labels.instance }}) não responde ao scrape'
+          descricao: >-
+            Sem raspagem não há alerta. Verifique o container e a rede interna do compose
+            antes de confiar em qualquer painel.
+          runbook: 'doc 21 §Diagnóstico'
+
+      - alert: PrometheusSemRegras
+        expr: prometheus_rule_evaluation_failures_total > 0
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          resumo: 'Regras do Prometheus falhando na avaliação'
+          descricao: 'SLO board e alertas derivados estão parcialmente cegos.'
+          runbook: 'doc 22 §13'
+
+  # =======================================================================================
+  - name: dashsgs-api
+    rules:
+      - alert: ApiInternaDegradada
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(http_request_duration_seconds_bucket{route=~"/api/v1/.*"}[5m]))
+          ) > 1
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          resumo: 'p95 da API interna acima de 1 s há 10 minutos'
+          descricao: 'p95 atual {{ $value | humanizeDuration }}. SLO do dashboard é 300 ms.'
+          runbook: 'doc 21 §Lentidão'
+
+      - alert: ApiInternaComErro5xx
+        expr: dashsgs:leitura:erro_ratio5m > 0.02
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          resumo: '5xx acima de 2% nas rotas de leitura'
+          descricao: '{{ $value | humanizePercentage }} das leituras estão falhando.'
+          runbook: 'doc 21 §Erros 5xx'
+
+      # Ataque de credencial não é 5xx, e por isso não aparece em nenhum dos dois alertas
+      # acima. O lockout já defende a conta; este alerta existe para a equipe **saber**.
+      - alert: PicoDeFalhasDeLogin
+        expr: sum(rate(login_failures_total[10m])) > 1
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          resumo: 'Mais de 60 falhas de login por minuto sustentadas'
+          descricao: 'Motivos predominantes no painel de plataforma. Avaliar doc 27.'
+          runbook: 'doc 27 §Triagem'
+
+  # =======================================================================================
+  - name: dashsgs-slo-burn
+    rules:
+      # Burn rate multi-janela (doc 18 §4). A janela longa diz que o orçamento está sendo
+      # consumido rápido; a curta confirma que **ainda** está — sem ela, um pico de 5 minutos
+      # continuaria acordando gente seis horas depois de resolvido.
+      #
+      # Orçamento de erro = 0,5% (SLO 99,5% em 30 d).
+      # Rápido: 2% do orçamento em 1 h → burn 14,4× → razão de erro 7,2%.
+      # Lento:  5% do orçamento em 6 h → burn 6×    → razão de erro 3,0%.
+      - alert: OrcamentoDeErroQueimandoRapido
+        expr: |
+          dashsgs:leitura:erro_ratio1h > 0.072
+          and
+          dashsgs:leitura:erro_ratio5m > 0.072
+        for: 2m
+        labels:
+          severity: page
+          slo: disponibilidade_leitura
+        annotations:
+          resumo: '2% do orçamento de erro mensal em 1 hora'
+          descricao: 'Nesse ritmo o SLO de 30 dias cai antes do fim do dia.'
+          runbook: 'doc 21 §Erros 5xx'
+
+      - alert: OrcamentoDeErroQueimandoDevagar
+        expr: |
+          dashsgs:leitura:erro_ratio6h > 0.03
+          and
+          dashsgs:leitura:erro_ratio30m > 0.03
+        for: 15m
+        labels:
+          severity: ticket
+          slo: disponibilidade_leitura
+        annotations:
+          resumo: '5% do orçamento de erro mensal em 6 horas'
+          descricao: 'Degradação lenta e persistente — investigar no horário comercial.'
+          runbook: 'doc 21 §Erros 5xx'
+
+      - alert: OrcamentoDeErroEsgotado
+        expr: dashsgs:leitura:orcamento_restante30d <= 0
+        for: 30m
+        labels:
+          severity: ticket
+          slo: disponibilidade_leitura
+        annotations:
+          resumo: 'Orçamento de erro de 30 dias esgotado'
+          descricao: >-
+            Congelar mudanças não essenciais até o orçamento voltar ao positivo
+            (regra de gestão do roadmap, doc 29).
+          runbook: 'doc 32 §Operação'
+
+  # =======================================================================================
+  - name: dashsgs-sincronizacao
+    rules:
+      # SLO de frescor em tempo real é 10 min; o alerta é o dobro, como manda o doc 18 §5.
+      # Sem o recorte de horário de loja, todo ERP desligado à noite acordaria o on-call.
+      - alert: SyncParado
+        expr: |
+          (max by (tenant) (sync_lag_seconds{domain="vendas_hoje"}) > 1200)
+          and on() (hour() >= 11 or hour() < 1)
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          resumo: 'Vendas de hoje sem atualizar há mais de 20 min (tenant {{ $labels.tenant }})'
+          descricao: 'Atraso de {{ $value | humanizeDuration }}. O cliente vê número velho na tela.'
+          runbook: 'doc 22 §4'
+
+      - alert: ConsolidadoAtrasado
+        expr: max by (tenant) (sync_lag_seconds{domain="vendas_dia"}) > 7200
+        for: 30m
+        labels:
+          severity: ticket
+        annotations:
+          resumo: 'Dia fechado não consolidado (tenant {{ $labels.tenant }})'
+          descricao: 'Atraso de {{ $value | humanizeDuration }} contra SLO de 60 min.'
+          runbook: 'doc 22 §4'
+
+      # O rótulo é `credenciais_invalidas`, e não `unauthorized` como a doc 18 §5 escreveu:
+      # o vocabulário real é o `SgFalha` do cliente SG (apps/api/src/integration/sg/sg-errors.ts).
+      - alert: CredencialErpInvalida
+        expr: |
+          increase(sg_token_refresh_total{result=~"credenciais_invalidas|rota_nao_contratada"}[15m]) > 0
+        labels:
+          severity: page
+        annotations:
+          resumo: 'Credencial do ERP recusada (tenant {{ $labels.tenant }})'
+          descricao: >-
+            A conexão precisa de ação humana — senha trocada no ERP ou rota fora do contrato
+            com a SG. Nenhum retry resolve.
+          runbook: 'doc 21 §Conexão ERP'
+
+      - alert: CircuitoAbertoProlongado
+        expr: sg_circuit_state == 2
+        for: 30m
+        labels:
+          severity: page
+        annotations:
+          resumo: 'Disjuntor aberto há 30 min (tenant {{ $labels.tenant }})'
+          descricao: 'A API SG do cliente está indisponível ou instável. Sync suspenso.'
+          runbook: 'doc 21 §Conexão ERP'
+
+      - alert: QuarentenaAnomala
+        expr: sum by (tenant, domain) (increase(sg_invalid_items_total[1h])) > 50
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          resumo: 'Quarentena acima do normal em {{ $labels.domain }} (tenant {{ $labels.tenant }})'
+          descricao: >-
+            {{ $value | printf "%.0f" }} itens recusados pelo schema em 1 h. Drift de contrato da
+            SG é a causa provável — comparar com o teste noturno.
+          runbook: 'doc 22 §4'
+
+      - alert: SyncFalhandoMuito
+        expr: dashsgs:sync:sucesso_ratio5m < 0.99
+        for: 30m
+        labels:
+          severity: ticket
+          slo: sucesso_sync
+        annotations:
+          resumo: 'Taxa de sucesso de sync abaixo de 99%'
+          descricao: '{{ $value | humanizePercentage }} das execuções concluem (SLO 99%).'
+          runbook: 'doc 22 §4'
+
+  # =======================================================================================
+  - name: dashsgs-filas
+    rules:
+      - alert: DlqCrescendo
+        expr: queue_dlq_depth > 0
+        for: 15m
+        labels:
+          severity: page
+        annotations:
+          resumo: 'Fila de veneno com {{ $value | printf "%.0f" }} job(s) em {{ $labels.queue }}'
+          descricao: 'Jobs esgotaram todas as tentativas. Nada mais os reprocessa sozinho.'
+          runbook: 'doc 22 §6'
+
+      - alert: FilaAcumulando
+        expr: queue_depth > 500
+        for: 30m
+        labels:
+          severity: ticket
+        annotations:
+          resumo: 'Fila {{ $labels.queue }} com {{ $value | printf "%.0f" }} jobs aguardando'
+          descricao: 'Worker sem vazão: verificar concorrência, rate limit da SG e CPU.'
+          runbook: 'doc 22 §6'
+
+  # =======================================================================================
+  - name: dashsgs-alertas-do-produto
+    rules:
+      # Meta-alerta: o motor que avisa o cliente também pode parar. Quando isso acontece o
+      # sintoma é silêncio — e silêncio nunca dispara nada sozinho.
+      - alert: EntregaDeAlertasLenta
+        expr: dashsgs:alertas:entrega_p95_5m > 300
+        for: 15m
+        labels:
+          severity: ticket
+          slo: entrega_alertas
+        annotations:
+          resumo: 'p95 de entrega de alertas acima de 5 min'
+          descricao: 'SLO do doc 18 §4 é 5 min do evento ao despacho da notificação.'
+          runbook: 'doc 22 §6'
+
+      - alert: NotificacoesFalhando
+        expr: |
+          sum(rate(alert_notifications_total{result="failed"}[15m]))
+            /
+          clamp_min(sum(rate(alert_notifications_total[15m])), 1e-9) > 0.1
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          resumo: 'Mais de 10% das notificações de alerta falham'
+          descricao: 'SMTP fora do ar ou destinatário recusando. O cliente não está sendo avisado.'
+          runbook: 'doc 21 §E-mail'
+
+  # =======================================================================================
+  - name: dashsgs-privacidade
+    rules:
+      # Doc 10 §2 promete prazos ao cliente. Este alerta é o que separa promessa de prática.
+      - alert: RetencaoNaoCumprida
+        expr: retention_pending_rows > 0
+        for: 24h
+        labels:
+          severity: ticket
+        annotations:
+          resumo: 'Política {{ $labels.policy }} com {{ $value | printf "%.0f" }} linha(s) vencida(s)'
+          descricao: 'O valor correto é sempre zero. Retenção prometida e não cumprida.'
+          runbook: 'doc 22 §12'
+
+      - alert: PurgaParou
+        expr: |
+          (time() - retention_last_run_timestamp_seconds) > 129600
+          or absent(retention_last_run_timestamp_seconds)
+        for: 1h
+        labels:
+          severity: ticket
+        annotations:
+          resumo: 'Purga de retenção sem concluir há mais de 36 h'
+          descricao: 'A rodada é diária (3h20 BRT). Verificar o agendador do worker.'
+          runbook: 'doc 22 §12'
+
+      # O teto do serviço é 8 h (MINUTOS_MAXIMO em break-glass.service.ts). Passar disso não é
+      # "quase no limite": é invariante do produto violada.
+      - alert: BreakGlassAlemDoPrazo
+        expr: breakglass_oldest_grant_seconds > 28800
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          resumo: 'Concessão de break-glass ativa há mais de 8 h'
+          descricao: 'Revogar imediatamente e apurar como o prazo máximo foi ultrapassado.'
+          runbook: 'doc 22 §11'
+
+      # "Fora de janela de incidente" não é computável: quem sabe se há incidente é a equipe.
+      # O alerta então é informativo e o procedimento é humano — confirmar que a concessão
+      # corresponde a um chamado aberto.
+      - alert: BreakGlassAtivo
+        expr: breakglass_grants_active > 0
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          resumo: '{{ $value | printf "%.0f" }} concessão(ões) de break-glass ativa(s)'
+          descricao: 'Confirmar que existe chamado aberto correspondente; revogar se não houver.'
+          runbook: 'doc 22 §11'
+
+  # =======================================================================================
+  - name: dashsgs-infraestrutura
+    rules:
+      - alert: DiscoQuaseCheio
+        expr: |
+          (
+            node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"}
+              /
+            node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}
+          ) < 0.15
+        for: 15m
+        labels:
+          severity: page
+        annotations:
+          resumo: 'Menos de 15% livres em {{ $labels.mountpoint }}'
+          descricao: >-
+            Postgres com disco cheio para de aceitar escrita e o WAL deixa de ser arquivado —
+            perde-se o PITR junto com a disponibilidade.
+          runbook: 'doc 21 §Disco'
+
+      - alert: DiscoEnchendoRapido
+        expr: |
+          predict_linear(node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"}[6h], 24 * 3600) < 0
+        for: 1h
+        labels:
+          severity: ticket
+        annotations:
+          resumo: '{{ $labels.mountpoint }} deve encher em 24 h no ritmo atual'
+          descricao: 'Aviso antecipado: agir agora custa menos que restaurar depois.'
+          runbook: 'doc 21 §Disco'
+
+      - alert: CpuSaturada
+        expr: |
+          100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          resumo: 'CPU acima de 85% há 15 min'
+          descricao: 'Backfill concorrendo com o dashboard é a causa mais comum.'
+          runbook: 'doc 21 §Lentidão'
+
+      - alert: MemoriaCritica
+        expr: |
+          node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.1
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          resumo: 'Menos de 10% de memória disponível'
+          descricao: 'O OOM killer costuma escolher o Postgres. Agir antes disso.'
+          runbook: 'doc 21 §Memória'
+
+      - alert: CertificadoTlsExpirando
+        expr: (probe_ssl_earliest_cert_expiry - time()) < 15 * 86400
+        for: 1h
+        labels:
+          severity: ticket
+        annotations:
+          resumo: 'Certificado de {{ $labels.instance }} expira em menos de 15 dias'
+          descricao: 'O Caddy renova sozinho; se chegou aqui, a renovação automática falhou.'
+          runbook: 'doc 21 §TLS'
+
+      - alert: SondaExternaFalhando
+        expr: probe_success == 0
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          resumo: '{{ $labels.instance }} não responde pela internet'
+          descricao: 'Do lado de fora o produto está no ar? Aqui a resposta é não.'
+          runbook: 'doc 21 §Diagnóstico'
+
+      - alert: PostgresIndisponivel
+        expr: pg_up == 0
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          resumo: 'Postgres não responde ao exporter'
+          runbook: 'doc 21 §Banco'
+
+      - alert: RedisIndisponivel
+        expr: redis_up == 0
+        for: 5m
+        labels:
+          severity: ticket
+        annotations:
+          resumo: 'Redis não responde ao exporter'
+          descricao: 'Filas e cache parados; sessão continua válida (mora no Postgres).'
+          runbook: 'doc 21 §Redis'
+
+      - alert: ConexoesDoBancoNoTeto
+        expr: |
+          sum(pg_stat_activity_count) / max(pg_settings_max_connections) > 0.8
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          resumo: 'Mais de 80% das conexões do Postgres em uso'
+          runbook: 'doc 21 §Banco'
+
+  # =======================================================================================
+  # As séries deste grupo NÃO vêm da aplicação: o backup as escreve como textfile e o
+  # node-exporter as publica (doc 20 §2). É por isso que `absent()` importa tanto aqui — o
+  # modo de falhar mais provável de um backup é deixar de rodar, não rodar e errar.
+  - name: dashsgs-backup
+    rules:
+      - alert: BackupFalhou
+        expr: |
+          (time() - backup_last_success_timestamp_seconds{kind="base"}) > 93600
+          or absent(backup_last_success_timestamp_seconds{kind="base"})
+        for: 30m
+        labels:
+          severity: page
+        annotations:
+          resumo: 'Sem base backup bem-sucedido nas últimas 26 h'
+          descricao: 'RPO de 1 h (doc 20 §1) depende do base backup somado ao WAL contínuo.'
+          runbook: 'doc 22 §9'
+
+      - alert: DumpLogicoFalhou
+        expr: |
+          (time() - backup_last_success_timestamp_seconds{kind="dump"}) > 93600
+          or absent(backup_last_success_timestamp_seconds{kind="dump"})
+        for: 30m
+        labels:
+          severity: ticket
+        annotations:
+          resumo: 'Sem dump lógico nas últimas 26 h'
+          descricao: 'É a redundância independente do formato físico — vale ticket, não pager.'
+          runbook: 'doc 22 §9'
+
+      - alert: ArquivamentoDeWalParado
+        expr: |
+          pg_stat_archiver_failed_count > 0
+          and
+          increase(pg_stat_archiver_archived_count[1h]) == 0
+        for: 30m
+        labels:
+          severity: page
+        annotations:
+          resumo: 'WAL não está sendo arquivado'
+          descricao: >-
+            Sem WAL arquivado não há PITR e o disco do banco começa a encher. É a falha que
+            transforma "perdemos 1 hora" em "perdemos o dia".
+          runbook: 'doc 22 §9'
+
+      # Backup que nunca foi restaurado não é backup (doc 20 §3). O teste roda semanalmente;
+      # 8 dias dá folga para um feriado sem transformar o alerta em ruído.
+      - alert: TesteDeRestauracaoAtrasado
+        expr: |
+          (time() - restore_test_last_success_timestamp_seconds) > 691200
+          or absent(restore_test_last_success_timestamp_seconds)
+        for: 1h
+        labels:
+          severity: ticket
+        annotations:
+          resumo: 'Teste de restauração sem sucesso há mais de 8 dias'
+          descricao: 'Rodar `pnpm dr:restore-test` ou o workflow "Restore test (semanal)".'
+          runbook: 'doc 22 §9'

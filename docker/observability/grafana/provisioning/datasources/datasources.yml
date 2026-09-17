@@ -1,0 +1,31 @@
+# Fontes de dados provisionadas como código (doc 20 §2: Grafana é git, não clique).
+# `uid` fixo porque os painéis referenciam por uid — recriar o Grafana do zero tem que produzir
+# exatamente os mesmos painéis funcionando.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: dashsgs-prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      # Igual ao `evaluation_interval` do Prometheus: passos menores no painel só produzem
+      # degraus falsos em cima de dados que não existem.
+      timeInterval: 30s
+      httpMethod: POST
+
+  - name: Loki
+    uid: dashsgs-loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    jsonData:
+      maxLines: 1000
+      # Do erro no painel para a linha de log correspondente: o correlation_id é o fio, e ele
+      # está no conteúdo da linha (não é rótulo — ver promtail.yml).
+      derivedFields:
+        - name: correlation_id
+          matcherRegex: '"correlation_id":"([^"]+)"'
+          url: '/explore?left={"datasource":"dashsgs-loki","queries":[{"expr":"{servico=~\".+\"} |= \"$${__value.raw}\""}]}'

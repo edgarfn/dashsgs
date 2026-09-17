@@ -1,0 +1,214 @@
+# DashSGS — stack de observabilidade (doc 18). Sobrepõe-se ao compose de staging/produção:
+#
+#   docker compose -f docker/compose.staging.yml -f docker/compose.observability.yml \
+#     --env-file .env.staging up -d
+#
+# São dois arquivos e um só projeto, de propósito: o Prometheus precisa das redes `app` e `data`
+# para raspar API, worker, Postgres e Redis — redes internas, sem rota para a internet. Subir a
+# observabilidade como projeto separado exigiria expor os alvos, que é exatamente o que o
+# Caddyfile impede.
+#
+# Nada aqui publica porta pública. O Grafana escuta em 127.0.0.1: o acesso é por túnel SSH
+# (`ssh -L 3000:127.0.0.1:3000 host`). Painel de operação com login na internet é superfície de
+# ataque nova para resolver conveniência de uma pessoa.
+
+name: dashsgs
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '3'
+
+services:
+  # Renderiza o que varia por instalação. Nem o Prometheus nem o Alertmanager expandem `${VAR}`
+  # no arquivo de configuração; um arquivo que parece interpolar e não interpola manda alerta
+  # para o endereço literal `${ONCALL}` e ninguém descobre até o primeiro incidente.
+  obs-config:
+    image: busybox:1.37
+    restart: 'no'
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN}
+      ALERTMANAGER_SMTP_HOST: ${ALERTMANAGER_SMTP_HOST}
+      ALERTMANAGER_FROM: ${ALERTMANAGER_FROM}
+      ALERTMANAGER_ONCALL_EMAIL: ${ALERTMANAGER_ONCALL_EMAIL}
+      ALERTMANAGER_PLATAFORMA_EMAIL: ${ALERTMANAGER_PLATAFORMA_EMAIL}
+    volumes:
+      - ./observability/alertmanager:/modelo:ro
+      - obs_config:/saida
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        mkdir -p /saida/alertmanager /saida/alvos
+        sed -e "s|__SMTP_HOST__|$$ALERTMANAGER_SMTP_HOST|g" \
+            -e "s|__SMTP_FROM__|$$ALERTMANAGER_FROM|g" \
+            -e "s|__ONCALL_EMAIL__|$$ALERTMANAGER_ONCALL_EMAIL|g" \
+            -e "s|__PLATAFORMA_EMAIL__|$$ALERTMANAGER_PLATAFORMA_EMAIL|g" \
+            /modelo/alertmanager.yml.tmpl > /saida/alertmanager/alertmanager.yml
+        printf -- '- targets:\n    - https://%s/\n    - https://%s/healthz\n' \
+            "$$APP_DOMAIN" "$$API_DOMAIN" > /saida/alvos/blackbox.yml
+        if grep -q '__[A-Z_]*__' /saida/alertmanager/alertmanager.yml; then
+          echo "marcador nao substituido: falta variavel de ambiente" >&2
+          exit 1
+        fi
+        echo "configuracao renderizada"
+    networks: [app]
+    logging: *logging
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    restart: unless-stopped
+    depends_on:
+      obs-config:
+        condition: service_completed_successfully
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      # 45 dias cobre a janela de 30 do SLO com folga para a conversa mensal acontecer depois
+      # do fechamento. Histórico mais longo é trabalho de outro banco (ClickHouse, doc 31 E11).
+      - '--storage.tsdb.retention.time=45d'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus/regras:/etc/prometheus/regras:ro
+      - obs_config:/etc/prometheus/rendered:ro
+      - promdata:/prometheus
+    networks: [app, data]
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:9090/-/healthy']
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    logging: *logging
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.0
+    restart: unless-stopped
+    depends_on:
+      obs-config:
+        condition: service_completed_successfully
+    command:
+      - '--config.file=/etc/alertmanager/rendered/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    volumes:
+      - obs_config:/etc/alertmanager/rendered:ro
+      - alertmanagerdata:/alertmanager
+    networks: [app]
+    logging: *logging
+
+  grafana:
+    image: grafana/grafana:11.5.1
+    restart: unless-stopped
+    depends_on: [prometheus]
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      # Sem cadastro, sem anônimo, sem telemetria: o Grafana aqui é ferramenta de operação, não
+      # um produto com usuários.
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+      GF_INSTALL_PLUGINS: ''
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/paineis:/var/lib/grafana/paineis:ro
+      - grafanadata:/var/lib/grafana
+    ports:
+      # Só loopback: chega-se por túnel SSH. Ver o cabeçalho deste arquivo.
+      - '127.0.0.1:${GRAFANA_PORT:-3000}:3000'
+    networks: [app]
+    logging: *logging
+
+  loki:
+    image: grafana/loki:3.3.2
+    restart: unless-stopped
+    command: ['-config.file=/etc/loki/loki.yml']
+    user: '10001:10001'
+    volumes:
+      - ./observability/loki/loki.yml:/etc/loki/loki.yml:ro
+      - lokidata:/loki
+    networks: [app]
+    logging: *logging
+
+  promtail:
+    image: grafana/promtail:3.3.2
+    restart: unless-stopped
+    depends_on: [loki]
+    command: ['-config.file=/etc/promtail/promtail.yml']
+    volumes:
+      - ./observability/promtail/promtail.yml:/etc/promtail/promtail.yml:ro
+      # Somente leitura no socket do Docker: o Promtail precisa descobrir containers, não
+      # controlá-los. Socket com escrita é root na máquina inteira.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - promtaildata:/promtail
+    networks: [app]
+    logging: *logging
+
+  blackbox:
+    image: prom/blackbox-exporter:v0.26.0
+    restart: unless-stopped
+    command: ['--config.file=/etc/blackbox/blackbox.yml']
+    volumes:
+      - ./observability/blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+    # `edge` porque esta sonda precisa sair para a internet e voltar pelo DNS público — é o
+    # único componente que mede o produto como o cliente o vê.
+    networks: [app, edge]
+    logging: *logging
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    restart: unless-stopped
+    command:
+      - '--path.rootfs=/host'
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      # Diretório onde o backup escreve o resultado da última rodada. É assim que "o backup
+      # rodou?" vira série do Prometheus sem abrir porta em nenhum container de banco.
+      - '--collector.textfile.directory=/textfile'
+      - '--collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run|var/lib/docker/.+)($$|/)'
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+      - backup_textfile:/textfile:ro
+    networks: [app]
+    logging: *logging
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.16.0
+    restart: unless-stopped
+    environment:
+      # Papel `app_monitor` (pg_monitor): estatísticas, nenhum dado de cliente. Ver
+      # docker/postgres/init/01-roles.sql.
+      DATA_SOURCE_NAME: ${POSTGRES_EXPORTER_DSN}
+      PG_EXPORTER_AUTO_DISCOVER_DATABASES: 'false'
+    # `pg_stat_archiver` não vem de fábrica, e é dele que sai o alerta de WAL não arquivado —
+    # o defeito que tira o PITR sem tirar o banco do ar (docker/observability/postgres-exporter).
+    command: ['--extend.query-path=/etc/postgres-exporter/queries.yml']
+    volumes:
+      - ./observability/postgres-exporter/queries.yml:/etc/postgres-exporter/queries.yml:ro
+    networks: [app, data]
+    logging: *logging
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.67.0
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis://redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    networks: [app, data]
+    logging: *logging
+
+volumes:
+  # Declarado também em compose.staging.yml (é o backup que escreve nele). Compose funde as
+  # duas declarações; repetir aqui deixa este arquivo legível sozinho.
+  backup_textfile:
+  promdata:
+  grafanadata:
+  alertmanagerdata:
+  lokidata:
+  promtaildata:
+  obs_config:

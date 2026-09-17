@@ -1,0 +1,20 @@
+# DashSGS — sonda externa (doc 18 §5: certificado TLS e disponibilidade vista de fora).
+#
+# É o único componente que não confia na nossa própria rede: ele chega pelo DNS público e pelo
+# Caddy, como o navegador do cliente. Um alvo interno verde com a sonda vermelha significa que o
+# produto está no ar para nós e fora do ar para quem paga.
+
+modules:
+  http_2xx:
+    prober: http
+    timeout: 10s
+    http:
+      method: GET
+      valid_status_codes: [200]
+      valid_http_versions: ['HTTP/1.1', 'HTTP/2.0']
+      follow_redirects: true
+      preferred_ip_protocol: ip4
+      # Certificado inválido é FALHA da sonda, não aviso: é assim que `probe_success` cai junto
+      # com a expiração e o incidente vira um só.
+      tls_config:
+        insecure_skip_verify: false

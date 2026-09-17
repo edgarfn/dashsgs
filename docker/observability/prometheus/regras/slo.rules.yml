@@ -1,0 +1,142 @@
+# DashSGS — SLIs do doc 18 §4 como regras de gravação.
+#
+# Por que gravar em vez de calcular no painel: o SLO board pergunta a mesma coisa em seis
+# janelas (5 min a 30 dias). Recalcular `rate()` sobre 30 dias a cada refresh do Grafana
+# derruba o Prometheus muito antes de derrubar o produto. A regra roda uma vez e todo mundo
+# lê o resultado — painel, alerta de burn rate e relatório mensal, sempre do mesmo número.
+#
+# Convenção de nome: `dashsgs:<sli>:<agregação><janela>`. Os dois-pontos marcam série derivada;
+# é o que separa, na busca do Grafana, o que medimos do que calculamos.
+
+groups:
+  # ---------------------------------------------------------------------------------------
+  - name: dashsgs-sli-disponibilidade
+    interval: 30s
+    rules:
+      # "Rota de leitura" é GET sob /api/v1: é o que o dashboard faz. POST de login ou de
+      # configuração tem outro dono e outra expectativa, e misturar os dois esconde os dois.
+      - record: dashsgs:leitura:requisicoes_rate5m
+        expr: sum(rate(http_requests_total{method="GET",route=~"/api/v1/.*"}[5m]))
+
+      # Falha é 5xx — e só. A doc 18 §4 escreveu "2xx+3xx / total", mas 4xx é o cliente pedindo
+      # o que não existe ou sem permissão: contar isso como indisponibilidade faria um usuário
+      # digitando uma URL errada queimar o orçamento de erro da plataforma. O que respondemos
+      # mal é o que conta.
+      - record: dashsgs:leitura:erros_rate5m
+        expr: sum(rate(http_requests_total{method="GET",route=~"/api/v1/.*",status=~"5.."}[5m]))
+
+      - record: dashsgs:leitura:erro_ratio5m
+        expr: |
+          dashsgs:leitura:erros_rate5m
+            /
+          clamp_min(dashsgs:leitura:requisicoes_rate5m, 1e-9)
+
+      - record: dashsgs:leitura:erro_ratio30m
+        expr: |
+          sum(rate(http_requests_total{method="GET",route=~"/api/v1/.*",status=~"5.."}[30m]))
+            /
+          clamp_min(sum(rate(http_requests_total{method="GET",route=~"/api/v1/.*"}[30m])), 1e-9)
+
+      - record: dashsgs:leitura:erro_ratio1h
+        expr: |
+          sum(rate(http_requests_total{method="GET",route=~"/api/v1/.*",status=~"5.."}[1h]))
+            /
+          clamp_min(sum(rate(http_requests_total{method="GET",route=~"/api/v1/.*"}[1h])), 1e-9)
+
+      - record: dashsgs:leitura:erro_ratio6h
+        expr: |
+          sum(rate(http_requests_total{method="GET",route=~"/api/v1/.*",status=~"5.."}[6h]))
+            /
+          clamp_min(sum(rate(http_requests_total{method="GET",route=~"/api/v1/.*"}[6h])), 1e-9)
+
+      # Janela do SLO (30 d). `increase` e não `rate`: no fim do mês a pergunta é sobre
+      # requisições contadas, não sobre velocidade instantânea.
+      - record: dashsgs:leitura:disponibilidade30d
+        expr: |
+          1 - (
+            sum(increase(http_requests_total{method="GET",route=~"/api/v1/.*",status=~"5.."}[30d]))
+              /
+            clamp_min(sum(increase(http_requests_total{method="GET",route=~"/api/v1/.*"}[30d])), 1e-9)
+          )
+
+      # Orçamento restante em fração de 1: 1 = intacto, 0 = estourado, negativo = dívida.
+      # SLO 99,5% → orçamento de erro 0,5%.
+      - record: dashsgs:leitura:orcamento_restante30d
+        expr: |
+          1 - (
+            (1 - dashsgs:leitura:disponibilidade30d) / 0.005
+          )
+
+  # ---------------------------------------------------------------------------------------
+  - name: dashsgs-sli-latencia
+    interval: 30s
+    rules:
+      # p95 do que o usuário espera olhando a tela. `route` fica no agrupamento por `le` apenas;
+      # o p95 é da experiência, não de uma rota isolada — a tela lenta some na média das rápidas
+      # se cada rota tiver seu próprio quantil.
+      - record: dashsgs:dashboard:latencia_p95_5m
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(http_request_duration_seconds_bucket{route=~"/api/v1/dashboard.*"}[5m]))
+          )
+
+      - record: dashsgs:dashboard:latencia_p95_7d
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(http_request_duration_seconds_bucket{route=~"/api/v1/dashboard.*"}[7d]))
+          )
+
+      # Fração do tempo em que o p95 esteve dentro dos 300 ms prometidos. É esta série, e não o
+      # p95 médio, que responde "cumprimos o SLO nos últimos 7 dias?".
+      - record: dashsgs:dashboard:latencia_dentro_slo7d
+        expr: avg_over_time((dashsgs:dashboard:latencia_p95_5m < bool 0.3)[7d:5m])
+
+  # ---------------------------------------------------------------------------------------
+  - name: dashsgs-sli-frescor
+    interval: 30s
+    rules:
+      # Frescor tempo real: o pior tenant é o SLI. A média entre clientes esconderia justamente
+      # aquele cujo ERP parou — que é o único que liga para reclamar.
+      - record: dashsgs:frescor:tempo_real_segundos
+        expr: max(sync_lag_seconds{domain="vendas_hoje"})
+
+      - record: dashsgs:frescor:tempo_real_por_tenant
+        expr: max by (tenant) (sync_lag_seconds{domain="vendas_hoje"})
+
+      - record: dashsgs:frescor:consolidado_segundos
+        expr: max(sync_lag_seconds{domain="vendas_dia"})
+
+      # Dentro do SLO (≤ 10 min) apenas em horário de loja — 11h–01h UTC ≈ 08h–22h em São Paulo.
+      # Medir frescor às 4 da manhã reprovaria a plataforma por um ERP que estava, corretamente,
+      # desligado.
+      - record: dashsgs:frescor:tempo_real_dentro_slo
+        expr: |
+          (dashsgs:frescor:tempo_real_segundos < bool 600)
+          and on() (hour() >= 11 or hour() < 1)
+
+  # ---------------------------------------------------------------------------------------
+  - name: dashsgs-sli-sync-e-alertas
+    interval: 30s
+    rules:
+      # `skipped` fica de fora do denominador: é o desfecho de "ERP indisponível / sem conexão
+      # configurada", e o doc 18 §4 exclui isso do SLI de propósito — não é falha nossa, e
+      # contá-la faria o SLO de sync medir a infraestrutura do cliente.
+      - record: dashsgs:sync:sucesso_ratio5m
+        expr: |
+          sum(rate(sync_runs_total{status="success"}[5m]))
+            /
+          clamp_min(sum(rate(sync_runs_total{status=~"success|error"}[5m])), 1e-9)
+
+      - record: dashsgs:sync:sucesso_ratio7d
+        expr: |
+          sum(increase(sync_runs_total{status="success"}[7d]))
+            /
+          clamp_min(sum(increase(sync_runs_total{status=~"success|error"}[7d])), 1e-9)
+
+      - record: dashsgs:alertas:entrega_p95_5m
+        expr: histogram_quantile(0.95, sum by (le) (rate(alert_delivery_seconds_bucket[5m])))
+
+      - record: dashsgs:alertas:entrega_p95_7d
+        expr: histogram_quantile(0.95, sum by (le) (rate(alert_delivery_seconds_bucket[7d])))

@@ -36,7 +36,11 @@
     "test:e2e:ui": "playwright test --ui",
     "db:rls-check": "node scripts/check-rls.mjs",
     "test:contract": "pnpm --filter @dashsgs/api test:contract",
-    "dev:worker": "pnpm --filter @dashsgs/api dev:worker"
+    "dev:worker": "pnpm --filter @dashsgs/api dev:worker",
+    "obs:check": "node scripts/check-observability.mjs",
+    "obs:up": "docker compose -f docker/compose.staging.yml -f docker/compose.observability.yml --env-file .env.staging up -d",
+    "dr:backup": "docker compose -f docker/compose.staging.yml --env-file .env.staging exec -T backup /opt/dashsgs/backup/backup.sh tudo",
+    "dr:restore-test": "docker compose -f docker/compose.staging.yml --env-file .env.staging exec -T backup /opt/dashsgs/backup/restore-test.sh"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

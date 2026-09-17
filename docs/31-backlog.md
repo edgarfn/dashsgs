@@ -237,8 +237,8 @@ Decisões e descobertas da implementação:
 | ID | História | Pri | Cx | CA |
 |---|---|---|---|---|
 | E6-01 ◐ | Auditoria append-only + hash chain + UI consulta (gravação e verificação prontas na Fase 3; falta a tela) | P0 | M | tamper test |
-| E6-02 | Métricas Prometheus + painéis Grafana + alertas doc 18 | P0 | M | SLO board |
-| E6-03 | Backups WAL-G + restore test semanal automatizado | P0 | M | doc 20 §3 |
+| E6-02 ✅ | Métricas Prometheus + painéis Grafana + alertas doc 18 | P0 | M | SLO board |
+| E6-03 ✅ | Backups WAL-G + restore test semanal automatizado | P0 | M | doc 20 §3 |
 | E6-04 ✅ | Jobs de retenção/purga (partições, logs, offboarding) | P0 | M | verify-purge zero |
 | E6-05 | dashsgs-cli (tenant, sync, queue, crypto, breakglass) | P1 | M | runbooks executáveis |
 | E6-06 | Export CSV assíncrono com máscara por papel | P1 | M | limite/permite testados |
@@ -366,7 +366,8 @@ Decisões e descobertas da implementação:
 E9-01 Pentest + correções (P0/G, **externo**) · E9-02 ✅ CSP final sem unsafe-inline (P0/M) ·
 E9-03 ✅ Break-glass auditado (P1/M) · E9-04 DPA/política/DPO (P0/M, **jurídico**) ·
 E9-05 Billing/planos (P0/G, Fase 12) · E9-06 Status page (P1/P, Fase 12) · E9-07 Game-day DR
-(P0/M, Fase 10 — depende de ambiente de produção).
+(P0/M, **go-live** — a restauração já é automatizada e testada semanalmente desde a Fase 10; o
+que falta do game-day é VM nova, DNS e RTO cronometrado, e isso exige produção).
 
 ## Épico E10 — Ações no ERP (Fase 13, P2 no MVP)
 E10-01 Framework de propostas/aprovação (G) · E10-02 Oferta (M) · E10-03 Pedido de compra (G) ·
@@ -422,3 +423,82 @@ Decisões e descobertas:
 - **A suíte A→B cobrou as rotas novas**, como era para cobrar: `POST /platform/retencao/executar`
   e `POST /platform/break-glass` são mutações sem id e precisaram ser classificadas à mão, com o
   teste que as cobre anotado na lista.
+
+## Fase 10 — Observabilidade & SRE (concluída em 17/09/2026)
+
+Entregue: **E6-02** (métricas completas, painéis Grafana, alertas operacionais e SLO board) e
+**E6-03** (WAL-G, backup diário e teste de restauração semanal automatizado). Ficou de fora, com
+motivo: **E9-07** (game-day completo) precisa de VM nova, DNS e RTO cronometrado — a parte de
+restaurar já é automática e roda toda semana, mas o resto é go-live, não código.
+
+O que ficou pronto:
+
+- **A stack como código**: `docker/compose.observability.yml` sobe Prometheus, Alertmanager,
+  Grafana, Loki, Promtail, blackbox e três exporters, sobreposto ao compose de staging — um
+  projeto só, porque o Prometheus precisa das redes internas para raspar API, worker, Postgres e
+  Redis. Nada publica porta pública; o Grafana escuta em `127.0.0.1` e se chega nele por túnel.
+- **Cinco painéis** (doc 18 §7) provisionados de arquivo, com `allowUiUpdates: false`.
+- **Os seis SLIs do doc 18 §4** em 19 regras de gravação, mais burn rate multi-janela (rápido
+  2%/1 h, lento 5%/6 h) e orçamento de erro de 30 dias no SLO board.
+- **Trinta e cinco alertas** com `resumo` e `runbook` obrigatórios, roteados em duas faixas
+  (`page` acorda alguém, `ticket` espera o expediente) e com inibições que impedem uma causa de
+  virar oito e-mails.
+- **WAL-G dentro da imagem do Postgres**, arquivamento contínuo, base backup + dump lógico
+  diários, expiração automática e **teste de restauração semanal** que sobe um cluster novo,
+  confere migrações, contagens por tabela e a cadeia de hash da auditoria.
+- **Métricas que faltavam** ao doc 18 §2: `sessions_active`, `login_failures_total{reason}`,
+  `export_jobs_total{status}` e as duas de break-glass.
+
+Decisões e descobertas:
+
+- **O alerta de credencial do ERP nunca teria disparado.** O doc 18 §5 mandava casar
+  `sg_token_refresh_total{result=unauthorized}`; o código emite `credenciais_invalidas` — o
+  vocabulário do `SgFalha`. A regra não falha, não avisa e não dispara: fica quieta para sempre,
+  e o sintoma é idêntico a "está tudo bem". O mesmo tipo de erro estava em
+  `alert_notifications_total{result="erro"}` (o valor real é `failed`). Foram dois entre os doze
+  alertas transcritos da especificação — é a taxa que justifica o gate.
+- **Daí o `pnpm obs:check`**, que roda no CI: confere que toda métrica citada em regra ou painel
+  existe, que todo valor de rótulo fechado está em `VOCABULARIO_METRICAS`, e que todo alerta tem
+  `runbook`. Para isso o vocabulário virou parte do contrato da métrica, e `SgFalha` virou array
+  em runtime (era só um tipo — e tipo não existe na hora de conferir um YAML).
+- **`sessions_active` não pode nascer na API.** Contador se soma entre réplicas; gauge de estado
+  compartilhado, não. Duas réplicas publicando o mesmo número dariam duas séries idênticas e
+  qualquer `sum()` responderia o dobro. A amostragem foi para o worker, que é único, e lê o
+  banco em vez de contar o que passou por ele.
+- **Configuração que parece interpolar e não interpola.** Nem Prometheus nem Alertmanager
+  expandem `${VAR}`: o arquivo teria mandado e-mail para o endereço literal `${ONCALL}`, e isso
+  só apareceria no primeiro incidente. Os pontos variáveis viraram marcadores `__MAIUSCULO__`
+  renderizados no boot por um serviço que **falha** se sobrar algum.
+- **4xx não queima orçamento de erro.** O doc 18 §4 definia disponibilidade como
+  "2xx+3xx / total", o que faz um usuário digitando uma URL errada consumir o orçamento da
+  plataforma. O SLI implementado conta 5xx como falha — o que respondemos mal, não o que nos
+  pediram errado. A mudança está registrada no comentário da regra.
+- **Alerta de frescor precisa saber que hora é.** `sync_lag` alto às 4 da manhã é loja fechada,
+  não incidente. As regras de tempo real carregam um recorte de horário de loja
+  (11h–01h UTC ≈ 08h–22h em São Paulo); sem ele, todo ERP desligado à noite acordaria o on-call.
+- **A imagem do banco mudou de alpine para bookworm**, porque o WAL-G oficial é glibc. Feito
+  agora, antes de existir dado real: a mesma troca depois exigiria `REINDEX DATABASE` — glibc e
+  musl ordenam texto diferente, e índice lido sob outra collation devolve resultado errado sem
+  acusar erro. O banco também ganhou saída para a internet, em rede própria e não na `edge`:
+  arquivamento contínuo precisa alcançar o object storage, mas o banco não precisa ser vizinho
+  de quem atende a internet.
+- **Um alerta que o doc 18 §5 pedia não era computável.** "Break-glass ativo fora de janela de
+  incidente" exige saber se há incidente aberto, e nada no sistema sabe. Virou dois alertas: um
+  objetivo (concessão mais velha que o teto de 8 h do próprio serviço — invariante violada) e um
+  que pede confirmação humana de que existe chamado correspondente.
+- **`0` em vez de série ausente.** `breakglass_oldest_grant_seconds` publica zero quando não há
+  concessão. Gauge sem valor some da raspagem, e regra escrita sobre série que some é a que não
+  dispara no dia em que importa.
+- **Backup sem cifra agora é recusa, não aviso.** `backup.sh` sai com erro sem
+  `WALG_LIBSODIUM_KEY`; backup em claro num storage de terceiro é vazamento com agendamento. A
+  fuga existe, grita no log e serve ao CI, que usa um MinIO descartável.
+- **O teste de restauração compara com a origem.** Restaurar e contar linhas só no destino
+  aprovaria um backup com metade dos dados. No workflow, as contagens de antes e depois têm que
+  bater.
+- **Rótulo padrão quebra teste, não consulta.** O registro carrega `service` e `env` em toda
+  série, então a linha exportada é `login_failures_total{reason="…",service="…",env="…"}`. PromQL
+  casa por nome de rótulo e não se importa; o teste de integração, que casava a string exata,
+  não achava nada. Vale para qualquer asserção sobre a saída crua do `/metrics`.
+- **`${variavel}EOF` não fecha here-document.** As contagens por tabela entravam dentro do
+  heredoc de métricas e quebravam a sintaxe do script inteiro — `bash -n` acusou antes do CI.
+  Shellcheck entrou como gate junto.

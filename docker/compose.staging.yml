@@ -97,21 +97,87 @@ services:
     stop_grace_period: 60s
     logging: *logging
 
+  # Imagem própria: Postgres + WAL-G. `archive_command` roda dentro do banco, com acesso ao
+  # pg_wal — é o que separa um RPO de 1 h (doc 20 §1) de um retrato diário.
   postgres:
-    image: postgres:17-alpine
+    build:
+      context: ..
+      dockerfile: docker/postgres/Dockerfile
+    image: dashsgs/postgres:17-walg
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+      WALG_S3_PREFIX: ${WALG_S3_PREFIX}
+      WALG_LIBSODIUM_KEY: ${WALG_LIBSODIUM_KEY}
+      AWS_ACCESS_KEY_ID: ${WALG_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${WALG_SECRET_ACCESS_KEY}
+      AWS_ENDPOINT: ${WALG_ENDPOINT}
+      AWS_REGION: ${WALG_REGION:-us-east-1}
+      AWS_S3_FORCE_PATH_STYLE: ${WALG_FORCE_PATH_STYLE:-true}
+    command:
+      - postgres
+      - -c
+      - archive_mode=on
+      # `wal-g wal-push` falhando faz o Postgres SEGURAR o WAL em disco e tentar de novo. É o
+      # comportamento certo: perder WAL é perder o PITR em silêncio, e disco cheio tem alerta.
+      - -c
+      - archive_command=wal-g wal-push %p
+      - -c
+      - archive_timeout=300
+      # `replica` é o mínimo para backup físico consistente; `logical` custaria WAL a mais sem
+      # ninguém para consumir.
+      - -c
+      - wal_level=replica
+      - -c
+      - max_wal_senders=3
     volumes:
       - pgdata:/var/lib/postgresql/data
-    networks: [data]
+    networks: [data, backup_egress]
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
       interval: 10s
       timeout: 5s
       retries: 12
+    logging: *logging
+
+  # Rodada diária de backup e teste semanal de restauração (doc 20 §§2-3 / E6-03).
+  #
+  # Mesma imagem do banco, de propósito: restaurar com um WAL-G diferente do que gravou é testar
+  # outra coisa. Monta o volume de dados porque `backup-push` lê os arquivos do cluster —
+  # backup físico não se faz por conexão.
+  backup:
+    build:
+      context: ..
+      dockerfile: docker/postgres/Dockerfile
+    image: dashsgs/postgres:17-walg
+    restart: unless-stopped
+    user: postgres
+    entrypoint: ['/opt/dashsgs/backup/agendador.sh']
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
+      PGDATA: /var/lib/postgresql/data
+      WALG_S3_PREFIX: ${WALG_S3_PREFIX}
+      WALG_LIBSODIUM_KEY: ${WALG_LIBSODIUM_KEY}
+      AWS_ACCESS_KEY_ID: ${WALG_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${WALG_SECRET_ACCESS_KEY}
+      AWS_ENDPOINT: ${WALG_ENDPOINT}
+      AWS_REGION: ${WALG_REGION:-us-east-1}
+      AWS_S3_FORCE_PATH_STYLE: ${WALG_FORCE_PATH_STYLE:-true}
+      TEXTFILE_DIR: /textfile
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # O node-exporter lê daqui; é assim que "o backup rodou?" vira série do Prometheus
+      # (docker/compose.observability.yml).
+      - backup_textfile:/textfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [data, backup_egress]
     logging: *logging
 
   redis:
@@ -135,9 +201,16 @@ networks:
   # Banco e cache não têm rota para a internet (doc 09 §1 "Infraestrutura").
   data:
     internal: true
+  # A exceção, e ela é consciente: o arquivamento contínuo de WAL precisa alcançar o object
+  # storage, e `archive_command` roda dentro do Postgres. Rede própria em vez de `edge` para que
+  # o banco não passe a compartilhar segmento com o proxy da borda — saída para a internet, sim;
+  # vizinhança com quem atende a internet, não. Nenhuma porta publicada aqui.
+  backup_egress:
 
 volumes:
   pgdata:
+  # Escrito pelo serviço `backup`, lido pelo node-exporter (doc 18 §5).
+  backup_textfile:
   redisdata:
   caddy_data:
   caddy_config:

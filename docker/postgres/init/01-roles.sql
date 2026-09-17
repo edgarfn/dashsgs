@@ -30,3 +30,10 @@ ALTER DEFAULT PRIVILEGES FOR ROLE app_migrator IN SCHEMA public
 
 -- Banco sombra usado pelo Prisma para detectar drift (nunca existe em produção).
 CREATE DATABASE dashsgs_shadow OWNER app_migrator;
+
+-- Papel de observabilidade (doc 18 §2): o postgres_exporter entra por aqui.
+-- `pg_monitor` dá acesso às visões de estatística e NADA de dado de aplicação — um exporter
+-- comprometido não deve ser um caminho para a tabela de vendas de um cliente.
+CREATE ROLE app_monitor LOGIN PASSWORD 'dev_only_password' NOSUPERUSER NOCREATEDB NOCREATEROLE
+  NOBYPASSRLS;
+GRANT pg_monitor TO app_monitor;

@@ -115,6 +115,30 @@ jobs:
           docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest \
             detect --source=/repo --config=/repo/.gitleaks.toml --redact --verbose
 
+  # 7b: observabilidade. Barato e roda em todo PR, porque o modo de falhar do que este job
+  # cobre é silencioso: alerta que cita métrica inexistente nunca dispara e nunca reclama.
+  observabilidade:
+    name: Observabilidade (regras · painéis · sintaxe)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Métricas citadas existem (regras e painéis)
+        run: node scripts/check-observability.mjs
+      - name: Sintaxe das regras e da configuração do Prometheus
+        run: |
+          docker run --rm -v "$PWD/docker/observability/prometheus:/p:ro"             --entrypoint promtool prom/prometheus:v3.1.0 check rules /p/regras/slo.rules.yml /p/regras/alertas.rules.yml
+      - name: Sintaxe da configuração do Alertmanager
+        run: |
+          mkdir -p /tmp/am
+          sed -e 's|__SMTP_HOST__|smtp.exemplo:587|' -e 's|__SMTP_FROM__|alertas@exemplo|'               -e 's|__ONCALL_EMAIL__|oncall@exemplo|' -e 's|__PLATAFORMA_EMAIL__|plataforma@exemplo|'               docker/observability/alertmanager/alertmanager.yml.tmpl > /tmp/am/alertmanager.yml
+          docker run --rm -v /tmp/am:/am:ro --entrypoint amtool prom/alertmanager:v0.28.0             check-config /am/alertmanager.yml
+      - name: Scripts de backup passam no shellcheck
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo koalaman/shellcheck:stable             scripts/backup/comum.sh scripts/backup/backup.sh scripts/backup/restore-test.sh             scripts/backup/agendador.sh
+
   # 8: build dos artefatos + validação do schema.
   build:
     name: Build

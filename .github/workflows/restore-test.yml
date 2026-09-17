@@ -1,0 +1,199 @@
+# DashSGS — teste de restauração semanal (doc 20 §3 / E6-03).
+#
+# "Temos backup" é uma crença até alguém restaurar. Este workflow restaura de verdade, toda
+# semana, num ambiente descartável: sobe Postgres com WAL-G, semeia dados, faz base backup para
+# um object storage (MinIO), força a troca de WAL, restaura em um cluster NOVO e confere que os
+# dados voltaram — schema, contagens por tabela e a cadeia de auditoria.
+#
+# Ele testa o MECANISMO (imagem, scripts, wal-push/wal-fetch, recuperação), não o bucket de
+# produção. O teste contra o storage real roda no próprio servidor pelo agendador do container
+# de backup, e é ele quem alimenta `restore_test_last_success_timestamp_seconds`. Os dois
+# existem porque falham por motivos diferentes: aqui, um script quebrado entra por PR; lá, uma
+# credencial expirada ou um bucket sem permissão de escrita.
+
+name: Restore test (semanal)
+
+on:
+  schedule:
+    # 04:30 UTC de domingo ≈ 01:30 em São Paulo — longe de qualquer expediente.
+    - cron: '30 4 * * 0'
+  workflow_dispatch:
+  # Mudou o mecanismo de backup? O teste roda no PR, não na semana seguinte.
+  pull_request:
+    paths:
+      - 'scripts/backup/**'
+      - 'docker/postgres/**'
+      - '.github/workflows/restore-test.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: restore-test-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22.14.0'
+  PNPM_VERSION: '10.29.3'
+  # Credenciais do MinIO efêmero deste job. Não são segredo: o storage nasce e morre aqui.
+  MINIO_USER: dashsgs-ci
+  MINIO_PASSWORD: dashsgs-ci-senha-local
+
+jobs:
+  restaurar:
+    name: Backup → restore → conferência
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Subir object storage efêmero (MinIO)
+        run: |
+          docker network create dashsgs-dr
+          docker run -d --name minio --network dashsgs-dr \
+            -e MINIO_ROOT_USER="$MINIO_USER" \
+            -e MINIO_ROOT_PASSWORD="$MINIO_PASSWORD" \
+            -p 9000:9000 \
+            quay.io/minio/minio:RELEASE.2025-01-20T14-49-07Z server /data
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:9000/minio/health/live && break
+            sleep 2
+          done
+          docker run --rm --network dashsgs-dr --entrypoint sh quay.io/minio/mc:latest -c "
+            mc alias set ci http://minio:9000 '$MINIO_USER' '$MINIO_PASSWORD' &&
+            mc mb ci/dashsgs-backup"
+
+      - name: Construir a imagem do Postgres com WAL-G
+        run: docker build -f docker/postgres/Dockerfile -t dashsgs/postgres:ci .
+
+      - name: Subir o banco de origem com arquivamento contínuo ligado
+        run: |
+          docker run -d --name origem --network dashsgs-dr \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD=ci_only_password \
+            -e POSTGRES_DB=dashsgs \
+            -e WALG_S3_PREFIX=s3://dashsgs-backup \
+            -e AWS_ACCESS_KEY_ID="$MINIO_USER" \
+            -e AWS_SECRET_ACCESS_KEY="$MINIO_PASSWORD" \
+            -e AWS_ENDPOINT=http://minio:9000 \
+            -e AWS_REGION=us-east-1 \
+            -e AWS_S3_FORCE_PATH_STYLE=true \
+            -e PERMITIR_BACKUP_SEM_CIFRA=true \
+            -p 5432:5432 \
+            dashsgs/postgres:ci \
+            postgres -c archive_mode=on -c 'archive_command=wal-g wal-push %p' \
+                     -c archive_timeout=60 -c wal_level=replica -c max_wal_senders=3
+          for _ in $(seq 1 60); do
+            docker exec origem pg_isready -U postgres -d dashsgs && break
+            sleep 2
+          done
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Restaurar um banco vazio prova pouco. O seed traz tenants, usuários, trilha de auditoria
+      # e vendas — é sobre esses números que a conferência do restore-test.sh fala.
+      - name: Migrar e semear a origem
+        env:
+          DATABASE_URL: postgresql://postgres:ci_only_password@127.0.0.1:5432/dashsgs
+          DATABASE_URL_MIGRATOR: postgresql://postgres:ci_only_password@127.0.0.1:5432/dashsgs
+          SEED_PASSWORD: Senha-De-Teste-Bem-Longa-2026
+        run: |
+          docker exec -i origem psql -U postgres -d dashsgs -v ON_ERROR_STOP=1 \
+            < docker/postgres/init/01-roles.sql
+          pnpm db:generate
+          pnpm db:migrate
+          pnpm db:seed
+
+      - name: Registrar as contagens de origem
+        run: |
+          docker exec origem psql -U postgres -d dashsgs -tAX -c "
+            SELECT 'app_users=' || count(*) FROM app_users
+            UNION ALL SELECT 'app_tenants=' || count(*) FROM app_tenants
+            UNION ALL SELECT 'app_audit_log=' || count(*) FROM app_audit_log
+            UNION ALL SELECT 'erp_vendas_cupons=' || count(*) FROM erp_vendas_cupons
+          " | tee origem.txt
+
+      - name: Base backup
+        run: |
+          docker exec -u postgres \
+            -e PGHOST=localhost -e PGUSER=postgres -e PGPASSWORD=ci_only_password \
+            -e PGDATABASE=dashsgs -e PGDATA=/var/lib/postgresql/data \
+            -e PERMITIR_BACKUP_SEM_CIFRA=true -e TEXTFILE_DIR=/tmp/textfile \
+            origem sh -c 'mkdir -p /tmp/textfile && /opt/dashsgs/backup/backup.sh base'
+
+      # O WAL posterior ao base backup é o que o `restore_command` vai buscar. Sem forçar a
+      # troca, o teste passaria mesmo com `wal-push` quebrado — e o PITR seria ficção.
+      - name: Forçar troca e arquivamento de WAL
+        run: |
+          docker exec origem psql -U postgres -d dashsgs -c "SELECT pg_switch_wal();"
+          docker exec origem psql -U postgres -d dashsgs -c "CHECKPOINT;"
+          sleep 10
+          docker exec origem psql -U postgres -d dashsgs -tAX -c "
+            SELECT 'arquivados=' || archived_count || ' falhas=' || failed_count
+            FROM pg_stat_archiver;"
+          falhas="$(docker exec origem psql -U postgres -d dashsgs -tAX \
+            -c 'SELECT failed_count FROM pg_stat_archiver;')"
+          if [ "$falhas" -ne 0 ]; then
+            echo "::error title=WAL não arquivado::wal-push falhou ${falhas} vez(es)"
+            docker logs origem | tail -n 50
+            exit 1
+          fi
+
+      # Container NOVO, volume NOVO: restaurar por cima do cluster que gerou o backup provaria
+      # apenas que os dados continuam onde sempre estiveram.
+      - name: Restaurar em um cluster novo e conferir
+        run: |
+          docker run -d --name destino --network dashsgs-dr \
+            -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=ci_only_password \
+            -e POSTGRES_DB=dashsgs \
+            dashsgs/postgres:ci
+          sleep 5
+          docker exec -u postgres \
+            -e WALG_S3_PREFIX=s3://dashsgs-backup \
+            -e AWS_ACCESS_KEY_ID="$MINIO_USER" \
+            -e AWS_SECRET_ACCESS_KEY="$MINIO_PASSWORD" \
+            -e AWS_ENDPOINT=http://minio:9000 \
+            -e AWS_REGION=us-east-1 \
+            -e AWS_S3_FORCE_PATH_STYLE=true \
+            -e PGUSER=postgres -e PGPASSWORD=ci_only_password -e PGDATABASE=dashsgs \
+            -e TEXTFILE_DIR=/tmp/textfile \
+            -e DESTINO=/tmp/restaurado \
+            destino sh -c 'mkdir -p /tmp/textfile && /opt/dashsgs/backup/restore-test.sh LATEST' \
+            2>&1 | tee restaurado.txt
+
+      # O script já falha sozinho se o schema não vier ou se a cadeia de auditoria estiver
+      # partida. Esta etapa compara com a ORIGEM: backup que restaura com metade das linhas
+      # passa em todo teste que só olha para o destino.
+      - name: Comparar contagens com a origem
+        run: |
+          set -e
+          for tabela in app_users app_audit_log erp_vendas_cupons; do
+            esperado="$(grep "^${tabela}=" origem.txt | cut -d= -f2)"
+            obtido="$(grep -oP "  ${tabela}: \K[0-9]+" restaurado.txt || echo "ausente")"
+            echo "${tabela}: origem=${esperado} restaurado=${obtido}"
+            if [ "$esperado" != "$obtido" ]; then
+              echo "::error title=Divergência no restore::${tabela} esperava ${esperado}, veio ${obtido}"
+              exit 1
+            fi
+          done
+
+      - name: Logs em caso de falha
+        if: failure()
+        run: |
+          echo "--- origem ---"; docker logs origem 2>&1 | tail -n 80
+          echo "--- destino ---"; docker logs destino 2>&1 | tail -n 80
+          echo "--- minio ---"; docker logs minio 2>&1 | tail -n 30
+
+      - name: Derrubar o ambiente efêmero
+        if: always()
+        run: |
+          docker rm -f origem destino minio >/dev/null 2>&1 || true
+          docker network rm dashsgs-dr >/dev/null 2>&1 || true

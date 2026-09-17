@@ -19,8 +19,13 @@ sete regras ativas, com feed, reconhecimento e e-mail. A Fase 9 fechou a CSP est
 `unsafe-inline`, verificada pelo navegador em todas as telas), a **retenção executável** — 21
 políticas do doc 10 §2 que a rodada diária apaga e confere — o offboarding com purga física e
 comprovante de destruição, e o **break-glass** com aprovação de segunda pessoa, prazo curto,
-aviso ao dono do tenant e relatório do que foi acessado. Próxima: Fase 10 — Observabilidade
-e SRE (painéis, backups e game-day). Nenhuma linha foi escrita antes
+aviso ao dono do tenant e relatório do que foi acessado. A **Fase 10** deixou o produto
+operável: a stack de observabilidade sobe como código (Prometheus, Alertmanager, Grafana com
+cinco painéis provisionados, Loki, sonda externa e exporters), os seis SLIs do doc 18 §4 viraram
+regras de gravação com burn rate e orçamento de erro, 35 alertas têm runbook obrigatório, e o
+backup WAL-G faz arquivamento contínuo com um **teste de restauração semanal** que sobe um
+cluster novo e confere migrações, contagens e a cadeia de auditoria. Próxima: Fase 11 — beta
+fechado com 2–3 tenants reais. Nenhuma linha foi escrita antes
 da especificação, por decisão de método: primeiro entender 100% da capacidade da API, depois
 construir.
 
@@ -45,18 +50,21 @@ Se a máquina já tiver Postgres/Redis locais, defina `POSTGRES_PORT`/`REDIS_POR
 ajuste as URLs. Verificação rápida: `curl localhost:3001/readyz` e `./scripts/smoke.sh`.
 Detalhes, tutoriais e padrões de código no [24-development-guide.md](docs/24-development-guide.md).
 
-| Comando                                                  | O que faz                                               |
-| -------------------------------------------------------- | ------------------------------------------------------- |
-| `pnpm dev`                                               | sobe API, web e o pacote compartilhado em watch         |
-| `pnpm dev:worker`                                        | sobe o worker de sincronização (filas + cadências)      |
-| `pnpm lint` · `pnpm format` · `pnpm typecheck`           | gates estáticos (mesmos do CI)                          |
-| `pnpm test` · `pnpm test:cov`                            | testes unitários (+cobertura dos módulos transversais)  |
-| `pnpm test:integration`                                  | testes com Postgres, Redis e Mailpit reais              |
-| `pnpm test:e2e`                                          | E2E no navegador (Playwright) com a aplicação de pé     |
-| `pnpm test:contract`                                     | contrato contra a homologação SG (pula sem credenciais) |
-| `pnpm db:migrate` · `db:seed` · `db:drift` · `db:studio` | banco: migrar, semear, checar drift, inspecionar        |
-| `pnpm db:rls-check`                                      | confere que toda tabela com `tenant_id` tem RLS         |
-| `pnpm infra:up` · `infra:down` · `infra:reset`           | infraestrutura local                                    |
+| Comando                                                  | O que faz                                                    |
+| -------------------------------------------------------- | ------------------------------------------------------------ |
+| `pnpm dev`                                               | sobe API, web e o pacote compartilhado em watch              |
+| `pnpm dev:worker`                                        | sobe o worker de sincronização (filas + cadências)           |
+| `pnpm lint` · `pnpm format` · `pnpm typecheck`           | gates estáticos (mesmos do CI)                               |
+| `pnpm test` · `pnpm test:cov`                            | testes unitários (+cobertura dos módulos transversais)       |
+| `pnpm test:integration`                                  | testes com Postgres, Redis e Mailpit reais                   |
+| `pnpm test:e2e`                                          | E2E no navegador (Playwright) com a aplicação de pé          |
+| `pnpm test:contract`                                     | contrato contra a homologação SG (pula sem credenciais)      |
+| `pnpm db:migrate` · `db:seed` · `db:drift` · `db:studio` | banco: migrar, semear, checar drift, inspecionar             |
+| `pnpm db:rls-check`                                      | confere que toda tabela com `tenant_id` tem RLS              |
+| `pnpm infra:up` · `infra:down` · `infra:reset`           | infraestrutura local                                         |
+| `pnpm obs:check`                                         | gate: nenhuma regra/painel cita métrica que ninguém emite    |
+| `pnpm obs:up`                                            | staging + stack de observabilidade (Grafana só em localhost) |
+| `pnpm dr:backup` · `dr:restore-test`                     | backup sob demanda e restauração de conferência              |
 
 ## Estrutura do repositório
 
@@ -68,7 +76,10 @@ apps/web/          Next.js 15 — front (App Router, CSP com nonce)
 packages/shared/   contratos compartilhados (códigos de erro, paginação, chaves de cache)
 prisma/            schema, migrações (RLS e auditoria append-only) e seed sintético
 docker/            compose de dev, compose de staging/prod, Dockerfiles, Caddyfile
-scripts/           deploy por digest, smoke test, gate de drift do schema
+docker/observability/  Prometheus (regras e SLIs), Alertmanager, painéis Grafana, Loki, sondas
+docker/postgres/   imagem do banco com WAL-G embutido (arquivamento contínuo, doc 20)
+scripts/           deploy por digest, smoke test, gates de drift/RLS/observabilidade
+scripts/backup/    rodada de backup, teste de restauração e o agendador dos dois
 docs/              a especificação (00–34) — fonte de verdade das decisões
 ```
 

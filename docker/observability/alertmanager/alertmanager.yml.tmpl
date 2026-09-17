@@ -1,0 +1,74 @@
+# DashSGS — roteamento de alertas (doc 18 §5). MODELO, não configuração final.
+#
+# Nem o Prometheus nem o Alertmanager expandem `${VAR}` no arquivo de configuração. Um arquivo
+# que *parece* interpolar e não interpola manda e-mail para o endereço literal `${ONCALL}` — e
+# ninguém descobre isso até o primeiro incidente. Por isso os pontos variáveis são marcadores
+# `__MAIUSCULO__`, substituídos no boot pelo serviço `obs-config` (docker/compose.observability.yml).
+#
+# Senha do SMTP não passa por aqui: entra por `smtp_auth_password_file`, montado como segredo.
+
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: '__SMTP_HOST__'
+  smtp_from: '__SMTP_FROM__'
+  smtp_require_tls: true
+
+route:
+  # Agrupar por alerta e por tenant: um ERP fora do ar não pode gerar oito e-mails, e dois
+  # tenants com o mesmo problema não podem virar um e-mail só — a resposta é diferente.
+  group_by: ['alertname', 'tenant']
+  group_wait: 30s
+  group_interval: 5m
+  # 4 h de repetição no pager e 24 h no ticket: menos que isso vira ruído, mais que isso deixa
+  # um incidente esquecido passar a noite.
+  repeat_interval: 4h
+  receiver: on-call
+
+  routes:
+    - matchers: ['severity = ticket']
+      receiver: plataforma
+      repeat_interval: 24h
+
+    - matchers: ['severity = page']
+      receiver: on-call
+
+inhibit_rules:
+  # Alvo fora do ar cala os alertas que dependem dele: sem isso, um worker reiniciando dispara
+  # "sync parado", "fila acumulando" e "DLQ" ao mesmo tempo, e a causa some no meio do barulho.
+  - source_matchers: ['alertname = AlvoForaDoAr']
+    target_matchers: ['severity =~ "page|ticket"']
+    equal: ['instance']
+
+  # Enquanto o disjuntor está aberto, o atraso de sync é consequência esperada — e já tem alerta.
+  - source_matchers: ['alertname = CircuitoAbertoProlongado']
+    target_matchers: ['alertname =~ "SyncParado|SyncFalhandoMuito"']
+    equal: ['tenant']
+
+  - source_matchers: ['alertname = CredencialErpInvalida']
+    target_matchers: ['alertname = SyncParado']
+    equal: ['tenant']
+
+receivers:
+  - name: on-call
+    email_configs:
+      - to: '__ONCALL_EMAIL__'
+        send_resolved: true
+        headers:
+          Subject: '[DashSGS][{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}{{ .Annotations.resumo }}
+          {{ .Annotations.descricao }}
+          Runbook: {{ .Annotations.runbook }}
+          {{ end }}
+
+  - name: plataforma
+    email_configs:
+      - to: '__PLATAFORMA_EMAIL__'
+        send_resolved: false
+        headers:
+          Subject: '[DashSGS][ticket] {{ .CommonLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}{{ .Annotations.resumo }}
+          {{ .Annotations.descricao }}
+          Runbook: {{ .Annotations.runbook }}
+          {{ end }}

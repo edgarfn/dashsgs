@@ -1,0 +1,53 @@
+# DashSGS — Loki de instalação única (doc 18 §1).
+#
+# Monolítico e em disco local: a alternativa (microsserviços + object storage) resolve escala
+# que ainda não existe e adiciona quatro componentes para falhar. Quando um tenant sozinho
+# gerar mais log do que a VM aguenta, isto vira um ADR — até lá, é complexidade sem pagador.
+
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+  log_level: warn
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/regras
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2026-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  # Retenção de aplicação é 30 dias (doc 18 §1). O log de segurança tem 90 e vive noutro lugar:
+  # a trilha de auditoria é `app_audit_log`, no Postgres, e não depende do Loki para existir.
+  retention_period: 720h
+  # Cardinalidade é orçamento aqui também: rótulo por tenant, jamais por correlação ou usuário.
+  max_label_names_per_series: 15
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h
+  ingestion_rate_mb: 8
+  ingestion_burst_size_mb: 16
+
+compactor:
+  working_directory: /loki/compactor
+  retention_enabled: true
+  delete_request_store: filesystem
+
+analytics:
+  reporting_enabled: false

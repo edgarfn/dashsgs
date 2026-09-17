@@ -2,6 +2,7 @@ import { Controller, Get, Header, Query, Res } from '@nestjs/common';
 import { type Response } from 'express';
 import { CurrentAuth, RequirePermissions, type AuthContext } from '../../common/auth';
 import { AppException } from '../../common/errors/app.exception';
+import { MetricsService } from '../../common/metrics/metrics.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { FiliaisScopeService, parseFiliaisParam } from '../../common/tenant';
 import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
@@ -56,6 +57,7 @@ export class DashboardController {
     private readonly escopo: FiliaisScopeService,
     private readonly cache: DashboardCache,
     private readonly prisma: PrismaService,
+    private readonly metrics: MetricsService,
   ) {}
 
   @Get('home')
@@ -245,6 +247,9 @@ export class DashboardController {
     });
 
     if (pagina.paginacao.total > MAX_LINHAS_CSV) {
+      // Recusa por tamanho é desfecho, não erro de servidor: contada à parte porque é ela que
+      // diz quando o export assíncrono (E6-06) deixou de ser opcional.
+      this.metrics.observeExport('muito_grande');
       throw new AppException('VALIDATION_ERROR', {
         message: `O período tem ${pagina.paginacao.total} cupons e o limite do export direto é ${MAX_LINHAS_CSV}. Filtre por filial ou caixa.`,
         details: [{ path: 'data', rule: 'export_muito_grande' }],
@@ -282,6 +287,8 @@ export class DashboardController {
       ],
       linhas,
     );
+
+    this.metrics.observeExport('ok');
 
     res
       .status(200)

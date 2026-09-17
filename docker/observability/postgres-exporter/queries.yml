@@ -1,0 +1,17 @@
+# Consultas adicionais do postgres_exporter (doc 18 §2 "Banco/Redis").
+#
+# O exporter não publica `pg_stat_archiver` por padrão, e é dele que sai o alerta mais
+# importante da doc 20: WAL que deixou de ser arquivado. Esse defeito é silencioso por natureza —
+# o banco continua servindo consultas normalmente, o PITR para de existir e o disco começa a
+# encher. Sem estas duas séries, o primeiro sinal seria o disco cheio.
+
+pg_stat_archiver:
+  query: 'SELECT archived_count, failed_count FROM pg_stat_archiver'
+  master: true
+  metrics:
+    - archived_count:
+        usage: 'COUNTER'
+        description: 'Segmentos de WAL arquivados com sucesso desde o último reset'
+    - failed_count:
+        usage: 'COUNTER'
+        description: 'Tentativas de arquivamento de WAL que falharam'

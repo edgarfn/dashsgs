@@ -74,10 +74,19 @@ alerta (E8-05); a credencial permanece válida no cofre, nada precisa ser recada
 ## 9. Disaster recovery (resumo executável; detalhes doc 20)
 1. Declarar DR (CTO). Comunicar status page.
 2. Nova VM por cloud-init (`infra/cloudinit.yaml`) → instalar compose.
-3. `walg backup-fetch` último base + replay WAL até ponto alvo.
+3. Restaurar o banco:
+   ```bash
+   # Na VM nova, com as variáveis WALG_* do cofre exportadas:
+   docker run --rm -e WALG_S3_PREFIX -e WALG_LIBSODIUM_KEY      -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_ENDPOINT      -v pgdata:/var/lib/postgresql/data dashsgs/postgres:17-walg      wal-g backup-fetch /var/lib/postgresql/data LATEST
+   ```
+   Para um ponto no tempo, em vez de `LATEST`: escreva `recovery_target_time` em
+   `postgresql.auto.conf` junto de `restore_command = 'wal-g wal-fetch "%f" "%p"'`.
 4. Subir stack com digest atual; smoke; apontar DNS (TTL 300 s).
 5. `dashsgs-cli sync recover-gap --all-tenants` (reprocessa janelas desde o ponto restaurado).
 6. Relatório pós-incidente em 72 h.
+
+**Antes de precisar**: `pnpm dr:restore-test` responde "o backup de hoje restaura?" em minutos,
+sem tocar em produção. É o mesmo script que roda sozinho aos domingos.
 
 ## 10. Atualização de dependências críticas
 Renovate abre PR → CI completo → staging 24 h → produção. Para patch de segurança CRITICAL:
@@ -103,3 +112,70 @@ operador não garante.
    não zerar, a política não está sendo cumprida — é incidente, não é enfeite.
 3. Em Prometheus, o mesmo dado é `retention_pending_rows`. O alerta operacional dispara com
    qualquer valor acima de zero por mais de 24 h.
+
+## 13. Subir, conferir e mexer na observabilidade
+
+```bash
+pnpm obs:up          # staging + stack de observabilidade, um projeto só
+pnpm obs:check       # gate: nenhuma regra/painel cita métrica que ninguém emite
+```
+
+O Grafana **não** tem porta pública: `ssh -L 3000:127.0.0.1:3000 <host>` e abra
+`http://localhost:3000`. Painéis são código (`docker/observability/grafana/paineis/`); editar
+pela interface não persiste — `allowUiUpdates: false` de propósito, porque painel editado no
+navegador some no próximo deploy, e some justamente quando alguém precisa dele.
+
+**Depois de mexer em regra ou painel:**
+
+1. `pnpm obs:check` — reprova métrica inexistente, valor de rótulo fora do vocabulário e alerta
+   sem `runbook`.
+2. `docker compose ... exec prometheus promtool check rules /etc/prometheus/regras/*.yml`.
+3. Recarregar sem reiniciar: `curl -X POST http://prometheus:9090/-/reload`.
+
+**Conferir que um alerta realmente dispara** (é o que o doc 32 cobra no go-live):
+
+```bash
+# 1. Ver a regra avaliada e seu estado atual
+curl -s http://prometheus:9090/api/v1/rules | jq '.data.groups[].rules[] | {name, state}'
+# 2. Forçar um alerta de teste direto no Alertmanager (chega o e-mail de verdade)
+curl -s -XPOST http://alertmanager:9093/api/v2/alerts -H 'content-type: application/json' -d '[{
+  "labels": {"alertname": "TesteDeRota", "severity": "page"},
+  "annotations": {"resumo": "teste de rota do on-call", "runbook": "doc 22 §13"}
+}]'
+```
+
+Alerta barulhento é problema, não paisagem: ou o limiar sobe, ou a causa é corrigida, ou a regra
+sai. Deixar disparando "porque a gente já sabe" treina a equipe a ignorar o pager.
+
+## 14. Backup: conferir, restaurar e trocar a chave
+
+**Está rodando?**
+
+```bash
+# Idade do último backup, direto da série que alimenta o alerta:
+curl -s 'http://prometheus:9090/api/v1/query?query=time()-backup_last_success_timestamp_seconds' | jq
+docker compose -f docker/compose.staging.yml logs backup --tail 50
+```
+
+**Restaurar para conferir** (não toca em produção; sobe um cluster efêmero na porta 55433):
+
+```bash
+pnpm dr:restore-test           # último backup
+pnpm dr:restore-test base_000000010000000000000003   # um específico
+```
+
+Saída esperada: migrações aplicadas, contagens por tabela e `cadeia de auditoria íntegra`.
+Qualquer falha publica `restore_test_last_result 0` e o alerta sai por conta própria.
+
+**PITR para um instante específico** (teste mensal do doc 20 §3): mesmo procedimento do §9,
+trocando `recovery_target = 'immediate'` por `recovery_target_time = '2026-09-16 14:00:00-03'`.
+
+**Trocar a chave de cifra**: WAL-G cifra por backup, não por bucket. Troque
+`WALG_LIBSODIUM_KEY`, reinicie `postgres` e `backup`, e **guarde a chave antiga** enquanto
+existir backup cifrado com ela — 35 dias de PITR. Chave antiga descartada cedo demais transforma
+o backup de ontem em ruído aleatório.
+
+**Trocar a imagem do Postgres**: a base é `bookworm` (glibc) porque o WAL-G oficial não roda em
+musl. Se algum dia a base voltar a mudar, `REINDEX DATABASE` é obrigatório — glibc e musl
+ordenam texto diferente, e índice de texto lido sob outra collation devolve resultado errado sem
+acusar erro em lugar nenhum.

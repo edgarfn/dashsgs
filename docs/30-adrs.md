@@ -109,3 +109,44 @@ fechar; (b), por exigir plumbing de nonce até dentro de componente de cliente, 
 precisão que ninguém enxerga.
 **Gatilho de revisão**: um gráfico que precise de precisão sub-1% — uma régua, um comparativo de
 milésimos — pede o `<style>` com nonce naquela tela.
+
+## ADR-016 — Vocabulário de rótulos como contrato verificável da métrica
+**Contexto**: a Fase 10 transcreveu os alertas do doc 18 §5 para regras do Prometheus. Dois dos
+doze casavam valores de rótulo que o código nunca emite — `sg_token_refresh_total{result=
+"unauthorized"}` (o real é `credenciais_invalidas`) e `alert_notifications_total{result="erro"}`
+(o real é `failed`). Regra assim não falha, não avisa e não dispara: fica silenciosa para
+sempre, e o sintoma é indistinguível de "está tudo bem".
+**Opções**: (a) revisão humana atenta; (b) teste que sobe a stack e espera o alerta disparar;
+(c) declarar o vocabulário dos rótulos de cardinalidade fechada e conferir as regras contra ele
+no CI.
+**Decisão**: (c). `VOCABULARIO_METRICAS` em `metrics.service.ts` lista, por métrica, os valores
+possíveis de cada rótulo fechado; `scripts/check-observability.mjs` extrai os matchers das
+regras e dos painéis e reprova o que não existe. `SgFalha` deixou de ser só um tipo e virou
+array em runtime — tipo não existe na hora de conferir um YAML.
+**Consequências**: o gate custa segundos e pega a classe inteira de erro, incluindo métrica com
+nome plausível e inexistente e alerta sem `runbook`. O preço é um segundo lugar para manter
+(o vocabulário), mitigado por `metrics-vocabulario.spec.ts`, que compara a cópia com a fonte.
+Rótulo aberto — `tenant`, `route`, `endpoint`, `queue`, `policy`, `domain` — fica de fora por
+construção: listá-lo faria o gate reprovar um tenant novo.
+**Gatilho de revisão**: se um dia as regras forem geradas a partir do código (em vez de escritas
+à mão), o gate vira redundante e sai junto.
+
+## ADR-017 — WAL-G dentro da imagem do Postgres (e a base em glibc)
+**Contexto**: o doc 20 §1 promete RPO de 1 h, o que exige arquivamento **contínuo** de WAL. O
+`archive_command` roda dentro do processo do Postgres, com acesso ao `pg_wal`.
+**Opções**: (a) sidecar com WAL-G, fazendo só base backup; (b) `archive_command` copiando para
+um spool local que um sidecar envia; (c) WAL-G embutido na imagem do banco.
+**Decisão**: (c). A mesma imagem serve ao banco, ao container de backup e ao teste de
+restauração — restaurar com um binário diferente do que gravou é testar outra coisa. Como os
+binários oficiais do WAL-G são ligados à glibc, a base passou de `postgres:17-alpine` para
+`postgres:17-bookworm`.
+**Consequências**: RPO de 1 h real, com `wal-push` falhando de forma segura (o Postgres segura o
+WAL e tenta de novo, e disco cheio tem alerta). Duas contrapartidas conscientes: a troca de base
+teria exigido `REINDEX DATABASE` se houvesse dados — glibc e musl ordenam texto diferente, e
+índice lido sob outra collation devolve resultado errado sem acusar erro —, por isso foi feita
+antes de existir instalação real; e o container do banco passou a ter saída para a internet, em
+rede própria (`backup_egress`) e não na `edge`, sem porta publicada e sem vizinhança com o proxy
+da borda. (b) foi descartada por perder a propriedade mais valiosa do `archive_command`: falhar
+para trás em vez de descartar WAL em silêncio.
+**Gatilho de revisão**: banco gerenciado (RDS/Cloud SQL) elimina a questão inteira — o
+arquivamento passa a ser do provedor, e a imagem volta a ser a oficial.

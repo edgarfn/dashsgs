@@ -84,6 +84,42 @@ describe('autenticação (integração)', () => {
       expect(unknownUser.body.message).toBe(wrongPassword.body.message);
     });
 
+    /**
+     * A resposta é igual para os dois casos; a MÉTRICA não é, e é ela que o painel de segurança
+     * lê (doc 18 §2). `usuario_inexistente` em alta é enumeração, `senha_invalida` em alta é
+     * força bruta — e as duas pedem respostas diferentes.
+     */
+    it('conta a recusa de login por motivo, sem expor a diferença ao cliente', async () => {
+      const { user } = await createTenantWithOwner(app, { role: 'viewer', password: PASSWORD });
+      const agent = agentFor(app);
+
+      await agent
+        .post(`${API_PREFIX}/auth/login`)
+        .send({ email: user.email, password: 'senha-errada-porem-longa' })
+        .expect(401);
+      await agent
+        .post(`${API_PREFIX}/auth/login`)
+        .send({ email: uniqueEmail('fantasma'), password: 'senha-errada-porem-longa' })
+        .expect(401);
+
+      const metricas = await request(app.getHttpServer()).get('/metrics').expect(200);
+      // O registro carrega rótulos padrão (`service`, `env`), então `reason` não é o único
+      // dentro das chaves — casar `reason="..."}` deixaria de encontrar a linha inteira.
+      const motivos = [
+        ...metricas.text.matchAll(/login_failures_total\{[^}]*reason="([^"]+)"[^}]*\} (\d+)/g),
+      ];
+      const porMotivo = Object.fromEntries(
+        motivos.map(([, motivo, valor]) => [motivo, Number(valor)]),
+      );
+
+      expect(porMotivo.usuario_inexistente).toBeGreaterThan(0);
+      // O motivo da senha errada existe e é OUTRO: se os dois caíssem no mesmo rótulo, o
+      // painel não distinguiria enumeração de força bruta.
+      expect(
+        Object.keys(porMotivo).filter((m) => m !== 'usuario_inexistente').length,
+      ).toBeGreaterThan(0);
+    });
+
     it('bloqueia a conta após tentativas repetidas (lockout incremental)', async () => {
       const { user } = await createTenantWithOwner(app, { role: 'viewer', password: PASSWORD });
       const agent = agentFor(app);

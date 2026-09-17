@@ -1,0 +1,69 @@
+# DashSGS — coleta de logs dos containers (doc 18 §1).
+#
+# A aplicação já emite JSON com redaction aplicada no logger (pino, doc 09 §3): o Promtail NÃO
+# é a camada de proteção de PII. Ele só transporta. O que ele faz de útil aqui é promover a
+# rótulo os três campos por que se busca num incidente — serviço, nível e tenant — e deixar o
+# resto como conteúdo, porque rótulo demais no Loki custa mais caro que log demais.
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: warn
+
+positions:
+  filename: /promtail/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: containers
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 15s
+
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'servico'
+
+    pipeline_stages:
+      # Log da aplicação é JSON; o do Postgres e o do Caddy não são. `json` falhando não
+      # descarta a linha — ela segue como texto, que é exatamente o que se quer de um log de
+      # infraestrutura durante um incidente.
+      #
+      # O campo de tempo é `ts` em ISO-8601, e não o `time` epoch padrão do pino: o logger
+      # (common/logging/logger.module.ts) o redefine assim de propósito, seguindo o doc 18 §1.
+      - json:
+          expressions:
+            ts: ts
+            nivel: level
+            service: service
+            tenant_id: tenant_id
+            event: event
+          drop_malformed: false
+
+      # pino grava `level` numérico (30 = info, 50 = error). Sem esta tradução, filtrar erro no
+      # Grafana exigiria decorar a tabela — e ninguém decora tabela às 3 da manhã.
+      # Uma linha só: template dobrado em várias linhas no YAML injeta espaço no valor, e o
+      # rótulo sairia como " error " sem que nada acusasse.
+      - template:
+          source: nivel
+          template: '{{ if eq .Value "10" }}trace{{ else if eq .Value "20" }}debug{{ else if eq .Value "30" }}info{{ else if eq .Value "40" }}warn{{ else if eq .Value "50" }}error{{ else if eq .Value "60" }}fatal{{ else }}{{ .Value }}{{ end }}'
+
+      # `correlation_id` NÃO vira rótulo: é único por requisição e transformaria cada requisição
+      # numa série do Loki. Ele fica no conteúdo, onde a busca por texto o encontra em segundos
+      # — que é o que o runbook pede.
+      - labels:
+          nivel:
+          service:
+          tenant_id:
+
+      - timestamp:
+          source: ts
+          format: RFC3339Nano
+          # Linha sem `ts` (Postgres, Caddy) fica com o horário de ingestão em vez de ser
+          # descartada: log de infraestrutura com 200 ms de atraso ainda vale; log ausente, não.
+          action_on_failure: fudge

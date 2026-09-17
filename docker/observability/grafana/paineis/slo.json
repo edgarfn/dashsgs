@@ -1,0 +1,873 @@
+{
+  "uid": "dashsgs-slo",
+  "title": "DashSGS · SLO board",
+  "description": "Os seis SLIs do doc 18 §4 com orçamento de erro e burn rate. É o painel da conversa mensal: cumprimos o que prometemos, e quanto de margem sobrou para arriscar.",
+  "tags": ["dashsgs"],
+  "timezone": "America/Sao_Paulo",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "refresh": "5m",
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": ["30s", "1m", "5m", "15m", "1h"]
+  },
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Objetivos",
+      "id": 1,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Disponibilidade · 30 d",
+      "id": 2,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dashsgs-prometheus"
+      },
+      "description": "SLO: 99,5%. Conta 5xx como falha; 4xx é pedido do cliente, não falha nossa.",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.993
+              },
+              {
+                "color": "green",
+                "value": 0.995
+              }
+            ]
+          },
+          "decimals": 3
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "expr": "dashsgs:leitura:disponibilidade30d",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "dashsgs-prometheus"
+          },
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Orçamento de erro restante",
+      "id": 3,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dashsgs-prometheus"
+      },
+      "description": "1 = intacto · 0 = esgotado · negativo = dívida. Abaixo de zero, congela-se mudança não essencial (doc 29).",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.2
+              },
+              {
+                "color": "green",
+                "value": 0.5
+              }
+            ]
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "expr": "dashsgs:leitura:orcamento_restante30d",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "dashsgs-prometheus"
+          },
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "p95 do dashboard · 7 d",
+      "id": 4,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dashsgs-prometheus"
+      },
+      "description": "SLO: abaixo de 300 ms.",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.3
+              },
+              {
+                "color": "red",
+                "value": 0.5
+              }
+            ]
+          },
+          "decimals": 3
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "expr": "dashsgs:dashboard:latencia_p95_7d",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "dashsgs-prometheus"
+          },
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Latência dentro do SLO · 7 d",
+      "id": 5,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dashsgs-prometheus"
+      },
+      "description": "Fração do tempo em que o p95 esteve abaixo de 300 ms — o p95 do p95.",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.95
+              },
+              {
+                "color": "green",
+                "value": 0.99
+              }
+            ]
+          },
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "expr": "dashsgs:dashboard:latencia_dentro_slo7d",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "dashsgs-prometheus"
+          },
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Sucesso de sync · 7 d",
+      "id": 6,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dashsgs-prometheus"
+      },
+      "description": "SLO: 99%. Exclui `skipped` (ERP indisponível), como manda o doc 18 §4.",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.99
+              },
+              {
+                "color": "green",
+                "value": 0.995
+              }
+            ]
+          },
+          "decimals": 3
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "expr": "dashsgs:sync:sucesso_ratio7d",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "dashsgs-prometheus"
+          },
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Entrega de alertas p95 · 7 d",
+      "id": 7,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dashsgs-prometheus"
+      },
+      "description": "SLO: 5 min do evento ao despacho da notificação.",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 180
+              },
+              {
+                "color": "red",
+                "value": 300
+              }
+            ]
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "expr": "dashsgs:alertas:entrega_p95_7d",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "dashsgs-prometheus"
+          },
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Burn rate do orçamento de erro",
+      "id": 8,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 13
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Razão de erro por janela",
+      "id": 9,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dashsgs-prometheus"
+      },
+      "description": "Duas linhas tracejadas: 3% é o limiar do burn lento (5% do orçamento em 6 h) e 7,2% o do rápido (2% em 1 h). O alerta exige janela longa E curta acima do limiar — a curta é o que impede um pico já resolvido de acordar gente.",
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.03
+              },
+              {
+                "color": "red",
+                "value": 0.072
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "dashsgs:leitura:erro_ratio5m",
+          "legendFormat": "5 min",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "dashsgs-prometheus"
+          }
+        },
+        {
+          "expr": "dashsgs:leitura:erro_ratio30m",
+          "legendFormat": "30 min",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "dashsgs-prometheus"
+          }
+        },
+        {
+          "expr": "dashsgs:leitura:erro_ratio1h",
+          "legendFormat": "1 h",
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "dashsgs-prometheus"
+          }
+        },
+        {
+          "expr": "dashsgs:leitura:erro_ratio6h",
+          "legendFormat": "6 h",
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "dashsgs-prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Burn rate (múltiplos do orçamento)",
+      "id": 10,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dashsgs-prometheus"
+      },
+      "description": "1× significa consumir exatamente o orçamento de 30 dias em 30 dias.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 23
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 6
+              },
+              {
+                "color": "red",
+                "value": 14.4
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "dashsgs:leitura:erro_ratio1h / 0.005",
+          "legendFormat": "1 h",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "dashsgs-prometheus"
+          }
+        },
+        {
+          "expr": "dashsgs:leitura:erro_ratio6h / 0.005",
+          "legendFormat": "6 h",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "dashsgs-prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Frescor do dado (pior tenant)",
+      "id": 11,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dashsgs-prometheus"
+      },
+      "description": "",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 23
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 600
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "dashsgs:frescor:tempo_real_segundos",
+          "legendFormat": "tempo real",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "dashsgs-prometheus"
+          }
+        },
+        {
+          "expr": "dashsgs:frescor:consolidado_segundos",
+          "legendFormat": "consolidado",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "dashsgs-prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Por tenant",
+      "id": 12,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 31
+      },
+      "panels": []
+    },
+    {
+      "type": "table",
+      "title": "Frescor em tempo real por tenant",
+      "id": 13,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dashsgs-prometheus"
+      },
+      "description": "",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Value"
+          }
+        ]
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true
+            }
+          }
+        }
+      ],
+      "targets": [
+        {
+          "expr": "dashsgs:frescor:tempo_real_por_tenant",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "dashsgs-prometheus"
+          },
+          "instant": true,
+          "format": "table",
+          "legendFormat": ""
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Entrega de alertas (p95, 5 min)",
+      "id": 14,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dashsgs-prometheus"
+      },
+      "description": "",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 300
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "dashsgs:alertas:entrega_p95_5m",
+          "legendFormat": "p95",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "dashsgs-prometheus"
+          }
+        }
+      ]
+    }
+  ]
+}

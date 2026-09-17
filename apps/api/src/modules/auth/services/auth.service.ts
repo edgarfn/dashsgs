@@ -5,6 +5,7 @@ import { AuditService } from '../../../common/audit';
 import { HashingService } from '../../../common/crypto';
 import { AppException } from '../../../common/errors/app.exception';
 import { MailService, securityNoticeEmail } from '../../../common/mail';
+import { MetricsService } from '../../../common/metrics/metrics.service';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { RATE_LIMITS, RateLimiterService } from '../../../common/rate-limit';
 import { type AuthContext, type RequestIdentity } from '../../../common/auth';
@@ -46,6 +47,7 @@ export class AuthService {
     private readonly rateLimiter: RateLimiterService,
     private readonly audit: AuditService,
     private readonly mail: MailService,
+    private readonly metrics: MetricsService,
   ) {}
 
   /**
@@ -313,6 +315,10 @@ export class AuthService {
     reason: string,
     extra: Record<string, unknown> = {},
   ): Promise<void> {
+    // Mesmo ponto para a auditoria e para a métrica: um caminho de recusa que esquecesse de
+    // contar apareceria como calmaria no painel de segurança (doc 18 §2).
+    this.metrics.observeLoginFailure(reason);
+
     await this.audit.record({
       action: 'auth.login.failed',
       resourceType: 'session',

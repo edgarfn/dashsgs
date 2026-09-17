@@ -1,0 +1,79 @@
+# DashSGS — coleta de métricas (doc 18 §2).
+#
+# API e worker são alvos SEPARADOS de propósito: as séries de sincronização nascem no processo
+# de worker (`sync_runs_total`, `sync_lag_seconds`, `queue_depth`) e as de HTTP nascem na API.
+# Raspar só um dos dois deixaria metade do produto sem painel.
+#
+# Nenhum destes alvos é alcançável de fora: Prometheus, API e worker conversam pela rede
+# interna do compose, e o Caddy responde 404 em /metrics (docker/Caddyfile).
+#
+# Este arquivo NÃO tem variável: o Prometheus não expande `${...}` em configuração, e config que
+# parece interpolar mas não interpola é a pior das duas opções. O que muda por instalação (os
+# domínios da sonda externa) entra por `file_sd`, escrito no boot pelo serviço `blackbox-alvos`.
+
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  # Avaliação com folga sobre o scrape: janela curta demais faz `rate()` de um alvo lento
+  # devolver buraco, e buraco vira alerta que ninguém consegue explicar.
+  evaluation_interval: 30s
+
+rule_files:
+  - /etc/prometheus/regras/*.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: dashsgs-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['api:3001']
+        labels:
+          componente: api
+
+  - job_name: dashsgs-worker
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['workers:3002']
+        labels:
+          componente: worker
+
+  # O node-exporter também lê o diretório de textfile onde o backup grava o resultado da última
+  # rodada (doc 20 §2): é assim que "o backup rodou?" vira série, sem abrir porta no container
+  # de banco só para isso.
+  - job_name: node
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  - job_name: postgres
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+
+  - job_name: redis
+    static_configs:
+      - targets: ['redis-exporter:9121']
+
+  # Sonda externa: o único alvo que enxerga o produto pelo lado do cliente — DNS, TLS e borda
+  # incluídos. `probe_ssl_earliest_cert_expiry` é o que sustenta o alerta de certificado
+  # (doc 18 §5); o Caddy renova sozinho, e o alerta existe para o dia em que não renovar.
+  - job_name: blackbox-https
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    file_sd_configs:
+      - files: ['/etc/prometheus/rendered/alvos/*.yml']
+        refresh_interval: 5m
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox:9115

@@ -8,23 +8,32 @@ import { AppException } from '../../common/errors/app.exception';
  * encontrado" em alguns módulos e 404 em outros (doc 02 §4.8). Quem consome a integração não
  * precisa saber disso: recebe um erro classificado, com a decisão de retry já embutida.
  */
-export type SgFalha =
+/**
+ * Vocabulário fechado das falhas da SG. Existe em runtime, e não só como tipo, porque ele
+ * também é **rótulo de métrica** (`sg_token_refresh_total{result}`): o alerta de credencial
+ * inválida do doc 18 §5 casa por esse valor, e um alerta que procura um rótulo inexistente
+ * fica silencioso para sempre sem nunca acusar erro.
+ */
+export const SG_FALHAS = [
   /** Credencial recusada na autorização — a conexão do tenant precisa de atenção humana. */
-  | 'credenciais_invalidas'
+  'credenciais_invalidas',
   /** Token expirou no meio do uso: renovar e repetir uma vez. */
-  | 'token_expirado'
+  'token_expirado',
   /** A rota não está no contrato do tenant com a SG. */
-  | 'rota_nao_contratada'
+  'rota_nao_contratada',
   /** Parâmetros errados — bug nosso, não adianta repetir. */
-  | 'requisicao_invalida'
+  'requisicao_invalida',
   /** Recurso inexistente: tratar como vazio, não como erro. */
-  | 'nao_encontrado'
+  'nao_encontrado',
   /** Erro do lado do ERP: vale repetir com backoff. */
-  | 'erro_servidor'
+  'erro_servidor',
   /** Rede, DNS, timeout: vale repetir com backoff. */
-  | 'inalcancavel'
+  'inalcancavel',
   /** Resposta fora do contrato: não repetir, quarentenar. */
-  | 'resposta_invalida';
+  'resposta_invalida',
+] as const;
+
+export type SgFalha = (typeof SG_FALHAS)[number];
 
 export class SgError extends Error {
   constructor(

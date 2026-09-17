@@ -5,6 +5,7 @@ import { ErrorsModule } from './common/errors/errors.module';
 import { LoggerModule } from './common/logging/logger.module';
 import { MailModule } from './common/mail';
 import { MetricsModule } from './common/metrics/metrics.module';
+import { PlataformaMetricsSampler } from './common/metrics/plataforma.sampler';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { RedisModule } from './common/redis/redis.module';
 import { TenantContextModule } from './common/tenant';
@@ -37,6 +38,8 @@ import { SyncModule } from './modules/sync/sync.module';
     AlertasModule,
     RetencaoModule,
   ],
-  providers: [SyncWorker],
+  // `PlataformaMetricsSampler` só existe aqui: é um gauge de estado compartilhado, e o worker
+  // é o único processo que não se multiplica em réplicas (ver o cabeçalho do arquivo).
+  providers: [SyncWorker, PlataformaMetricsSampler],
 })
 export class WorkerModule {}

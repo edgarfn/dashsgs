@@ -44,14 +44,24 @@ Nenhum item [BLOQ] pode estar aberto no go-live.
 - [ ] [BLOQ] app_audit_log append-only (tentativa de UPDATE falha) + hash chain verificada —
       privilégio revogado + trigger; a **única** exclusão admitida é a da retenção de 5 anos,
       por `app_purge_audit_log()`, com o prazo fixo dentro do banco (Fase 9)
-- [ ] [BLOQ] Alertas operacionais doc 18 §5 ativos e roteados (teste de disparo)
-- [ ] Painéis Grafana provisionados; SLO board com dados reais
+- [x] [BLOQ] Alertas operacionais doc 18 §5 **escritos, versionados e conferidos** — 35 regras em
+      `docker/observability/prometheus/regras/`, cada uma com `resumo` e `runbook`; o gate
+      `pnpm obs:check` roda no CI e reprova alerta que cite métrica ou valor de rótulo que
+      ninguém emite (foi assim que dois alertas natimortos apareceram). **Falta** o teste de
+      disparo ponta a ponta contra o SMTP real — runbook 22 §13 tem o comando
+- [x] Painéis Grafana provisionados (5, provisionados de arquivo, `allowUiUpdates: false`); SLO
+      board pronto — **falta** rodar com dados reais, o que só existe com produção
 - [ ] Correlation id fim-a-fim verificado (request→log→Sentry)
 
 ## Continuidade
-- [ ] [BLOQ] Backup WAL-G ativo p/ storage externo imutável; restore automático semanal VERDE
-- [ ] [BLOQ] PITR testado neste mês; game-day DR executado com RTO ≤4 h
-- [ ] Runbooks 22 revisados após game-day
+- [x] [BLOQ] Backup WAL-G ativo p/ storage externo imutável; restore automático semanal VERDE —
+      WAL-G na imagem do banco, `archive_command` contínuo, base + dump diários às 06:10 UTC e
+      restauração semanal que confere migrações, contagens e a cadeia de auditoria. **Falta**
+      apontar para o bucket real com object-lock ligado, que é configuração de produção
+- [ ] [BLOQ] PITR testado neste mês; game-day DR executado com RTO ≤4 h — o mecanismo de PITR
+      está no runbook 22 §14; o cronômetro exige VM nova e DNS
+- [ ] Runbooks 22 revisados após game-day (§§13 e 14 escritos na Fase 10, ainda não exercitados
+      sob incidente real)
 - [ ] Status page pronta; contatos de incidente atualizados
 
 ## Integração SG

@@ -18,10 +18,25 @@ Internet ──> [Cloudflare (opcional: WAF/CDN)] ──> VM app (Caddy :443)
          ──> api (NestJS, container)
    api/workers ──> postgres (container ou gerenciado*), redis (container)
    workers ──> ERPs dos tenants (egress allowlist)
-   [obs] prometheus + loki + grafana (VM própria ou a mesma no MVP)
+   [obs] prometheus + alertmanager + grafana + loki + promtail + blackbox + exporters
+         (mesma VM no MVP; docker/compose.observability.yml)
+   postgres ──> object storage (WAL-G: base backup + WAL contínuo, outra região)
 ```
 *[RECOMENDAÇÃO] Postgres gerenciado (RDS/Cloud SQL/Neon) assim que houver clientes pagantes —
 backups/replicação sem custo operacional. Compose com volume + WAL-G é aceitável no MVP.
+
+A stack de observabilidade sobe **no mesmo projeto** do compose de staging/produção, não como
+projeto separado: o Prometheus precisa das redes internas para raspar API, worker, Postgres e
+Redis, e subir apartado exigiria expor esses alvos — exatamente o que o Caddyfile impede.
+
+```bash
+pnpm obs:up   # docker compose -f docker/compose.staging.yml -f docker/compose.observability.yml up -d
+```
+
+Nada da stack publica porta pública. O Grafana escuta em `127.0.0.1` e o acesso é por túnel SSH.
+O container do banco é o único com saída para a internet (rede `backup_egress`), porque
+`archive_command` roda dentro dele — sem porta publicada e sem compartilhar segmento com a borda
+(ADR-017).
 
 ## 3. Variáveis de ambiente (contrato validado por zod no boot — falha rápida)
 
@@ -61,7 +76,8 @@ duplicidade. `stop_grace_period: 60s` dá tempo de o job corrente terminar antes
 2. `deploy.sh <digest>`: pull → `docker compose up -d --no-deps api-migrate` (job de migração
    com `DATABASE_URL_MIGRATOR`) → healthcheck → swap dos serviços `api`/`web`/`workers` (rolling
    por replica) → smoke (`/readyz`, login sintético) → tag `current` atualizada.
-3. Verificação pós-deploy 15 min (painel SLO); rollback: `deploy.sh <digest-anterior>`
+3. Verificação pós-deploy 15 min (painel SLO — `DashSGS · SLO board`, uid `dashsgs-slo`);
+   rollback: `deploy.sh <digest-anterior>`
    (migrações são expand/contract — compatíveis com N-1; doc 11 §3).
 4. Janela: horário de baixo uso (13h–15h ou 22h+); nunca durante pico de manhã de sábado
    (varejo).
