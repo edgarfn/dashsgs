@@ -24,8 +24,10 @@ operável: a stack de observabilidade sobe como código (Prometheus, Alertmanage
 cinco painéis provisionados, Loki, sonda externa e exporters), os seis SLIs do doc 18 §4 viraram
 regras de gravação com burn rate e orçamento de erro, 35 alertas têm runbook obrigatório, e o
 backup WAL-G faz arquivamento contínuo com um **teste de restauração semanal** que sobe um
-cluster novo e confere migrações, contagens e a cadeia de auditoria. Próxima: Fase 11 — beta
-fechado com 2–3 tenants reais. Nenhuma linha foi escrita antes
+cluster novo e confere migrações, contagens e a cadeia de auditoria. Depois dela, a **tela de Metas** fechou o
+último P0 aberto do dashboard: a previsão de vendas do ERP passou a sincronizar (E5-11) e com ela
+vieram o ritmo por filial, a projeção de fechamento e a oitava das dez regras de alerta do doc 15
+§8. Próxima: Fase 11 — beta fechado com 2–3 tenants reais. Nenhuma linha foi escrita antes
 da especificação, por decisão de método: primeiro entender 100% da capacidade da API, depois
 construir.
 

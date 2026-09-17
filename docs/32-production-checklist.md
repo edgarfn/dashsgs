@@ -19,7 +19,7 @@ Nenhum item [BLOQ] pode estar aberto no go-live.
 ## Segurança de aplicação e infra
 - [ ] [BLOQ] TLS A+ (ssllabs), HSTS ativo, headers doc 09 presentes
 - [x] [BLOQ] CSP sem unsafe-inline em produção — política estrita fora de `development`;
-      `e2e/seguranca.spec.ts` abre as 10 telas do MVP contra o build de produção e falha com
+      `e2e/seguranca.spec.ts` abre as 11 telas do MVP contra o build de produção e falha com
       qualquer violação (Fase 9). Falta confirmar no domínio real depois do deploy.
 - [ ] [BLOQ] Pentest externo sem High/Critical abertos
 - [ ] [BLOQ] Secrets fora de git/imagens (gitleaks histórico completo verde)
@@ -34,7 +34,7 @@ Nenhum item [BLOQ] pode estar aberto no go-live.
 - [ ] [BLOQ] Redaction de logs testada em produção (busca por padrões de CPF/senha/token nos sinks = zero)
 - [ ] [BLOQ] Módulo Clientes desligado por default; campos vetados ausentes do schema
 - [ ] [BLOQ] DPA assinado com tenants ativos; política de privacidade publicada; DPO designado
-- [x] Jobs de retenção/purga agendados e testados (verify-purge) — 21 políticas em
+- [x] Jobs de retenção/purga agendados e testados (verify-purge) — 23 políticas em
       `modules/retencao/politicas.ts`, rodada diária às 3h20, painel em `/plataforma/retencao`,
       gauge `retention_pending_rows`. O teste de integração purga e exige verificação zero.
 - [ ] Export com máscara por papel; desmascaramento auditado

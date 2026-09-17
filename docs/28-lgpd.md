@@ -57,7 +57,7 @@ privacidade e aviso do app · [ ] ROPA vivo (revisão semestral) · [ ] Inventá
 
 Os dois itens marcados fecharam na Fase 9 (E6-04):
 
-- **Retenções como jobs**: 21 políticas executáveis (doc 10 §8), rodada diária às 3h20, com
+- **Retenções como jobs**: 23 políticas executáveis (doc 10 §8), rodada diária às 3h20, com
   verificação depois da purga. O estado se confere em `/plataforma/retencao` — a resposta certa
   é uma coluna de zeros — e em `retention_pending_rows` no Prometheus.
 - **Purge/offboarding**: exclusão lógica com confirmação, carência de 30 dias, purga física por

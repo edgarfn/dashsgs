@@ -129,7 +129,7 @@ Duas decisões saíram daí:
 1. **A medida virou classe** (`medida-largura` + `medida-N`, em `globals.css`): o estilo sai do
    HTML e entra na folha, que a CSP libera pela origem. Custa 1% de arredondamento — invisível
    numa barra de 200px. Ver ADR-015.
-2. **O teste que julga é o navegador**: `e2e/seguranca.spec.ts` abre as dez telas do MVP com a
+2. **O teste que julga é o navegador**: `e2e/seguranca.spec.ts` abre as onze telas do MVP com a
    política de produção ligada e falha se o console registrar qualquer violação. Um segundo
    cenário mede a largura real de uma barra: zero significa estilo bloqueado.
 

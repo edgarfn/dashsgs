@@ -14,6 +14,7 @@ export const SYNC_DOMAINS = [
   'resumo_filial',
   'financeiro',
   'compras',
+  'previsao',
   'backfill',
 ] as const;
 
@@ -89,6 +90,15 @@ export const SYNC_DOMAIN_INFO: Record<SyncDomain, SyncDomainInfo> = {
     cadenciaSegundos: 3_600,
     porFilial: false,
     sloAtrasoSegundos: 14_400,
+  },
+  previsao: {
+    label: 'Previsão de vendas',
+    descricao: 'Meta do mês por filial e a curva diária que o ERP projeta.',
+    // Uma vez por dia: a previsão é lançada pelo gerente e mexe raramente. Cadência curta aqui
+    // só gastaria chamada no ERP da loja para reler o mesmo número.
+    cadenciaSegundos: 86_400,
+    porFilial: false,
+    sloAtrasoSegundos: 172_800,
   },
   backfill: {
     label: 'Carga histórica',

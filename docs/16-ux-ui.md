@@ -37,6 +37,7 @@ produto (id/descrição/GTIN), indicador de frescor/sync, menu do usuário (sess
 | Financeiro — Despesas | Custo operacional | por tipo/departamento, fixas×variáveis | export | manager+ |
 | Financeiro — Cartões | Taxas e conciliação | volume por bandeira/adquirente, taxa efetiva, não conciliadas | export | manager+ |
 | Compras — Pedidos | Suprimento | lista por situação, lead time, fill rate | detalhe, proposta (fase 8) | dashboard.view |
+| Metas | Chegamos onde prometemos? | ritmo por filial, projeção de fechamento, esperado até hoje | filtro por competência | dashboard.view |
 | Metas | Acompanhamento | atingimento por filial/depto, projeção | — | dashboard.view |
 | Alertas — Feed | Agir | lista com severidade, filtros, ack em massa | ack, ir ao contexto | alerts.ack |
 | Alertas — Regras | Configurar | CRUD de regras com parâmetros e canais | criar/editar/desativar | alerts.manage |
@@ -78,9 +79,9 @@ produto (id/descrição/GTIN), indicador de frescor/sync, menu do usuário (sess
 ## 6. Estado da implementação (Fase 7)
 
 Telas no ar: Visão Geral (`/`), Vendas — Diário (`/vendas`), Vendas — Comparativos
-(`/vendas/comparativos`), Estoque (`/estoque`), Financeiro (`/financeiro`), Compras
-(`/compras`), Alertas — Feed (`/alertas`) e Alertas — Regras (`/alertas/regras`), além das telas
-de autenticação, perfil e administração entregues nas fases anteriores.
+(`/vendas/comparativos`), Metas (`/metas`), Estoque (`/estoque`), Financeiro (`/financeiro`),
+Compras (`/compras`), Alertas — Feed (`/alertas`) e Alertas — Regras (`/alertas/regras`), além
+das telas de autenticação, perfil e administração entregues nas fases anteriores.
 
 A Fase 9 acrescentou duas telas de operação da plataforma: **Retenção e descarte**
 (`/plataforma/retencao`) e **Break-glass** (`/plataforma/break-glass`, com o relatório em

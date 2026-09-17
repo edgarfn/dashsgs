@@ -356,6 +356,110 @@ async function seedVendas(tenantId: string): Promise<void> {
 }
 
 /**
+ * Previsão de vendas sintética (E5-11).
+ *
+ * A meta **não** é um número inventado: ela é derivada do que o gerador de vendas de fato
+ * escreveu, e só então multiplicada por um fator por filial. Assim o ambiente de desenvolvimento
+ * sempre mostra o espectro que a tela existe para mostrar — uma loja folgada, uma no limite e uma
+ * claramente em risco — em vez de depender de o gerador continuar produzindo o mesmo volume.
+ *
+ * A filial 3 fica abaixo de 90% de propósito: é ela que dá ao alerta "meta em risco" algo real
+ * para disparar, sem precisar de fixture separada.
+ */
+const FATOR_DA_META: Record<number, number> = { 1: 0.85, 2: 1.02, 3: 1.3, 4: 0.97 };
+
+/** Domingo → sábado. Sábado vende quase o dobro de uma terça, e a curva precisa dizer isso. */
+const PESO_DO_DIA = [0.7, 1, 1, 1, 1.1, 1.3, 1.8];
+
+async function seedPrevisao(tenantId: string): Promise<void> {
+  const hoje = diaISO(0);
+  const competenciaAtual = hoje.slice(0, 7);
+  const competenciaAnterior = mesAnterior(competenciaAtual);
+
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.$executeRawUnsafe(`SET LOCAL app.tenant_id = '${tenantId}'`);
+
+      await tx.erpPrevisaoVendasDiaria.deleteMany({});
+      await tx.erpPrevisaoVendas.deleteMany({});
+
+      for (const competencia of [competenciaAnterior, competenciaAtual]) {
+        const dias = diasDaCompetencia(competencia);
+        const ehMesCorrente = competencia === competenciaAtual;
+        const ate = ehMesCorrente ? hoje : (dias.at(-1) as string);
+
+        for (const filial of FILIAIS) {
+          const realizado = await tx.erpFilialVendaResumo.aggregate({
+            _sum: { valor: true },
+            where: {
+              filialErpId: filial.erpId,
+              data: { gte: new Date(`${dias[0]}T00:00:00Z`), lte: new Date(`${ate}T00:00:00Z`) },
+            },
+          });
+
+          const somado = Number(realizado._sum.valor ?? 0);
+          if (somado <= 0) continue;
+
+          // Projeta o mês inteiro a partir do que já foi vendido, e só então aplica o fator.
+          const fracao = ehMesCorrente ? Number(ate.slice(8, 10)) / dias.length : 1;
+          const meta = Number(((somado / fracao) * (FATOR_DA_META[filial.erpId] ?? 1)).toFixed(2));
+
+          await tx.erpPrevisaoVendas.create({
+            data: {
+              tenantId,
+              filialErpId: filial.erpId,
+              competencia: new Date(`${competencia}-01T00:00:00Z`),
+              previsaoVenda: meta,
+              previsaoLucro: Number((meta * 0.22).toFixed(2)),
+              diasUteis: dias.filter((dia) => diaDaSemana(dia) !== 0).length,
+            },
+          });
+
+          const somaDosPesos = dias.reduce(
+            (acumulado, dia) => acumulado + (PESO_DO_DIA[diaDaSemana(dia)] as number),
+            0,
+          );
+
+          for (const dia of dias) {
+            await tx.erpPrevisaoVendasDiaria.create({
+              data: {
+                tenantId,
+                filialErpId: filial.erpId,
+                data: new Date(`${dia}T00:00:00Z`),
+                previsaoVenda: Number(
+                  ((meta * (PESO_DO_DIA[diaDaSemana(dia)] as number)) / somaDosPesos).toFixed(2),
+                ),
+              },
+            });
+          }
+        }
+      }
+    },
+    { timeout: 120_000, maxWait: 20_000 },
+  );
+}
+
+function mesAnterior(competencia: string): string {
+  const ano = Number(competencia.slice(0, 4));
+  const mes = Number(competencia.slice(5, 7));
+  return mes === 1 ? `${ano - 1}-12` : `${ano}-${String(mes - 1).padStart(2, '0')}`;
+}
+
+function diasDaCompetencia(competencia: string): string[] {
+  const ano = Number(competencia.slice(0, 4));
+  const mes = Number(competencia.slice(5, 7));
+  const ultimo = new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+  return Array.from(
+    { length: ultimo },
+    (_, indice) => `${competencia}-${String(indice + 1).padStart(2, '0')}`,
+  );
+}
+
+function diaDaSemana(dia: string): number {
+  return new Date(`${dia}T00:00:00Z`).getUTCDay();
+}
+
+/**
  * Financeiro e compras sintéticos (Fase 8).
  *
  * O painel financeiro sem dado é uma tela de zeros que não dá para revisar. Aqui entram títulos
@@ -588,6 +692,7 @@ async function main(): Promise<void> {
   // Só o tenant demo recebe movimento: o vizinho existe para provar isolamento, e um tenant
   // vazio ao lado de um cheio é justamente o contraste que denuncia vazamento.
   await seedVendas(demo.id);
+  await seedPrevisao(demo.id);
   await seedFinanceiro(demo.id);
 
   // Conta de operação da plataforma: papel global, sem membership em tenant nenhum (doc 07 §2).
@@ -618,6 +723,7 @@ async function main(): Promise<void> {
   );
   console.log(`  vendas : ${DIAS_DE_HISTORICO} dias sintéticos no tenant demo`);
   console.log('  financ.: contas, despesas, cartões e pedidos de compra sintéticos');
+  console.log('  metas  : previsão do mês corrente e do anterior (filial 3 abaixo da meta)');
   for (const user of [...DEMO_USERS, ...VIZINHO_USERS]) {
     const recorte = user.filiais.length > 0 ? ` — filiais ${user.filiais.join(', ')}` : '';
     console.log(`  usuário: ${user.email} — papel ${user.role}${recorte}`);

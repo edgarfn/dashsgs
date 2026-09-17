@@ -87,6 +87,21 @@ export const periodoQuerySchema = z
   );
 export type PeriodoQuery = z.infer<typeof periodoQuerySchema>;
 
+/**
+ * Metas (doc 15 §7). A competência é `AAAA-MM` e não um par de datas: previsão é lançada por mês
+ * no ERP, e aceitar um intervalo arbitrário convidaria a somar metade de dois meses.
+ */
+export const metasQuerySchema = z
+  .object({
+    filiais,
+    competencia: z
+      .string()
+      .regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'use o formato AAAA-MM')
+      .optional(),
+  })
+  .strict();
+export type MetasQuery = z.infer<typeof metasQuerySchema>;
+
 export const rupturaQuerySchema = z
   .object({
     filiais,

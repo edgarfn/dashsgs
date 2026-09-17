@@ -17,11 +17,13 @@ import { gerarCsv, nomeDeArquivo } from './csv';
 import {
   comparativoQuerySchema,
   homeQuerySchema,
+  metasQuerySchema,
   periodoQuerySchema,
   rupturaQuerySchema,
   vendasDiaQuerySchema,
   type ComparativoQuery,
   type HomeQuery,
+  type MetasQuery,
   type PeriodoQuery,
   type RupturaQuery,
   type VendasDiaQuery,
@@ -30,6 +32,7 @@ import { ComprasService, type ComprasView } from './compras.service';
 import { EstoqueService } from './estoque.service';
 import { FinanceiroService, type FinanceiroView } from './financeiro.service';
 import { HomeService } from './home.service';
+import { MetasService, type MetasView } from './metas.service';
 import { VendasService } from './vendas.service';
 
 /** Papéis que enxergam custo e margem (doc 15 §1: "manager+"). */
@@ -54,6 +57,7 @@ export class DashboardController {
     private readonly estoque: EstoqueService,
     private readonly financeiro: FinanceiroService,
     private readonly compras: ComprasService,
+    private readonly metas: MetasService,
     private readonly escopo: FiliaisScopeService,
     private readonly cache: DashboardCache,
     private readonly prisma: PrismaService,
@@ -199,6 +203,31 @@ export class DashboardController {
       { filiais, de: query.de, ate: query.ate },
       TTL.historico,
       () => this.financeiro.montar({ tenantId, filiais, de: query.de, ate: query.ate }),
+    );
+  }
+
+  /**
+   * Metas: previsão × realizado e projeção de fechamento (doc 15 §7 / E7-03).
+   *
+   * Cache curto como o da home, e não o do histórico: o realizado do mês corrente muda a cada
+   * ciclo de sync, e uma meta "batida" que só aparece 15 minutos depois é exatamente o tipo de
+   * atraso que o gerente percebe.
+   */
+  @Get('metas')
+  @RequirePermissions('dashboard.view')
+  async metasView(
+    @Query(new ZodValidationPipe(metasQuerySchema)) query: MetasQuery,
+    @CurrentAuth() auth: AuthContext,
+  ): Promise<MetasView> {
+    const { tenantId, filiais, timezone } = await this.contexto(auth, query.filiais);
+    const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date());
+
+    return this.cache.lembrar(
+      tenantId,
+      'metas',
+      { filiais, competencia: query.competencia ?? hoje.slice(0, 7) },
+      TTL.hoje,
+      () => this.metas.montar({ tenantId, filiais, hoje, competencia: query.competencia }),
     );
   }
 

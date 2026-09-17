@@ -56,6 +56,7 @@ dados aceitam `?filiais=1,2` (validado contra `filiais_allowed`).
 | GET /dashboard/estoque?situacao&curva&filiais&pagina | ruptura / negativo / excesso com cobertura | 15 min |
 | GET /dashboard/financeiro?de&ate&filiais | aging, fluxo previsto, despesas e cartões (manager+) | 15 min |
 | GET /dashboard/compras?de&ate&filiais | pedidos por situação, lead time, pendentes e entradas | 15 min |
+| GET /dashboard/metas?competencia&filiais | meta × realizado por filial, projeção de fechamento e curva acumulada. `competencia` é `AAAA-MM` (padrão: mês corrente) | 60 s |
 | GET /dashboard/vendas/dia/export?… | CSV do diário (`reports.export`) | sem cache |
 | GET /dim/filiais | dimensões para os filtros | — |
 

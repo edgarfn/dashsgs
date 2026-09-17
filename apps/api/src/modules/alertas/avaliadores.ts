@@ -219,6 +219,99 @@ const quedaDeVenda: Avaliador = async ({ tx, hoje, horaLocal, params }) => {
   });
 };
 
+// ---------------------------------------------------------------- metas
+/**
+ * Meta em risco: a projeção do mês abaixo do mínimo aceitável (doc 15 §8 / E5-11).
+ *
+ * Duas salvaguardas contra o alerta que ninguém quer receber:
+ *
+ * - **Só a partir do dia configurado** (padrão: 15). No dia 3, qualquer loja está "abaixo da
+ *   meta"; avisar ali é garantir que o e-mail seja filtrado antes do mês em que ele importa.
+ * - **A fração decorrida sai da curva diária quando ela existe.** Com curva, "quanto já deveria
+ *   ter vendido" respeita sábado e feriado; sem ela, a conta é proporcional aos dias do mês —
+ *   aproximação honesta, que a tela de metas também declara.
+ */
+const metaEmRisco: Avaliador = async ({ tx, hoje, params }) => {
+  const percentualMinimo = params.percentualMinimo ?? 90;
+  const diaDoMes = params.diaDoMes ?? 15;
+
+  if (Number(hoje.slice(8, 10)) < diaDoMes) return [];
+
+  const competencia = `${hoje.slice(0, 7)}-01`;
+
+  const linhas = await tx.$queryRaw<
+    Array<{ filial_erp_id: number; meta: number; realizado: number; fracao: number }>
+  >(Prisma.sql`
+    WITH meta AS (
+      SELECT filial_erp_id, SUM(previsao_venda)::float8 AS meta
+      FROM erp_previsao_vendas
+      WHERE competencia = ${competencia}::date
+      GROUP BY filial_erp_id
+    ),
+    realizado AS (
+      SELECT filial_erp_id, COALESCE(SUM(valor), 0)::float8 AS realizado
+      FROM erp_filial_venda_resumo
+      WHERE data >= ${competencia}::date AND data <= ${hoje}::date
+      GROUP BY filial_erp_id
+    ),
+    curva AS (
+      SELECT filial_erp_id,
+             SUM(previsao_venda) FILTER (WHERE data <= ${hoje}::date)::float8 AS ate_hoje,
+             SUM(previsao_venda)::float8 AS total
+      FROM erp_previsao_vendas_diaria
+      WHERE data >= ${competencia}::date
+        AND data < (${competencia}::date + INTERVAL '1 month')
+      GROUP BY filial_erp_id
+    )
+    SELECT m.filial_erp_id,
+           m.meta,
+           COALESCE(r.realizado, 0) AS realizado,
+           CASE
+             WHEN c.total > 0 THEN LEAST(1, COALESCE(c.ate_hoje, 0) / c.total)
+             ELSE EXTRACT(DAY FROM ${hoje}::date)::float8
+                  / EXTRACT(DAY FROM (date_trunc('month', ${hoje}::date)
+                                      + INTERVAL '1 month - 1 day'))::float8
+           END AS fracao
+    FROM meta m
+    LEFT JOIN realizado r ON r.filial_erp_id = m.filial_erp_id
+    LEFT JOIN curva c ON c.filial_erp_id = m.filial_erp_id
+    WHERE m.meta > 0`);
+
+  const nomes = await nomesDeFilial(
+    tx,
+    linhas.map((linha) => linha.filial_erp_id),
+  );
+
+  return linhas
+    .map((linha) => {
+      const fracao = Number(linha.fracao);
+      const meta = Number(linha.meta);
+      const projecao = fracao > 0 ? Number(linha.realizado) / fracao : 0;
+      const ritmo = (projecao / meta) * 100;
+      return { linha, projecao, ritmo, meta };
+    })
+    .filter(({ ritmo, projecao }) => projecao > 0 && ritmo < percentualMinimo)
+    .map(({ linha, projecao, ritmo, meta }) => {
+      const filial = nomes.get(linha.filial_erp_id) ?? `filial ${linha.filial_erp_id}`;
+
+      return {
+        filialErpId: linha.filial_erp_id,
+        // A chave carrega a competência, não o dia: o mês em risco é o mesmo problema do dia 15
+        // ao 30. Sem isso seriam quinze e-mails sobre a mesma meta.
+        dedupeKey: `${hoje.slice(0, 7)}:${linha.filial_erp_id}`,
+        resumo: `${filial} deve fechar o mês em ${ritmo.toFixed(0)}% da meta`,
+        payload: {
+          meta,
+          realizado: Number(linha.realizado),
+          projecao: Number(projecao.toFixed(2)),
+          ritmo: Number(ritmo.toFixed(1)),
+          filial,
+          link: `/metas?filiais=${linha.filial_erp_id}`,
+        },
+      };
+    });
+};
+
 // ---------------------------------------------------------------- integração
 /**
  * O alerta que o admin do tenant precisa ver antes do cliente ligar (E8-05).
@@ -368,6 +461,7 @@ export const AVALIADORES: Partial<Record<AlertType, Avaliador>> = {
   estoque_negativo: estoqueNegativo,
   divergencia_fechamento: divergenciaFechamento,
   queda_de_venda: quedaDeVenda,
+  meta_em_risco: metaEmRisco,
   integracao_parada: integracaoParada,
   conta_a_vencer: contaAVencer,
   cartao_nao_conciliado: cartaoNaoConciliado,

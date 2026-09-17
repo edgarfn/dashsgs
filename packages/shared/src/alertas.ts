@@ -111,8 +111,7 @@ export const ALERT_TYPE_INFO: Record<AlertType, AlertTypeInfo> = {
     severidadePadrao: 'media',
     parametrosPadrao: { percentualMinimo: 90, diaDoMes: 15 },
     audienciaPadrao: 'operacao',
-    disponivel: false,
-    dependencia: 'sincronização da previsão de vendas (E5-11)',
+    disponivel: true,
   },
   conta_a_vencer: {
     label: 'Conta a vencer',

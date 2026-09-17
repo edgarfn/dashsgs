@@ -6,6 +6,7 @@ import { EstoqueService } from './estoque.service';
 import { FinanceiroService } from './financeiro.service';
 import { FrescorService } from './frescor.service';
 import { HomeService } from './home.service';
+import { MetasService } from './metas.service';
 import { VendasService } from './vendas.service';
 
 /**
@@ -25,6 +26,7 @@ import { VendasService } from './vendas.service';
     EstoqueService,
     FinanceiroService,
     ComprasService,
+    MetasService,
   ],
   exports: [FrescorService],
 })

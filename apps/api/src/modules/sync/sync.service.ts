@@ -9,6 +9,7 @@ import { ErpConnectionService } from '../erp-connection/erp-connection.service';
 import { ComprasSync } from './domains/compras.sync';
 import { DimensoesSync } from './domains/dimensoes.sync';
 import { FinanceiroSync } from './domains/financeiro.sync';
+import { PrevisaoSync } from './domains/previsao.sync';
 import { ProdutosSync } from './domains/produtos.sync';
 import { ResumoFilialSync } from './domains/resumo-filial.sync';
 import { VendasDiaSync } from './domains/vendas-dia.sync';
@@ -67,6 +68,7 @@ export class SyncService {
     resumoFilial: ResumoFilialSync,
     financeiro: FinanceiroSync,
     compras: ComprasSync,
+    previsao: PrevisaoSync,
   ) {
     this.logger.setContext(SyncService.name);
     this.jobs = {
@@ -81,6 +83,7 @@ export class SyncService {
       resumo_filial: resumoFilial,
       financeiro,
       compras,
+      previsao,
     };
   }
 

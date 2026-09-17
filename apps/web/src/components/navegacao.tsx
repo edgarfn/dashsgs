@@ -20,6 +20,12 @@ export function Cabecalho({ me, ativo }: { me: MeResponse; ativo?: string }) {
       visivel: me.permissions.includes('dashboard.view'),
     },
     {
+      href: '/metas',
+      rotulo: 'Metas',
+      chave: 'metas',
+      visivel: me.permissions.includes('dashboard.view'),
+    },
+    {
       href: '/estoque',
       rotulo: 'Estoque',
       chave: 'estoque',

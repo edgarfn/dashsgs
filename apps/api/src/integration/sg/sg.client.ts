@@ -18,6 +18,8 @@ import {
   gtinSchema,
   notaEntradaSchema,
   pedidoCompraSchema,
+  previsaoVendasSchema,
+  previsaoVendasDiariaSchema,
   tipoDespesaSchema,
   finalizadoraSchema,
   produtoSchema,
@@ -34,6 +36,8 @@ import {
   type SgGtin,
   type SgNotaEntrada,
   type SgPedidoCompra,
+  type SgPrevisaoVendas,
+  type SgPrevisaoVendasDiaria,
   type SgTipoDespesa,
   type SgProduto,
   type SgResumoFilial,
@@ -414,6 +418,45 @@ export class SgClient {
       notaEntradaSchema,
       'entradas',
       'entradas',
+    );
+  }
+
+  /**
+   * Previsão de vendas do mês (E5-11, doc 15 §7).
+   *
+   * [NECESSITA CONFIRMAÇÃO] O doc 03 marca esta rota como **sem filtro de período**, o que sugere
+   * que ela devolve as competências abertas (mês corrente e próximo) de uma vez. Os parâmetros
+   * `mes`/`ano` são enviados assim mesmo: se a API os ignorar, o resultado é o mesmo; se ela os
+   * respeitar, deixamos de puxar o histórico inteiro a cada ciclo.
+   */
+  async getPrevisaoVendas(
+    contexto: SgCallContext,
+    params: { mes?: number; ano?: number; filial?: number } = {},
+  ): Promise<ResultadoColeta<SgPrevisaoVendas>> {
+    return this.coletarPaginado(
+      contexto,
+      `${BASE}/previsaovendas`,
+      { mes: params.mes, ano: params.ano, filial: params.filial },
+      'GET /previsaovendas',
+      previsaoVendasSchema,
+      'previsao_vendas',
+      'previsoes',
+    );
+  }
+
+  /** Curva diária da previsão — exige filial, como todo recurso com recorte por loja (doc 03). */
+  async getPrevisaoVendasDiaria(
+    contexto: SgCallContext,
+    params: { filial: number; mes?: number; ano?: number },
+  ): Promise<ResultadoColeta<SgPrevisaoVendasDiaria>> {
+    return this.coletarPaginado(
+      contexto,
+      `${BASE}/previsaovendas/diaria`,
+      { filial: params.filial, mes: params.mes, ano: params.ano },
+      'GET /previsaovendas/diaria',
+      previsaoVendasDiariaSchema,
+      'previsao_vendas_diaria',
+      'previsoes',
     );
   }
 

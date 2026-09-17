@@ -136,10 +136,15 @@ describe('alertas (integração)', () => {
       expect(lista.map((regra) => regra.type)).toContain('ruptura_curva_a');
 
       // Regra sem avaliador nasce desligada: ligar algo que não roda seria promessa falsa.
-      // 'meta_em_risco' depende da previsão de vendas (E5-11), que ainda não é sincronizada.
-      const semDado = lista.find((regra) => regra.type === 'meta_em_risco');
+      // 'vencimento_proximo' depende da sincronização de vencimentos (E5-10), que ainda não existe.
+      const semDado = lista.find((regra) => regra.type === 'vencimento_proximo');
       expect(semDado?.enabled).toBe(false);
-      expect(semDado?.dependencia).toContain('previsão');
+      expect(semDado?.dependencia).toContain('vencimentos');
+
+      // 'meta_em_risco' saiu dessa lista quando a previsão de vendas passou a sincronizar
+      // (E5-11): regra com dado disponível nasce ligada, sem dependência escrita.
+      const comDado = lista.find((regra) => regra.type === 'meta_em_risco');
+      expect(comDado?.dependencia).toBeUndefined();
     });
 
     it('semear de novo não duplica nem sobrescreve o ajuste do cliente', async () => {

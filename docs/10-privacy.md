@@ -82,7 +82,7 @@ Prazo interno de atendimento ao Controlador: 72 h úteis para gerar o material.
 ## 8. Estado da implementação (Fase 9 — E6-04)
 
 A matriz do §2 deixou de ser só um compromisso escrito: virou um catálogo executável em
-`apps/api/src/modules/retencao/politicas.ts`, com 21 políticas. **A mesma lista** é usada para
+`apps/api/src/modules/retencao/politicas.ts`, com 23 políticas. **A mesma lista** é usada para
 apagar e para conferir — não existe a possibilidade de uma purga que "esqueceu" uma linha da
 tabela, porque quem verifica lê o mesmo arquivo que quem apaga.
 

@@ -6,6 +6,7 @@ import { BackfillService } from './backfill.service';
 import { ComprasSync } from './domains/compras.sync';
 import { DimensoesSync } from './domains/dimensoes.sync';
 import { FinanceiroSync } from './domains/financeiro.sync';
+import { PrevisaoSync } from './domains/previsao.sync';
 import { ProdutosSync } from './domains/produtos.sync';
 import { ResumoFilialSync } from './domains/resumo-filial.sync';
 import { VendasDiaSync } from './domains/vendas-dia.sync';
@@ -44,6 +45,7 @@ import { WatermarkService } from './watermark.service';
     ResumoFilialSync,
     FinanceiroSync,
     ComprasSync,
+    PrevisaoSync,
     SyncService,
     BackfillService,
     SyncStatusService,

@@ -90,7 +90,22 @@ anterior).
 | Meta mês × realizado (filial) | previsão vs Σ vendas | /previsaovendas + /filiais/vendas |
 | Meta por departamento/marca/produto | recortes da previsão vs venda respectiva | /previsaovendas/* |
 | Meta diária × realizado do dia | previsão diária | /previsaovendas/diaria + /vendas/hoje |
-| Projeção de fechamento do mês | realizado ÷ dias úteis decorridos × `diasUteis` | idem |
+| Projeção de fechamento do mês | realizado ÷ fração do mês decorrida | idem |
+
+**Implementado em 17/09/2026 (E5-11 + E7-03).** Duas notas sobre a projeção, porque a fórmula
+mudou em relação ao que estava escrito acima:
+
+- **A fração decorrida sai da curva diária quando o ERP a fornece**, e não de "dias úteis
+  decorridos". Contar dias úteis exigiria conhecer o calendário de feriados da loja; a curva que
+  o gerente lançou já o conhece. Sem curva, a conta cai na proporcional (dias corridos), e a tela
+  **diz qual das duas está em uso** — projeção sem procedência é número que ninguém sabe se pode
+  usar.
+- **O destaque da tela é o ritmo, não o atingimento.** No dia 10, ter 30% da meta não informa
+  nada sozinho; o que informa é onde o mês fecha mantido o passo. As filiais aparecem ordenadas
+  da pior para a melhor.
+
+Os recortes por departamento, marca e produto (linha 2 da tabela) continuam fora: dependem de
+`/previsaovendas/departamentos/*`, que só valem a pena junto com a margem por produto (§3).
 
 ## 8. Alertas (regras padrão; motor no doc 05 `app_alert_rules`)
 
@@ -146,10 +161,9 @@ Decisões tomadas na implementação:
 - **Custo da margem por departamento é o custo atual do cadastro.** A API não devolve o custo
   praticado na venda (doc 33); a limitação está escrita na própria tela, não só aqui.
 
-Ainda não implementado deste doc: metas (§7) e margem por produto (§3) dependem da previsão de
-vendas (E5-11); perdas, trocas, vencimentos e movimentações (§4) dependem de E5-10; financeiro
-(§5) e compras (§6) dependem de E5-09/E5-10; vendedores e ofertas (§2) são P2. Os alertas (§8)
-são a Fase 8.
+Ainda não implementado deste doc: margem por produto (§3); perdas, trocas, vencimentos e
+movimentações (§4) dependem do resto de E5-10; vendedores e ofertas (§2) são P2. As metas (§7)
+entraram em 17/09/2026 com a previsão de vendas (E5-11).
 
 ## 11. Estado da implementação dos alertas (Fase 8)
 
@@ -163,7 +177,7 @@ são a Fase 8.
 | Conta a vencer | ✅ soma as parcelas que vencem na janela e avisa uma vez por dia |
 | Cartão não conciliado | ✅ por filial, transações sem baixa além do prazo |
 | Vencimento próximo · Perda anormal | ⛔ dependem da sincronização de vencimentos e perdas (E5-10) |
-| Meta em risco | ⛔ depende da previsão de vendas (E5-11) |
+| Meta em risco | ✅ a partir do dia configurado (padrão 15), quando a projeção fica abaixo de 90% da meta |
 
 As regras indisponíveis **existem** no catálogo e aparecem na tela desligadas, com a dependência
 escrita. Some da tela seria pior: o cliente concluiria que o produto não cobre aquilo.

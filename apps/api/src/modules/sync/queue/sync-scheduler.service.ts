@@ -29,6 +29,9 @@ const PRIORIDADE: Record<SyncDomain, number> = {
   dimensoes: 5,
   financeiro: 6,
   compras: 6,
+  // Depois do financeiro: a meta do mês não muda durante o dia, e ela esperar dois minutos
+  // atrás de uma fila cheia não custa nada a ninguém.
+  previsao: 7,
   backfill: 9,
 };
 

@@ -6,6 +6,8 @@ import {
   dimensaoSchema,
   filialSchema,
   pedidoCompraSchema,
+  previsaoVendasDiariaSchema,
+  previsaoVendasSchema,
   produtoSchema,
   statusSchema,
   tipoDespesaSchema,
@@ -190,6 +192,43 @@ descreve('contrato com a API SG (homologação)', () => {
         expect({ rota: recurso.rota, status }).toEqual({ rota: recurso.rota, status: 200 });
 
         const pagina = normalizarPagina(corpo, recurso.chave);
+        const invalidos = pagina.itens.filter((item) => !recurso.schema.safeParse(item).success);
+
+        expect({ rota: recurso.rota, invalidos: invalidos.length }).toEqual({
+          rota: recurso.rota,
+          invalidos: 0,
+        });
+      }
+    },
+    TIMEOUT,
+  );
+
+  /**
+   * Previsão de vendas (E5-11). Fica num cenário próprio porque é a única família de rotas do
+   * produto **sem** filtro de período: o mês vai por `mes`/`ano`, e o doc 03 marca o período como
+   * ausente. Se a homologação exigir outros parâmetros, é aqui que se descobre.
+   */
+  it(
+    'previsão de vendas bate com o schema (competência e nomes de campo não confirmados)',
+    async () => {
+      const agora = new Date();
+      const recursos = [
+        { rota: 'previsaovendas', schema: previsaoVendasSchema, query: {} },
+        { rota: 'previsaovendas/diaria', schema: previsaoVendasDiariaSchema, query: { filial: 1 } },
+      ] as const;
+
+      for (const recurso of recursos) {
+        const { status, corpo } = await chamar(`/integracao/sgsistemas/v1/${recurso.rota}`, {
+          ...recurso.query,
+          mes: agora.getUTCMonth() + 1,
+          ano: agora.getUTCFullYear(),
+        });
+
+        // Previsão é módulo opcional do ERP: rota fora do contrato não é falha de schema.
+        if (status === 401 || status === 403) continue;
+        expect({ rota: recurso.rota, status }).toEqual({ rota: recurso.rota, status: 200 });
+
+        const pagina = normalizarPagina(corpo, 'previsoes');
         const invalidos = pagina.itens.filter((item) => !recurso.schema.safeParse(item).success);
 
         expect({ rota: recurso.rota, invalidos: invalidos.length }).toEqual({

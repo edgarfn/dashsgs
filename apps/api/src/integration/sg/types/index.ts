@@ -583,6 +583,78 @@ export const notaEntradaSchema = z
   }));
 export type SgNotaEntrada = z.infer<typeof notaEntradaSchema>;
 
+// ---------------------------------------------------------------- previsão de vendas
+/**
+ * Previsão de vendas por mês e filial (doc 03 §Previsão de Vendas / E5-11).
+ *
+ * [NECESSITA CONFIRMAÇÃO] Os nomes de campo e o formato da competência vêm do doc 03 e ainda não
+ * foram confirmados contra a homologação. O schema aceita as duas formas que a API usa em outros
+ * módulos — competência como data (`2026-09-01`) ou como par mês/ano — e normaliza para o
+ * primeiro dia do mês, que é como o espelho guarda. Campo com outro nome cai na quarentena e o
+ * contrato noturno acusa, em vez de a tela de metas aparecer vazia para o primeiro cliente.
+ */
+export const previsaoVendasSchema = z
+  .object({
+    idFilial: sgInteiro,
+    competencia: sgData,
+    mes: sgInteiro,
+    ano: sgInteiro,
+    previsaoVenda: sgNumero,
+    previsaoLucro: sgNumero,
+    diasUteis: sgInteiro,
+  })
+  .passthrough()
+  .transform((bruto) => ({
+    filialErpId: bruto.idFilial,
+    competencia: primeiroDiaDoMes(bruto.competencia, bruto.ano, bruto.mes),
+    previsaoVenda: bruto.previsaoVenda,
+    previsaoLucro: bruto.previsaoLucro,
+    diasUteis: bruto.diasUteis,
+  }))
+  // Previsão sem filial, sem competência ou sem valor não é previsão: é linha vazia, e deixá-la
+  // entrar faria a tela dividir por zero em silêncio.
+  .refine(
+    (item) => item.filialErpId !== null && item.competencia !== null && item.previsaoVenda !== null,
+    { message: 'previsão sem filial, competência ou valor' },
+  );
+export type SgPrevisaoVendas = z.infer<typeof previsaoVendasSchema>;
+
+export const previsaoVendasDiariaSchema = z
+  .object({
+    idFilial: sgInteiro,
+    data: sgData,
+    previsaoVenda: sgNumero,
+  })
+  .passthrough()
+  .transform((bruto) => ({
+    filialErpId: bruto.idFilial,
+    data: bruto.data,
+    previsaoVenda: bruto.previsaoVenda,
+  }))
+  .refine(
+    (item) => item.filialErpId !== null && item.data !== null && item.previsaoVenda !== null,
+    { message: 'previsão diária sem filial, data ou valor' },
+  );
+export type SgPrevisaoVendasDiaria = z.infer<typeof previsaoVendasDiariaSchema>;
+
+/**
+ * Normaliza a competência para `YYYY-MM-01`.
+ *
+ * O primeiro dia do mês é a única forma que compara com `data` de venda sem conversão no SQL — e
+ * guardar "09/2026" como texto transformaria toda consulta de meta numa conversão por linha.
+ */
+function primeiroDiaDoMes(
+  competencia: string | null,
+  ano: number | null,
+  mes: number | null,
+): string | null {
+  if (competencia) return `${competencia.slice(0, 7)}-01`;
+  if (ano && mes && mes >= 1 && mes <= 12) {
+    return `${String(ano).padStart(4, '0')}-${String(mes).padStart(2, '0')}-01`;
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------- erro da API
 export const sgErroSchema = z
   .object({ error: z.string() })

@@ -829,6 +829,51 @@ model AggVendasDiaDep {
 }
 
 // ============================================================================
+// Previsão de vendas (doc 03 §Previsão / doc 15 §7 — E5-11)
+// ============================================================================
+
+/// Meta do mês por filial, como o ERP a projeta.
+///
+/// A competência é o **primeiro dia do mês**, não um par (ano, mês): com `date` a consulta compara
+/// com `data` de venda sem conversão, e o índice serve as duas perguntas da tela — "qual a meta
+/// deste mês?" e "como foram os últimos seis?".
+model ErpPrevisaoVendas {
+  tenantId    String   @map("tenant_id") @db.Uuid
+  filialErpId Int      @map("filial_erp_id")
+  competencia DateTime @db.Date
+
+  previsaoVenda Decimal  @map("previsao_venda") @db.Decimal(14, 4)
+  previsaoLucro Decimal? @map("previsao_lucro") @db.Decimal(14, 4)
+  /// Dias úteis do mês **segundo a loja** — feriado municipal e domingo de supermercado entram
+  /// no calendário do ERP, não num que a gente adivinhe (doc 15 §7).
+  diasUteis     Int?     @map("dias_uteis")
+
+  syncedAt DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  @@id([tenantId, filialErpId, competencia])
+  @@index([tenantId, competencia])
+  @@map("erp_previsao_vendas")
+}
+
+/// Curva diária da previsão, quando o ERP a fornece.
+///
+/// Vale mais que o total do mês dividido por dias úteis: sábado não vende como terça, e a
+/// projeção feita sobre a curva real não acusa "meta em risco" toda segunda-feira.
+model ErpPrevisaoVendasDiaria {
+  tenantId    String   @map("tenant_id") @db.Uuid
+  filialErpId Int      @map("filial_erp_id")
+  data        DateTime @db.Date
+
+  previsaoVenda Decimal @map("previsao_venda") @db.Decimal(14, 4)
+
+  syncedAt DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+
+  @@id([tenantId, filialErpId, data])
+  @@index([tenantId, data])
+  @@map("erp_previsao_vendas_diaria")
+}
+
+// ============================================================================
 // Alertas (doc 05 §1 / doc 15 §8) — o que faz o produto ligar para o cliente.
 // ============================================================================
 

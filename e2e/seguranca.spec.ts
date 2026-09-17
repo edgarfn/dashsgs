@@ -19,6 +19,7 @@ const TELAS = [
   '/',
   '/vendas',
   '/vendas/comparativos',
+  '/metas',
   '/estoque',
   '/financeiro',
   '/compras',
@@ -82,11 +83,18 @@ test.describe('CSP em execução', () => {
 
     await login(page, CONTAS.gerente);
 
+    const naoAbertas: string[] = [];
+
     for (const tela of TELAS) {
       await page.goto(tela);
       await page.waitForLoadState('networkidle');
+      // Sessão perdida redireciona para /entrar — e a tela de login não viola CSP nenhuma.
+      // Sem esta conferência, o teste passaria por não ter visitado nada, que é o pior jeito
+      // possível de ficar verde.
+      if (new URL(page.url()).pathname.startsWith('/entrar')) naoAbertas.push(tela);
     }
 
+    expect(naoAbertas).toEqual([]);
     expect(violacoes).toEqual([]);
   });
 

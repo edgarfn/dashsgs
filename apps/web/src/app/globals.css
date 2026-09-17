@@ -32,6 +32,12 @@ body {
   height: var(--medida, 0%);
 }
 
+/* Terceiro eixo, pelo mesmo motivo dos outros dois: a tela de metas marca com um traço vertical
+   onde a venda deveria estar hoje, e `left` num atributo `style` cairia em silêncio na CSP. */
+.medida-esquerda {
+  left: var(--medida, 0%);
+}
+
 .medida-0 {
   --medida: 0%;
 }

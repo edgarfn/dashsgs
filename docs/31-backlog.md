@@ -194,7 +194,7 @@ Decisões e descobertas da implementação:
 | E5-08 ✅ | Agregados (agg_*) recalculados por evento | P0 | M | E5-05 | consistentes com fatos |
 | E5-09 ✅ | Sync financeiro (contas, despesas, cartões) | P1 | G | E5-01 | reconciliação semanal |
 | E5-10 ◐ | Sync compras (pedidos, entradas) + perdas/trocas/vencimentos/movimentações | P1 | G | E5-01 | janelas ≤30 d |
-| E5-11 | Sync previsão de vendas (+recortes) | P1 | M | E5-01 | mês corrente+próximo |
+| E5-11 ✅ | Sync previsão de vendas (mês corrente+próximo + curva diária; recortes por depto/marca/produto ficaram de fora) | P1 | M | E5-01 | mês corrente+próximo |
 | E5-12 ✅ | Painel sync-status por tenant | P0 | M | E5-01 | lag/erros visíveis |
 
 **E5-03 ficou parcial**: produtos (as três datas de alteração) e GTINs entraram; `/produtos/precos`
@@ -248,7 +248,7 @@ Decisões e descobertas da implementação:
 |---|---|---|---|---|---|
 | E7-01 ✅ | Home executiva (cards + curva do dia + ranking + fechamento) | P0 | G | E5-04..08 | snapshot KPIs |
 | E7-02 ✅ | Vendas diário (cupons) + comparativos | P0 | G | E5-05 | p95<300ms |
-| E7-03 ⛔ | Metas (previsão×realizado + projeção) | P0 | M | E5-11 | cálculo diasUteis |
+| E7-03 ✅ | Metas (previsão×realizado + projeção) | P0 | M | E5-11 | cálculo diasUteis |
 | E7-04 ◐ | Estoque: ruptura + vencimentos + cobertura | P0 | M | E5-03/10 | curva A priorizada |
 | E7-05 ✅ | Estados vazios/erro/parcial + selo de frescor | P0 | M | — | doc 16 §3 |
 | E7-06 ◐ | Mobile da home + acessibilidade AA | P1 | M | E7-01 | Lighthouse/axe |
@@ -256,8 +256,8 @@ Decisões e descobertas da implementação:
 | E7-08 ✅ | Financeiro (aging, despesas, cartões) + Compras | P1 | G | E5-09/10 | amostras batem |
 | E7-09 | Vendas por vendedor / ofertas | P2 | M | E5-05 | — |
 
-**E7-03 está bloqueado por dado, não por tela**: metas dependem de `/previsaovendas`, que só é
-sincronizado na E5-11. Entregar a tela sem a previsão seria mostrar uma meta inventada.
+**E7-03 entrou em 17/09/2026**, junto com a E5-11 que o destravava: a tela nunca poderia vir
+antes do dado, porque meta sem previsão do ERP é meta inventada.
 **E7-04 saiu parcial** pelo mesmo motivo: ruptura, estoque negativo, excesso e cobertura vêm do
 cadastro de produtos (já sincronizado); vencimentos e perdas dependem da E5-10.
 **E7-06 ficou parcial**: as telas são responsivas e acessíveis por construção (semântica, foco,
@@ -304,11 +304,11 @@ Decisões e descobertas da implementação:
 | E8-04 ✅ | UI de configuração de regras | P1 | M | validação params |
 | E8-05 ✅ | Alerta de integração (credencial/lag) p/ admin do tenant | P0 | P | — |
 
-**E8-03 continua parcial por dependência de dado**: **sete** das dez regras do doc 15 §8 avaliam
+**E8-03 continua parcial por dependência de dado**: **oito** das dez regras do doc 15 §8 avaliam
 hoje — ruptura curva A, estoque negativo, divergência de fechamento, queda de venda, integração
-parada e, com a chegada de E5-09, conta a vencer e cartão não conciliado. As três restantes
-(vencimento próximo, perda anormal e meta em risco) aparecem na tela desligadas com a dependência
-escrita, e ligam sozinhas quando o resto de E5-10 e a E5-11 entrarem.
+parada, conta a vencer e cartão não conciliado (E5-09) e, desde 17/09/2026, meta em risco
+(E5-11). As duas restantes (vencimento próximo e perda anormal) aparecem na tela desligadas com
+a dependência escrita, e ligam sozinhas quando o resto de E5-10 entrar.
 
 ### Fechamento da Fase 8 — financeiro e compras
 
@@ -502,3 +502,55 @@ Decisões e descobertas:
 - **`${variavel}EOF` não fecha here-document.** As contagens por tabela entravam dentro do
   heredoc de métricas e quebravam a sintaxe do script inteiro — `bash -n` acusou antes do CI.
   Shellcheck entrou como gate junto.
+
+## Metas e previsão de vendas (17/09/2026) — E5-11 + E7-03
+
+Entregue fora de fase, entre a 10 e a 11, por um motivo simples: a **E7-03 era o último P0 aberto
+do dashboard**, e convidar design partners para um beta com a tela de Metas faltando seria pedir
+o feedback que já se sabe qual é. O que entrou:
+
+- **Sincronização da previsão** (`domains/previsao.sync.ts`): meta do mês por filial e a curva
+  diária, mês corrente e próximo, uma vez por dia.
+- **Tela de Metas** (`/metas`): ritmo por filial ordenado do pior para o melhor, projeção de
+  fechamento, esperado até hoje e curva acumulada previsto × realizado.
+- **A oitava regra do doc 15 §8 ligada**: meta em risco, a partir do dia configurado.
+
+Decisões e descobertas:
+
+- **A fórmula do doc 15 §7 não era executável como estava.** "Realizado ÷ dias úteis decorridos ×
+  diasUteis" exige saber quantos dias úteis já passaram, e isso depende do calendário de feriados
+  da loja — que não está em lugar nenhum do nosso lado. O ERP dá o total de dias úteis do mês,
+  não quantos decorreram. A saída foi usar a **curva diária** como régua: a fração do mês
+  decorrida é a fração do previsto que já deveria ter sido vendida. Quem lançou a curva na loja
+  já respeitou o feriado.
+- **E quando não há curva, a tela diz que não há.** O fallback proporcional (dias corridos) é
+  honesto mas sistematicamente pessimista no começo da semana, porque fim de semana vende mais
+  que 2/7. Uma projeção sem procedência é um número que ninguém sabe se pode usar numa reunião.
+- **O destaque virou o ritmo, não o atingimento.** No dia 10, "30% da meta" não informa nada; a
+  pergunta é onde o mês fecha mantido o passo. O atingimento ficou no detalhe.
+- **A chave de dedupe do alerta carrega a competência, não o dia.** O mês em risco é o mesmo
+  problema do dia 15 ao 30 — com chave diária seriam quinze e-mails sobre a mesma meta, que é
+  como se ensina um cliente a criar filtro para a nossa caixa.
+- **A tabela do doc 05 §3 tinha uma coluna `escopo` que seria armadilha.** Guardar mês-por-filial
+  e dia-por-filial na mesma tabela obriga toda consulta a filtrar por escopo; a que esquecer soma
+  a curva com o total e devolve o dobro, sem erro nenhum. Viraram duas tabelas. E a competência
+  virou `date` (dia 1) em vez de `(ano, mes)`: é o que compara com a data do resumo diário sem
+  conversão por linha.
+- **O `Record<SyncDomain, …>` do agendador pegou o esquecimento na hora.** Adicionar o domínio no
+  pacote compartilhado quebrou a compilação da tabela de prioridades — exatamente o que um
+  `Partial` teria deixado passar para produção como "domínio que nunca é enfileirado".
+- **O seed deriva a meta do que ele mesmo vendeu.** Número fixo envelheceria junto com o gerador
+  de vendas; a meta sai do realizado projetado vezes um fator por filial, com a filial 3
+  calibrada abaixo de 90% para que o alerta tenha o que disparar no ambiente de desenvolvimento.
+- **Validação de competência responde 422, não 400.** É o contrato de erro do produto (doc 23), e
+  o teste de integração fixou isso.
+- **O cache do painel contaminava o teste seguinte.** O primeiro cenário gravava `sem_base` na
+  chave do tenant e os próximos liam de lá; a suíte passou a purgar o cache do tenant a cada
+  cenário, como a de dashboard já fazia.
+
+Continua aberto: os recortes da previsão por departamento, marca e produto (doc 15 §7, linha 2) —
+eles só valem junto com a margem por produto (§3), que é E7-07.
+
+Totais depois desta entrega: **273 testes unitários, 177 de integração e 60 E2E**. A suíte de CSP
+passou a conferir que cada tela realmente abriu — sessão perdida redireciona para `/entrar`, que
+não viola política nenhuma, e o teste ficaria verde por não ter visitado nada.

@@ -1,7 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { type SgTransport } from '../http/sg-http.client';
-import { gerarFinalizadorasDoDia, gerarResumoFilial, gerarVendasDoDia } from './gerador';
+import {
+  gerarFinalizadorasDoDia,
+  gerarPrevisaoDiaria,
+  gerarPrevisaoVendas,
+  gerarResumoFilial,
+  gerarVendasDoDia,
+} from './gerador';
 import {
   FIXTURE_AUTORIZACAO,
   FIXTURE_DEPARTAMENTOS_N1,
@@ -69,6 +75,10 @@ export class SgMockTransport implements SgTransport {
     if (caminho.endsWith('/vendascartoes')) return this.comPeriodo(alvo, FIXTURE_CARTOES);
     if (caminho.endsWith('/pedidoscompra')) return this.comPeriodo(alvo, FIXTURE_PEDIDOS_COMPRA);
     if (caminho.endsWith('/entradas')) return this.comPeriodo(alvo, FIXTURE_ENTRADAS);
+    // A diária vem ANTES: `/previsaovendas` é prefixo dela, e trocar a ordem faria a rota
+    // específica nunca ser alcançada.
+    if (caminho.endsWith('/previsaovendas/diaria')) return this.previsaoDiaria(alvo);
+    if (caminho.endsWith('/previsaovendas')) return this.previsaoVendas(alvo);
     if (caminho.endsWith('/produtos/gtins')) return this.paginado(alvo, FIXTURE_GTINS, 'gtins');
     if (caminho.endsWith('/produtos')) return this.paginado(alvo, FIXTURE_PRODUTOS, 'produtos');
     if (caminho.endsWith('/vendas/hoje')) return this.exigeFilial(alvo, FIXTURE_VENDAS_HOJE);
@@ -123,6 +133,30 @@ export class SgMockTransport implements SgTransport {
       return json({ error: 'Parametros obrigatorios: dataInicial, dataFinal' }, 400);
     }
     return json(fixture);
+  }
+
+  /** Sem filtro de período nesta rota (doc 03): o mês vem por `mes`/`ano`, com hoje como padrão. */
+  private previsaoVendas(alvo: URL): Response {
+    const { ano, mes } = this.competencia(alvo);
+    const filial = alvo.searchParams.get('filial');
+    const filiais = filial ? [Number(filial)] : [1, 2];
+    return json(gerarPrevisaoVendas(filiais, ano, mes));
+  }
+
+  private previsaoDiaria(alvo: URL): Response {
+    const filial = alvo.searchParams.get('filial');
+    if (!filial) return json({ error: 'Parametros obrigatorios: filial' }, 400);
+
+    const { ano, mes } = this.competencia(alvo);
+    return json(gerarPrevisaoDiaria(Number(filial), ano, mes));
+  }
+
+  private competencia(alvo: URL): { ano: number; mes: number } {
+    const agora = new Date();
+    return {
+      ano: Number(alvo.searchParams.get('ano')) || agora.getUTCFullYear(),
+      mes: Number(alvo.searchParams.get('mes')) || agora.getUTCMonth() + 1,
+    };
   }
 
   private resumoFilial(alvo: URL): Response {

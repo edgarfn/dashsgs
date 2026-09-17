@@ -154,9 +154,10 @@ erp_notas_entrada / erp_nota_entrada_itens / erp_notas_saida / erp_nota_saida_it
   (campos fiscais completos; chave_nfe char(44) SECURITY_SENSITIVE — acesso restrito)
 erp_nfs / erp_nfs_servicos
 erp_verbas / erp_verba_parcelas / erp_verba_pagamentos / erp_verba_eventos
-erp_previsao_vendas(tenant_id, filial_erp_id, ano, mes, escopo[filial|dep1..6|marca|produto|dia],
-  escopo_erp_id, previsao_venda, previsao_lucro, dias_uteis,
-  PK(tenant_id, filial_erp_id, ano, mes, escopo, escopo_erp_id))
+erp_previsao_vendas(tenant_id, filial_erp_id, competencia[date, dia 1 do mês],
+  previsao_venda, previsao_lucro, dias_uteis, PK(tenant_id, filial_erp_id, competencia))
+erp_previsao_vendas_diaria(tenant_id, filial_erp_id, data, previsao_venda,
+  PK(tenant_id, filial_erp_id, data))   -- a curva; opcional no ERP
 erp_clientes  -- SOMENTE se feature habilitada pelo tenant (doc 10): campos minimizados
   (tenant_id, erp_id, nome, cpf_cnpj_hash, cpf_cnpj_masked, tipo_principal, municipio_erp_id,
    situacao, data_cadastro, limite_compras, filial_erp_id)  -- sem endereço/telefone/email/gênero/nascimento
@@ -247,8 +248,29 @@ Decisões tomadas na implementação:
 Ainda não implementado deste doc: o **particionamento por mês** dos fatos (§4). O gate de drift
 compara migrações com o schema do Prisma, que não modela partições — fazer isso agora exigiria
 tirar as tabelas do controle do ORM. Entra com E6-04 (retenção/purga), que é onde as partições
-começam a pagar. Também faltam os espelhos de financeiro, compras, notas e previsão, que vêm com
-os jobs de E5-09 a E5-11.
+começam a pagar. Também faltam os espelhos de notas fiscais e o resto de E5-10 (perdas, trocas,
+vencimentos e movimentações).
+
+## 5.3 Estado da implementação (Fases 8 a 11)
+
+| Grupo | Tabelas criadas |
+|---|---|
+| Financeiro (E5-09) | `erp_contas_pagar` + parcelas, `erp_contas_receber` + parcelas, `erp_tipos_despesa`, `erp_despesas`, `erp_cartao_vendas` |
+| Compras (E5-10 parcial) | `erp_pedidos_compra`, `erp_notas_entrada` |
+| Alertas (E8) | `app_alert_rules`, `app_alert_events`, `app_notifications` |
+| Retenção/acesso (E6-04, E9-03) | `app_break_glass_grants` |
+| Previsão (E5-11) | `erp_previsao_vendas`, `erp_previsao_vendas_diaria` |
+
+Duas mudanças de forma em relação ao esboço do §3, ambas da previsão de vendas:
+
+- **A competência virou `date` (dia 1 do mês)** em vez do par `(ano, mes)`. É a única forma que
+  compara com a `data` do resumo diário sem conversão em toda consulta — e é o mesmo índice que
+  responde "qual a meta deste mês?" e "como foram os últimos seis?".
+- **A coluna `escopo` saiu, e a curva diária virou tabela própria.** Uma tabela que guarda ao
+  mesmo tempo mês-por-filial e dia-por-filial precisa de `escopo` em toda cláusula — e uma
+  consulta que esquece o filtro soma a curva com o total do mês e devolve o dobro, sem erro. Os
+  recortes por departamento/marca/produto voltam quando alguma tela precisar deles; até lá,
+  seriam coluna sem leitor.
 ## 6. Segurança do banco
 
 - RLS em TODAS as tabelas com `tenant_id` (política `tenant_id = current_setting('app.tenant_id')::uuid`),

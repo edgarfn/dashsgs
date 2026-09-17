@@ -102,6 +102,7 @@ resultados de verificação de permissão (avaliar sempre).
 | Agregados por evento | `apps/api/src/modules/sync/aggregates.service.ts` |
 | §2 Financeiro (contas, despesas, cartões) | `domains/financeiro.sync.ts` — janela −45/+90 dias, cadência de 1 h |
 | §2 Compras (pedidos, entradas) | `domains/compras.sync.ts` — janela de 60 dias, cadência de 1 h |
+| §2 Previsão de vendas | `domains/previsao.sync.ts` — **por competência**, não por janela de dias: mês corrente + próximo, uma vez por dia. A curva diária é opcional e a rota pode nem estar no contrato do tenant — nesses casos o domínio conclui com sucesso e a tela de metas declara a base proporcional |
 
 Decisões tomadas na implementação:
 
