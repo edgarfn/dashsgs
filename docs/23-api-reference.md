@@ -28,7 +28,9 @@ dados aceitam `?filiais=1,2` (validado contra `filiais_allowed`).
 | POST /tenant/erp-connection/resync | dispara re-sync (domínio/período) | erp_connection.manage |
 | GET/PUT /tenant/modules | módulo clientes / escrita ERP (com aceite DPIA) | modules.manage (+MFA) |
 | GET /tenant/sync-status | watermarks, lag, últimos runs | autenticado |
-| GET /tenant/audit?filters | trilha de auditoria | audit.view |
+| GET /tenant/audit?de&ate&acao&categoria&resultado&atorId&page | trilha de auditoria paginada, com rótulo em português | audit.view |
+| GET /tenant/audit/acoes | ações que existem na trilha desta rede (alimenta o filtro) | audit.view |
+| GET /tenant/audit/export?…mesmos filtros | CSV da trilha; o próprio export vira evento (`audit.exported`) | audit.view |
 
 ### Plataforma (conta de operação: `platform_admin` + MFA recente; 404 para os demais)
 
@@ -38,6 +40,7 @@ dados aceitam `?filiais=1,2` (validado contra `filiais_allowed`).
 | POST /platform/tenants/:id/suspend · /resume | corta e devolve o acesso, sem tocar no dado |
 | POST /platform/tenants/:id/offboard | exclusão lógica; exige o slug digitado; purga física em D+30 |
 | GET /platform/retencao | catálogo do doc 10 §2 + quanto está fora do prazo + fila de offboarding |
+| GET /platform/auditoria/verificacao?limite&desdeId | reconfere a cadeia de hash da trilha (a cadeia é da instalação, não de um tenant) |
 | POST /platform/retencao/executar | antecipa a rodada diária e devolve a verificação pós-purga |
 | GET/POST /platform/break-glass | concessões de acesso excepcional; o POST só cria o pedido |
 | POST /platform/break-glass/:id/aprovar | aprovação de 2ª pessoa (recusa auto-aprovação) |

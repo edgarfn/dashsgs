@@ -26,6 +26,7 @@ const TELAS = [
   '/alertas',
   '/alertas/regras',
   '/admin/sincronizacao',
+  '/admin/auditoria',
   '/perfil',
 ];
 

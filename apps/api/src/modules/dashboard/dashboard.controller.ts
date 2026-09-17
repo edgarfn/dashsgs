@@ -13,7 +13,7 @@ import {
   type HomeView,
   type VendasDiaView,
 } from './dashboard.types';
-import { gerarCsv, nomeDeArquivo } from './csv';
+import { gerarCsv, nomeDeArquivo } from '../../common/csv';
 import {
   comparativoQuerySchema,
   homeQuerySchema,

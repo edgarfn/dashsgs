@@ -19,7 +19,7 @@ Nenhum item [BLOQ] pode estar aberto no go-live.
 ## Segurança de aplicação e infra
 - [ ] [BLOQ] TLS A+ (ssllabs), HSTS ativo, headers doc 09 presentes
 - [x] [BLOQ] CSP sem unsafe-inline em produção — política estrita fora de `development`;
-      `e2e/seguranca.spec.ts` abre as 11 telas do MVP contra o build de produção e falha com
+      `e2e/seguranca.spec.ts` abre as 12 telas do MVP contra o build de produção e falha com
       qualquer violação (Fase 9). Falta confirmar no domínio real depois do deploy.
 - [ ] [BLOQ] Pentest externo sem High/Critical abertos
 - [ ] [BLOQ] Secrets fora de git/imagens (gitleaks histórico completo verde)
@@ -41,9 +41,13 @@ Nenhum item [BLOQ] pode estar aberto no go-live.
 - [ ] ROPA atualizado; RIPD template disponível
 
 ## Auditoria e observabilidade
-- [ ] [BLOQ] app_audit_log append-only (tentativa de UPDATE falha) + hash chain verificada —
+- [x] [BLOQ] app_audit_log append-only (tentativa de UPDATE falha) + hash chain verificada —
       privilégio revogado + trigger; a **única** exclusão admitida é a da retenção de 5 anos,
-      por `app_purge_audit_log()`, com o prazo fixo dentro do banco (Fase 9)
+      por `app_purge_audit_log()`, com o prazo fixo dentro do banco (Fase 9). A verificação da
+      cadeia virou tela em `/plataforma` e endpoint (`GET /platform/auditoria/verificacao`), com
+      teste que insere linha por fora do serviço e exige que ela seja apontada (E6-01)
+- [x] Trilha consultável pelo cliente — `/admin/auditoria` com filtros, export CSV auditado e o
+      recorte por membro que a RLS de identidade sozinha não dá (E6-01)
 - [x] [BLOQ] Alertas operacionais doc 18 §5 **escritos, versionados e conferidos** — 35 regras em
       `docker/observability/prometheus/regras/`, cada uma com `resumo` e `runbook`; o gate
       `pnpm obs:check` roda no CI e reprova alerta que cite métrica ou valor de rótulo que

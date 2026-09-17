@@ -7,6 +7,15 @@ import { CreateTenantForm, OffboardForm, ResumeButton, SuspendForm } from './for
 export const metadata = { title: 'Plataforma — DashSGS' };
 export const dynamic = 'force-dynamic';
 
+/** Espelha `VerificacaoDaCadeia` da API (platform/auditoria.controller.ts). */
+interface VerificacaoDaCadeia {
+  ok: boolean;
+  conferidas: number;
+  quebradaEm: string | null;
+  total: number;
+  verificadoEm: string;
+}
+
 interface TenantResumo {
   id: string;
   name: string;
@@ -30,7 +39,10 @@ const data = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' });
  */
 export default async function PlataformaPage() {
   const me = await requireMe();
-  const tenants = await apiRequest<TenantResumo[]>('GET', '/platform/tenants');
+  const [tenants, cadeia] = await Promise.all([
+    apiRequest<TenantResumo[]>('GET', '/platform/tenants'),
+    apiRequest<VerificacaoDaCadeia>('GET', '/platform/auditoria/verificacao'),
+  ]);
 
   // A API responde 404 para quem não opera a plataforma: a tela repete a mesma resposta.
   if (!me.user.platformAdmin || tenants.status === 404) {
@@ -59,6 +71,7 @@ export default async function PlataformaPage() {
   }
 
   const lista = tenants.data ?? [];
+  const integridade = cadeia.data;
 
   return (
     <main className="mx-auto w-full max-w-4xl space-y-8 px-6 py-12">
@@ -89,6 +102,42 @@ export default async function PlataformaPage() {
           </Link>
         </nav>
       </header>
+
+      {/*
+        A verificação é da instalação inteira, não de um tenant: a cadeia encadeia por `id`, sem
+        separar por cliente. É por isso que ela mora aqui e não na tela de auditoria do tenant —
+        verificar "só a parte de A" não significaria nada, porque o elo que falta pode ser de B.
+      */}
+      <section className="space-y-2 rounded-xl border border-white/10 bg-white/[0.02] p-6">
+        <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+          Integridade da trilha de auditoria
+        </h2>
+        {!integridade ? (
+          <p className="text-sm text-slate-400">Não foi possível verificar a cadeia agora.</p>
+        ) : integridade.ok ? (
+          <>
+            <p className="text-sm text-emerald-300">
+              ✓ Cadeia íntegra — {integridade.conferidas.toLocaleString('pt-BR')} entradas
+              reconferidas de {integridade.total.toLocaleString('pt-BR')}.
+            </p>
+            <p className="text-xs text-slate-500">
+              Cada entrada é reconstruída e comparada com o hash gravado. A verificação percorre a
+              cauda da trilha: cinco anos a cada carregamento de página tornaria o número inútil.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-rose-300">
+              ✗ Cadeia quebrada na entrada {integridade.quebradaEm} —{' '}
+              {integridade.conferidas.toLocaleString('pt-BR')} entradas conferidas.
+            </p>
+            <p className="text-xs text-slate-400">
+              Isto é incidente de segurança, não defeito de tela: a aplicação não tem privilégio
+              para alterar a trilha. Siga o doc 27 antes de qualquer outra coisa.
+            </p>
+          </>
+        )}
+      </section>
 
       <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
         <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">Contratos</h2>

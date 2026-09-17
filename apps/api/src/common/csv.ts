@@ -1,5 +1,7 @@
 /**
- * Geração de CSV para os relatórios tabulares (doc 15 §9 / doc 16 §4).
+ * Geração de CSV para tudo que sai do produto como planilha: relatórios do dashboard
+ * (doc 15 §9 / doc 16 §4) e a trilha de auditoria (doc 16 §2). Mora em `common/` porque são dois
+ * módulos — e porque as três decisões abaixo valem para qualquer arquivo que o cliente abra.
  *
  * Três decisões que parecem detalhe e não são, porque o arquivo vai ser aberto no Excel em
  * português:

@@ -67,6 +67,11 @@ export function Cabecalho({ me, ativo }: { me: MeResponse; ativo?: string }) {
       rotulo: 'Sincronização',
       visivel: me.permissions.includes('erp_connection.manage'),
     },
+    {
+      href: '/admin/auditoria',
+      rotulo: 'Auditoria',
+      visivel: me.permissions.includes('audit.view'),
+    },
     { href: '/plataforma', rotulo: 'Plataforma', visivel: me.user.platformAdmin },
   ].filter((item) => item.visivel);
 

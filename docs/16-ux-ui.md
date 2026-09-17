@@ -80,8 +80,9 @@ produto (id/descrição/GTIN), indicador de frescor/sync, menu do usuário (sess
 
 Telas no ar: Visão Geral (`/`), Vendas — Diário (`/vendas`), Vendas — Comparativos
 (`/vendas/comparativos`), Metas (`/metas`), Estoque (`/estoque`), Financeiro (`/financeiro`),
-Compras (`/compras`), Alertas — Feed (`/alertas`) e Alertas — Regras (`/alertas/regras`), além
-das telas de autenticação, perfil e administração entregues nas fases anteriores.
+Compras (`/compras`), Alertas — Feed (`/alertas`), Alertas — Regras (`/alertas/regras`) e
+Auditoria (`/admin/auditoria`), além das telas de autenticação, perfil e administração
+entregues nas fases anteriores.
 
 A Fase 9 acrescentou duas telas de operação da plataforma: **Retenção e descarte**
 (`/plataforma/retencao`) e **Break-glass** (`/plataforma/break-glass`, com o relatório em

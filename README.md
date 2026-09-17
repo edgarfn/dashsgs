@@ -27,7 +27,10 @@ backup WAL-G faz arquivamento contínuo com um **teste de restauração semanal*
 cluster novo e confere migrações, contagens e a cadeia de auditoria. Depois dela, a **tela de Metas** fechou o
 último P0 aberto do dashboard: a previsão de vendas do ERP passou a sincronizar (E5-11) e com ela
 vieram o ritmo por filial, a projeção de fechamento e a oitava das dez regras de alerta do doc 15
-§8. Próxima: Fase 11 — beta fechado com 2–3 tenants reais. Nenhuma linha foi escrita antes
+§8. A **trilha de auditoria** ganhou tela
+(`/admin/auditoria`), export CSV auditado e verificação da cadeia de hash na área de plataforma —
+com isso não resta nenhum P0 aberto no repositório. Próxima: Fase 11 — beta fechado com 2–3
+tenants reais. Nenhuma linha foi escrita antes
 da especificação, por decisão de método: primeiro entender 100% da capacidade da API, depois
 construir.
 

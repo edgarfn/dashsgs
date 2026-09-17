@@ -50,9 +50,21 @@ Ajuste limiares por realidade da sua operação (ex.: perda anormal, meta em ris
 (e-mail; outros canais em roadmap). Crie regras por filial quando os padrões diferirem.
 
 ## 5. Auditoria (Administração → Auditoria)
-Filtre por pessoa, ação e período; exporte para CSV. Eventos incluem: logins, mudanças de
-papel, alterações da conexão, ativação de módulos, aprovações de ações no ERP, exportações e
-desmascaramentos. Retenção: 5 anos.
+Filtre por período, categoria, evento, resultado e pessoa; exporte para CSV. Eventos incluem
+logins e recusas de login, mudanças de papel, convites, alterações da conexão com o ERP,
+re-sincronizações, alertas reconhecidos e o próprio export da trilha. Retenção: 5 anos.
+
+Cada linha traz o evento em português e o código técnico ao lado — o primeiro para você, o
+segundo para citar num chamado conosco. Eventos que merecem atenção mesmo sem ninguém estar
+procurando (recusa de acesso, segundo fator desligado, export da trilha) vêm marcados com ⚑.
+
+A trilha é **append-only**: nem nós conseguimos alterar ou apagar uma linha antes do prazo de
+retenção — o banco recusa a operação, e cada entrada carrega o hash da anterior, de modo que
+remover uma quebre a cadeia de forma detectável.
+
+Você verá os logins dos membros da sua rede, e apenas deles. Tentativas de login com e-mails que
+não existem no sistema não aparecem aqui: são registradas na trilha da plataforma, porque
+mostrá-las contaria a você sobre contas que não são suas.
 
 ## 6. Sinais de problema e o que fazer
 | Sinal | Ação |

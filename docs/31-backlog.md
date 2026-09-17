@@ -236,7 +236,7 @@ Decisões e descobertas da implementação:
 ## Épico E6 — Plataforma transversal
 | ID | História | Pri | Cx | CA |
 |---|---|---|---|---|
-| E6-01 ◐ | Auditoria append-only + hash chain + UI consulta (gravação e verificação prontas na Fase 3; falta a tela) | P0 | M | tamper test |
+| E6-01 ✅ | Auditoria append-only + hash chain + UI de consulta, export CSV e verificação da cadeia na plataforma | P0 | M | tamper test |
 | E6-02 ✅ | Métricas Prometheus + painéis Grafana + alertas doc 18 | P0 | M | SLO board |
 | E6-03 ✅ | Backups WAL-G + restore test semanal automatizado | P0 | M | doc 20 §3 |
 | E6-04 ✅ | Jobs de retenção/purga (partições, logs, offboarding) | P0 | M | verify-purge zero |
@@ -554,3 +554,54 @@ eles só valem junto com a margem por produto (§3), que é E7-07.
 Totais depois desta entrega: **273 testes unitários, 177 de integração e 60 E2E**. A suíte de CSP
 passou a conferir que cada tela realmente abriu — sessão perdida redireciona para `/entrar`, que
 não viola política nenhuma, e o teste ficaria verde por não ter visitado nada.
+
+## Trilha de auditoria consultável (17/09/2026) — E6-01
+
+Fecha o último P0 que ainda estava parcial. A gravação e a verificação existiam desde a Fase 3; o
+que faltava era o caminho de leitura — e sem ele a trilha era uma promessa que só se cumpria com
+acesso ao banco.
+
+- **`/admin/auditoria`**: filtro por período, categoria, evento, resultado e pessoa; evento em
+  português com o código ao lado; detalhes por linha; paginação; export CSV.
+- **Catálogo de eventos** (`packages/shared/src/auditoria.ts`): 39 ações com rótulo, categoria e
+  marca de sensibilidade.
+- **Verificação da cadeia** em `/plataforma`, com a janela e quantas entradas foram reconferidas.
+
+Decisões e descobertas:
+
+- **A RLS não podia ser o filtro desta tela.** `app_audit_log` usa a política de *identidade*,
+  que aceita `tenant_id IS NULL` — e precisa aceitar, porque login acontece antes de existir
+  tenant na sessão. Um serviço que confiasse nela mostraria ao administrador de uma rede as
+  tentativas de login de todas as outras. O recorte correto é por pessoa: o que aconteceu no
+  tenant, mais o que os **membros dele** fizeram sem tenant. Evento com os dois nulos — tentativa
+  de login de e-mail inexistente — é de plataforma e não entra na visão de ninguém. Quatro
+  cenários de integração cobrem as quatro combinações.
+- **Sem a segunda metade do recorte, a tela não mostraria login nenhum** — e login é o primeiro
+  evento que qualquer auditoria procura. O doc 26 §5 promete logins na tela; a promessa só se
+  cumpre porque o recorte olha para o membro, não só para o `tenant_id`.
+- **A verificação da cadeia é da instalação, não do tenant.** As entradas encadeiam por `id`, sem
+  separar por cliente: conferir "só a parte de A" não significa nada, porque o elo que falta pode
+  ser de B. Por isso ela mora na plataforma, e a tela do tenant **não** promete integridade
+  verificada — explica a garantia (append-only por privilégio revogado + trigger) e para por aí.
+  Prometer ao cliente uma conferência que não se pode fazer no recorte dele seria pior que nada.
+- **O export vira evento.** Levar a trilha para fora é o momento em que ela sai do nosso controle
+  (doc 10 §3): `audit.exported` registra quem, quando, com que filtro e se o arquivo saiu
+  truncado — e é marcado como sensível na própria tela.
+- **Rótulo e código juntos, nunca só um.** O rótulo serve ao auditor; o código serve a quem abre
+  chamado conosco. Esconder o código transformaria toda conversa de suporte em adivinhação.
+- **O catálogo ganhou gate** (`auditoria-catalogo.spec.ts`): ele lê do fonte todas as ações que o
+  código grava e exige entrada para cada uma — nos dois sentidos, para não sobrar rótulo de
+  evento extinto sugerindo que aquilo ainda acontece. O gate varre também `prisma/`, porque o
+  seed já gravou na trilha no passado (`seed.executed`, hoje extinto) e uma ação escrita fora de
+  `apps/api/src` continua aparecendo na tela.
+- **A verificação encontrou lixo real no banco de desenvolvimento.** A suíte de retenção insere
+  linhas cruas (é a única forma de ter linha vencida para purgar), e linha que não passou pelo
+  serviço não tem hash — a cadeia acusa. É o comportamento correto: o teste de tamper que
+  acompanha esta entrega insere exatamente uma linha assim e exige que a verificação aponte o id.
+- **`csv.ts` saiu de `modules/dashboard` para `common/`**: com dois consumidores, o arquivo
+  deixou de ser detalhe do dashboard.
+- **O teste de tela quase passou por engano.** `getByText('Entrou no sistema')` casava com uma
+  `<option>` escondida do filtro, não com a linha da tabela. Asserção de conteúdo em página com
+  `<select>` precisa ser escopada ao elemento certo.
+
+Totais depois desta entrega: **277 testes unitários, 192 de integração e 66 E2E**.

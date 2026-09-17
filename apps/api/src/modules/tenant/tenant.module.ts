@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { AuditoriaService } from './auditoria.service';
 import { FiliaisService } from './filiais.service';
 import { MembersService } from './members.service';
 import { DimController, TenantController } from './tenant.controller';
@@ -12,7 +13,7 @@ import { DimController, TenantController } from './tenant.controller';
 @Module({
   imports: [AuthModule],
   controllers: [TenantController, DimController],
-  providers: [MembersService, FiliaisService],
-  exports: [MembersService, FiliaisService],
+  providers: [MembersService, FiliaisService, AuditoriaService],
+  exports: [MembersService, FiliaisService, AuditoriaService],
 })
 export class TenantModule {}
