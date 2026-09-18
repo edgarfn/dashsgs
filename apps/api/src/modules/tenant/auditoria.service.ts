@@ -10,6 +10,7 @@ import {
 } from '@dashsgs/shared';
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { fimDoDiaEm, inicioDoDiaEm } from '../../common/datas';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
 export interface FiltroAuditoria {
@@ -109,13 +110,19 @@ export class AuditoriaService {
   ): Promise<Prisma.AuditLogWhereInput> {
     const where: Prisma.AuditLogWhereInput = await this.escopo(tenantId);
 
-    if (filtro.de) where.createdAt = { gte: new Date(`${filtro.de}T00:00:00.000Z`) };
+    // As bordas do período são resolvidas no fuso do TENANT, não em UTC.
+    //
+    // Quem digita "de 17/09 até 17/09" na tela quer o dia 17 da loja. Com bordas em UTC, um
+    // evento das 22h de São Paulo cai no dia seguinte e some do filtro — o auditor conclui que a
+    // trilha tem buraco, que é o pior que uma trilha de auditoria pode sugerir (doc 34 §4.5).
+    //
+    // O fim é exclusivo (`lt`): o dia seguinte começa exatamente onde este termina.
+    const timezone = await this.fusoDoTenant(tenantId);
+    if (filtro.de) where.createdAt = { gte: inicioDoDiaEm(filtro.de, timezone) };
     if (filtro.ate) {
       where.createdAt = {
         ...(where.createdAt as object),
-        // Fim do dia inclusivo: filtrar "até 17/09" e não ver o que aconteceu no dia 17 é o tipo
-        // de surpresa que faz o auditor desconfiar da ferramenta inteira.
-        lte: new Date(`${filtro.ate}T23:59:59.999Z`),
+        lt: fimDoDiaEm(filtro.ate, timezone),
       };
     }
     if (filtro.acao) where.action = filtro.acao;
@@ -134,6 +141,15 @@ export class AuditoriaService {
     }
 
     return where;
+  }
+
+  /** Fuso do tenant; `America/Sao_Paulo` é o padrão do cadastro (prisma/schema.prisma). */
+  private async fusoDoTenant(tenantId: string): Promise<string> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { timezone: true },
+    });
+    return tenant?.timezone ?? 'America/Sao_Paulo';
   }
 
   /** O recorte de quem pode aparecer na trilha deste tenant — ver o cabeçalho da classe. */

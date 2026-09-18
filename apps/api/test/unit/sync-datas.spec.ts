@@ -1,4 +1,5 @@
 import { fatiar } from '../../src/modules/sync/domains/resumo-filial.sync';
+import { fimDoDiaEm, inicioDoDiaEm } from '../../src/common/datas';
 import { diaEm, diferencaEmDias, somarDias } from '../../src/modules/sync/sync.types';
 
 /**
@@ -93,5 +94,62 @@ describe('fatiar', () => {
     expect(fatiar('2026-09-13', '2026-09-13', 30)).toEqual([
       { inicio: '2026-09-13', fim: '2026-09-13' },
     ]);
+  });
+});
+
+/**
+ * Bordas de dia no fuso do tenant (doc 34 §4.5).
+ *
+ * É a aritmética que decide se um título está "vencido" ou "a vencer", e se um evento das 22h
+ * aparece no filtro do dia certo. Erro aqui não derruba nada: devolve um número plausível e
+ * errado, que é como o defeito original sobreviveu.
+ */
+describe('bordas de dia no fuso do tenant', () => {
+  it('o dia começa às 03:00 UTC em São Paulo (UTC−3)', () => {
+    expect(inicioDoDiaEm('2026-09-17', 'America/Sao_Paulo').toISOString()).toBe(
+      '2026-09-17T03:00:00.000Z',
+    );
+  });
+
+  it('o fim é exclusivo e encosta no começo do dia seguinte', () => {
+    const fim = fimDoDiaEm('2026-09-17', 'America/Sao_Paulo');
+    expect(fim.toISOString()).toBe('2026-09-18T03:00:00.000Z');
+    expect(fim.getTime()).toBe(inicioDoDiaEm('2026-09-18', 'America/Sao_Paulo').getTime());
+  });
+
+  it('um evento das 23h em São Paulo cai DENTRO do dia local, não no seguinte', () => {
+    // 2026-09-18T02:15Z é 2026-09-17 23:15 em São Paulo — o instante exato em que a suíte
+    // falhou e o defeito apareceu.
+    const evento = new Date('2026-09-18T02:15:00.000Z');
+
+    expect(evento >= inicioDoDiaEm('2026-09-17', 'America/Sao_Paulo')).toBe(true);
+    expect(evento < fimDoDiaEm('2026-09-17', 'America/Sao_Paulo')).toBe(true);
+
+    // E a borda em UTC — que era o que o filtro usava — o deixaria de fora.
+    expect(evento < new Date('2026-09-17T23:59:59.999Z')).toBe(false);
+  });
+
+  it('é o inverso exato de diaEm', () => {
+    for (const dia of ['2026-01-01', '2026-06-15', '2026-12-31']) {
+      expect(diaEm(inicioDoDiaEm(dia, 'America/Sao_Paulo'), 'America/Sao_Paulo')).toBe(dia);
+    }
+  });
+
+  it('acerta fuso a leste de Greenwich, onde o dia começa antes do UTC', () => {
+    // Tóquio é UTC+9: o dia 17 local começa às 15:00 UTC do dia 16.
+    expect(inicioDoDiaEm('2026-09-17', 'Asia/Tokyo').toISOString()).toBe(
+      '2026-09-16T15:00:00.000Z',
+    );
+  });
+
+  it('atravessa a virada do horário de verão sem perder nem inventar hora', () => {
+    // Nova York entra no horário de verão em 08/03/2026: o dia começa às 05:00 UTC antes e às
+    // 04:00 UTC depois. Um cálculo com offset fixo erraria um dos dois.
+    expect(inicioDoDiaEm('2026-03-07', 'America/New_York').toISOString()).toBe(
+      '2026-03-07T05:00:00.000Z',
+    );
+    expect(inicioDoDiaEm('2026-03-09', 'America/New_York').toISOString()).toBe(
+      '2026-03-09T04:00:00.000Z',
+    );
   });
 });

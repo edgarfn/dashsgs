@@ -124,8 +124,27 @@ Vários testes de integração calculavam "hoje" em UTC enquanto o produto calcu
 tenant. Entre 00h e 03h UTC os dois divergem e a suíte falhava por três horas todo dia, com
 mensagens que não tinham relação com o cenário. Os testes passaram a usar `hojeNoTenant()`.
 
-Sobra um resíduo **no produto**, não nos testes: o painel de compras conta "dias em aberto" com
-`CURRENT_DATE` do Postgres (UTC) e o filtro da trilha de auditoria recorta `created_at` por
-instante UTC. Perto da virada do dia, ambos erram por um em relação ao dia do tenant. É defeito
-real, de baixa gravidade, e merece uma passada própria — não foi corrigido aqui para não misturar
-com a questão do transporte.
+**Resíduo corrigido em 18/09/2026.** A passada seguinte fechou os pontos do produto — e eram
+mais do que os dois anotados aqui:
+
+| Onde | O que decidia errado |
+|---|---|
+| Financeiro — aging | `CURRENT_DATE` classificava como **vencido** o título que ainda vence hoje para quem opera a loja |
+| Financeiro — fluxo previsto | parcela do dia sumia do horizonte de 13 semanas |
+| Financeiro — cartões não conciliados | a régua de 7 dias corria um dia adiantada |
+| Compras — dias em aberto | "parado há 40 dias" virava 41 |
+| Auditoria — filtro de período | evento das 22h caía no dia seguinte e sumia do filtro |
+
+A correção tem duas metades. `inicioDoDiaEm`/`fimDoDiaEm` (em `common/datas.ts`) são o inverso de
+`diaEm`: dado um dia local, devolvem o instante UTC em que ele começa e termina, com o offset
+lido do `Intl` — o que acerta horário de verão sem carregar base de fusos. E as rotas do
+dashboard passaram a mandar `hoje` já no fuso do tenant para os serviços, em vez de deixar o SQL
+perguntar ao relógio do banco.
+
+O `hoje` entrou também na **chave do cache**: sem isso, uma resposta gravada ontem continuaria
+respondendo "vencido" para quem pergunta hoje.
+
+Os testes de borda (`sync-datas.spec.ts`) fixam o comportamento com datas explícitas, inclusive na
+virada do horário de verão de Nova York e num fuso a leste de Greenwich — casos em que um cálculo
+com offset fixo erraria. A suíte completa foi executada dentro da janela de divergência (02:57
+UTC, quando em São Paulo ainda era o dia anterior).

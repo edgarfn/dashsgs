@@ -2,6 +2,7 @@ import { Controller, Get, Header, Query, Res } from '@nestjs/common';
 import { type Response } from 'express';
 import { CurrentAuth, RequirePermissions, type AuthContext } from '../../common/auth';
 import { AppException } from '../../common/errors/app.exception';
+import { diaEm } from '../../common/datas';
 import { MetricsService } from '../../common/metrics/metrics.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { FiliaisScopeService, parseFiliaisParam } from '../../common/tenant';
@@ -96,7 +97,7 @@ export class DashboardController {
     @CurrentAuth() auth: AuthContext,
   ): Promise<VendasDiaView> {
     const { tenantId, filiais, timezone } = await this.contexto(auth, query.filiais);
-    const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date());
+    const hoje = diaEm(new Date(), timezone);
 
     return this.cache.lembrar(
       tenantId,
@@ -194,15 +195,18 @@ export class DashboardController {
     @Query(new ZodValidationPipe(periodoQuerySchema)) query: PeriodoQuery,
     @CurrentAuth() auth: AuthContext,
   ): Promise<FinanceiroView> {
-    const { tenantId, filiais } = await this.contexto(auth, query.filiais);
+    const { tenantId, filiais, timezone } = await this.contexto(auth, query.filiais);
     this.exigirPapelFinanceiro(auth, tenantId);
+    const hoje = diaEm(new Date(), timezone);
 
     return this.cache.lembrar(
       tenantId,
       'financeiro',
-      { filiais, de: query.de, ate: query.ate },
+      // `hoje` entra na chave: o aging muda de faixa na virada do dia, e uma entrada gravada
+      // ontem responderia "vencido" para quem pergunta hoje (doc 34 §4.5).
+      { filiais, de: query.de, ate: query.ate, hoje },
       TTL.historico,
-      () => this.financeiro.montar({ tenantId, filiais, de: query.de, ate: query.ate }),
+      () => this.financeiro.montar({ tenantId, filiais, de: query.de, ate: query.ate, hoje }),
     );
   }
 
@@ -220,7 +224,7 @@ export class DashboardController {
     @CurrentAuth() auth: AuthContext,
   ): Promise<MetasView> {
     const { tenantId, filiais, timezone } = await this.contexto(auth, query.filiais);
-    const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date());
+    const hoje = diaEm(new Date(), timezone);
 
     return this.cache.lembrar(
       tenantId,
@@ -237,14 +241,15 @@ export class DashboardController {
     @Query(new ZodValidationPipe(periodoQuerySchema)) query: PeriodoQuery,
     @CurrentAuth() auth: AuthContext,
   ): Promise<ComprasView> {
-    const { tenantId, filiais } = await this.contexto(auth, query.filiais);
+    const { tenantId, filiais, timezone } = await this.contexto(auth, query.filiais);
+    const hoje = diaEm(new Date(), timezone);
 
     return this.cache.lembrar(
       tenantId,
       'compras',
-      { filiais, de: query.de, ate: query.ate },
+      { filiais, de: query.de, ate: query.ate, hoje },
       TTL.historico,
-      () => this.compras.montar({ tenantId, filiais, de: query.de, ate: query.ate }),
+      () => this.compras.montar({ tenantId, filiais, de: query.de, ate: query.ate, hoje }),
     );
   }
 

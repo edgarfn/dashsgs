@@ -160,6 +160,11 @@ Decisões tomadas na implementação:
   que somar dezenas de milhares de cupons, dentro do orçamento de 300 ms do doc 04 §3.1.
 - **Custo da margem por departamento é o custo atual do cadastro.** A API não devolve o custo
   praticado na venda (doc 33); a limitação está escrita na própria tela, não só aqui.
+- **"Hoje" é sempre o dia do TENANT, nunca o do banco** (18/09/2026). Nenhuma consulta usa
+  `CURRENT_DATE`: a data vem da rota, já convertida pelo fuso do contrato, e entra na chave do
+  cache. O relógio do Postgres é UTC, e usá-lo fazia o aging marcar como vencido, depois das 21h
+  em São Paulo, o título que ainda vence hoje — o painel discordava do boleto na mão do gerente
+  (doc 34 §4.5).
 
 Ainda não implementado deste doc: margem por produto (§3); perdas, trocas, vencimentos e
 movimentações (§4) dependem do resto de E5-10; vendedores e ofertas (§2) são P2. As metas (§7)

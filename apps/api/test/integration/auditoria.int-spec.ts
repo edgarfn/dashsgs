@@ -12,6 +12,7 @@ import {
   cleanupTenantFixtures,
   createTenantFixture,
   type TenantFixture,
+  hojeNoTenant,
 } from './helpers/tenant.helpers';
 
 const SENHA = 'Cavalo-Bateria-Grampo-Correto-9';
@@ -193,8 +194,7 @@ describe('auditoria (integração)', () => {
     });
 
     it('o período inclui o dia final inteiro', async () => {
-      // UTC: o filtro do serviço recorta `created_at` por instante UTC, não pelo dia do tenant.
-      const hoje = new Date().toISOString().slice(0, 10);
+      const hoje = hojeNoTenant();
       const trilha = await buscar(donoA, `?de=${hoje}&ate=${hoje}&pageSize=200`);
 
       // Tudo do fixture foi gravado hoje: um `ate` exclusivo devolveria zero e ninguém

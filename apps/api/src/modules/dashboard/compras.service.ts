@@ -41,8 +41,16 @@ export class ComprasService {
     filiais: number[] | null;
     de: string;
     ate: string;
+    /**
+     * Hoje no fuso do tenant (`AAAA-MM-DD`).
+     *
+     * Vem de fora e não de `CURRENT_DATE` porque o relógio do Postgres é UTC: perto da virada do
+     * dia, "há 40 dias parado" viraria 41 para um comprador que ainda está no dia anterior
+     * (doc 34 §4.5).
+     */
+    hoje: string;
   }): Promise<ComprasView> {
-    const { tenantId, de, ate } = params;
+    const { tenantId, de, ate, hoje } = params;
     const recorte = filtroFiliais(params.filiais);
 
     const [situacoes, leadTime, pendentes, entradas] = await this.tenantDb.run(
@@ -87,7 +95,7 @@ export class ComprasService {
           SELECT p.erp_id,
                  COALESCE(f.nome_fantasia, f.razao_social) AS nome,
                  p.data_pedido,
-                 (CURRENT_DATE - p.data_pedido)::int AS dias,
+                 (${hoje}::date - p.data_pedido)::int AS dias,
                  p.situacao,
                  p.valor_total::float8
           FROM erp_pedidos_compra p
@@ -96,7 +104,7 @@ export class ComprasService {
           WHERE p.data_atendimento IS NULL
             AND p.data_pedido IS NOT NULL
             -- Cast explícito: o driver manda número como int8, e date menos int8 não existe.
-            AND p.data_pedido <= CURRENT_DATE - ${DIAS_PARA_PENDENTE_ANTIGO}::int
+            AND p.data_pedido <= ${hoje}::date - ${DIAS_PARA_PENDENTE_ANTIGO}::int
             AND COALESCE(p.situacao, '') <> 'atendido'
             ${recorte('p.filial_erp_id')}
           ORDER BY dias DESC

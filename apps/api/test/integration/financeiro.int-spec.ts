@@ -17,6 +17,8 @@ import {
   cleanupTenantFixtures,
   createTenantFixture,
   type TenantFixture,
+  diaNoTenant,
+  hojeNoTenant,
 } from './helpers/tenant.helpers';
 
 const SENHA = 'Cavalo-Bateria-Grampo-Correto-9';
@@ -43,12 +45,8 @@ describe('financeiro e compras (integração)', () => {
   let analista: TestAgent;
   let csrf: string;
 
-  // UTC de propósito, e não o fuso do tenant: o painel de compras conta "dias em aberto" com
-  // `CURRENT_DATE` do Postgres, que é UTC. Enquanto o serviço usar o relógio do banco, o teste
-  // precisa usar o mesmo — ver a nota sobre fuso no doc 34.
-  const hoje = () => new Date().toISOString().slice(0, 10);
-  const emDias = (dias: number) =>
-    new Date(Date.now() + dias * 86_400_000).toISOString().slice(0, 10);
+  const hoje = () => hojeNoTenant();
+  const emDias = (dias: number) => diaNoTenant(dias);
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();

@@ -75,15 +75,23 @@ export class FinanceiroService {
     filiais: number[] | null;
     de: string;
     ate: string;
+    /**
+     * Hoje no fuso do tenant (`AAAA-MM-DD`).
+     *
+     * Aqui o relógio decide se um título está **vencido** ou **a vencer** — a diferença entre
+     * "cobre hoje" e "cobre semana que vem". Usar `CURRENT_DATE` (UTC) marcava como vencido, na
+     * virada do dia, o boleto que ainda vence hoje para quem opera a loja (doc 34 §4.5).
+     */
+    hoje: string;
   }): Promise<FinanceiroView> {
-    const { tenantId, de, ate } = params;
+    const { tenantId, de, ate, hoje } = params;
     const recorte = filtroFiliais(params.filiais);
 
     const [pagar, receber, fluxo, despesas, cartoes, naoConciliados] = await this.tenantDb.run(
       tenantId,
       async (tx) => [
-        await this.aging(tx, 'pagar'),
-        await this.aging(tx, 'receber'),
+        await this.aging(tx, 'pagar', hoje),
+        await this.aging(tx, 'receber', hoje),
 
         // Fluxo previsto por semana: o horizonte que cabe numa conversa de caixa (doc 15 §5).
         await tx.$queryRaw<Array<{ semana: Date; pagar: number | null; receber: number | null }>>(
@@ -96,13 +104,13 @@ export class FinanceiroService {
                      COALESCE(saldo, valor_documento) AS pagar,
                      0 AS receber
               FROM erp_conta_pagar_parcelas
-              WHERE paga = false AND data_vencimento >= CURRENT_DATE
+              WHERE paga = false AND data_vencimento >= ${hoje}::date
               UNION ALL
               SELECT DATE_TRUNC('week', data_vencimento)::date AS semana,
                      0 AS pagar,
                      COALESCE(saldo, valor_documento) AS receber
               FROM erp_conta_receber_parcelas
-              WHERE paga = false AND data_vencimento >= CURRENT_DATE
+              WHERE paga = false AND data_vencimento >= ${hoje}::date
             ) movimentos
             GROUP BY semana
             ORDER BY semana
@@ -156,7 +164,7 @@ export class FinanceiroService {
           SELECT COUNT(*)::int AS transacoes, SUM(valor_bruto)::float8 AS valor
           FROM erp_cartao_vendas
           WHERE baixada = false
-            AND data_venda <= CURRENT_DATE - 7
+            AND data_venda <= ${hoje}::date - 7
             ${recorte('filial_erp_id')}`),
       ],
     );
@@ -217,13 +225,14 @@ export class FinanceiroService {
   }
 
   /**
-   * Aging por faixa de vencimento. As faixas são calculadas em SQL porque a conta é sobre a data
-   * de hoje no banco — trazer todas as parcelas para somar em memória seria o mesmo resultado com
-   * dez vezes mais tráfego.
+   * Aging por faixa de vencimento. As faixas são calculadas em SQL porque trazer todas as
+   * parcelas para somar em memória daria o mesmo resultado com dez vezes mais tráfego — mas a
+   * data de corte vem de FORA, no fuso do tenant, e não do relógio do banco.
    */
   private async aging(
     tx: Parameters<Parameters<TenantDatabase['run']>[1]>[0],
     tipo: 'pagar' | 'receber',
+    hoje: string,
   ): Promise<AgingView> {
     const tabela = Prisma.raw(
       tipo === 'pagar' ? 'erp_conta_pagar_parcelas' : 'erp_conta_receber_parcelas',
@@ -232,10 +241,10 @@ export class FinanceiroService {
     const linhas = await tx.$queryRaw<Array<{ bucket: string; valor: number; parcelas: number }>>(
       Prisma.sql`
         SELECT CASE
-                 WHEN data_vencimento < CURRENT_DATE THEN 'vencido'
-                 WHEN data_vencimento <= CURRENT_DATE + 7 THEN 'ate7'
-                 WHEN data_vencimento <= CURRENT_DATE + 30 THEN 'ate30'
-                 WHEN data_vencimento <= CURRENT_DATE + 90 THEN 'ate90'
+                 WHEN data_vencimento < ${hoje}::date THEN 'vencido'
+                 WHEN data_vencimento <= ${hoje}::date + 7 THEN 'ate7'
+                 WHEN data_vencimento <= ${hoje}::date + 30 THEN 'ate30'
+                 WHEN data_vencimento <= ${hoje}::date + 90 THEN 'ate90'
                  ELSE 'acima90'
                END AS bucket,
                SUM(COALESCE(saldo, valor_documento))::float8 AS valor,
