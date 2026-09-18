@@ -264,6 +264,14 @@ do doc 12 §5 nunca atua aqui, e nada diz isso: o painel mostra "conexão ok" e 
 
 Não corrigido nesta rodada, porque a correção é uma decisão de produto e não um reparo: "claim
 vazia" precisa deixar de ser indistinguível de "ainda não sei", e isso muda o que a tela promete.
+
+> **Correção (mesma data, ~1h depois):** "vem vazia" não é o fato — é **inconsistente**. Um
+> refresh de token durante o reseed de `dimensoes` que se segue (§4.7 acima) logou
+> `sg_token_refreshed` com `rotas: 114`, mesmo caminho de código que antes tinha medido zero duas
+> vezes seguidas (token novo e de cache). Não investiguei a causa — pode ser estado do lado da SG,
+> pode ser algo em como o teste anterior forçou a invalidação. O que fica de pé é o problema de
+> design (lista vazia = "libera tudo" é ambíguo entre "sem token" e "contrato vazio"); o que **não**
+> fica de pé é a alegação de que a claim é sempre vazia nesta instalação.
 Mesmo formato do furo de TLS/VPN da §4.4 — mecanismo de proteção que não se aplica, sem aviso.
 
 #### Resíduos conhecidos
