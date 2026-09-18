@@ -13,14 +13,14 @@ Nenhuma resposta bloqueia as fases 2–4 do roadmap; Q1–Q4 bloqueiam a fase 5 
 | # | Pergunta | Por que importa | Bloqueia |
 |---|---|---|---|
 | Q1 | A API do cliente pode ser exposta via **HTTPS** (certificado próprio/SG Cloud)? Qual a prática recomendada de transporte em produção? | R1 (crítico): sem TLS não colocamos credencial/PII na rede | F5 prod |
-| Q2 | Formato canônico do header `Authorization`: JWT puro ou `Bearer <jwt>`? Ambos aceitos? | Implementação do token manager | F5 |
+| Q2 | Formato canônico do header `Authorization`: JWT puro ou `Bearer <jwt>`? Ambos aceitos? — **confirmado: JWT puro (ver §4.6)** | Implementação do token manager | F5 |
 | Q3 | Existe **rate limit**/limite de conexões? Qual RPS é seguro sem afetar o ERP da loja? | Calibrar self-throttling (R4) | F5 prod |
 | Q4 | `itensPorPagina` máximo aceito por endpoint? | Custo de backfill | F6 |
-| Q5 | No **SG Cloud**, o prefixo `/public` vale só para `/autorizacao` ou para todas as rotas? | Cliente HTTP correto p/ tenants cloud | F5 (tenants cloud) |
+| Q5 | No **SG Cloud**, o prefixo `/public` vale só para `/autorizacao` ou para todas as rotas? — **confirmado: só a autorização (ver §4.6)** | Cliente HTTP correto p/ tenants cloud | F5 (tenants cloud) |
 | Q6 | POSTs são idempotentes de alguma forma? `idPedidoIntegrador` duplicado é rejeitado ou duplica pedido? | Estratégia de reprocesso seguro (R5) | F13 |
 | Q7 | Existe changelog/aviso de mudanças da API? Versionamento além de `/v1`? | Gestão de drift (R6) | — |
 | Q8 | Há endpoints/eventos push não publicados (webhooks)? | Simplificaria tempo real | — |
-| Q9 | `GET /sgsistemas/v1/status` exige token? | Health-check sem consumir login | — |
+| Q9 | `GET /sgsistemas/v1/status` exige token? — **confirmado: não exige (ver §4.6)** | Health-check sem consumir login | — |
 | Q10 | Token: existe revogação server-side ao trocar a senha do usuário de integração? | Janela de exposição em incidente | — |
 | Q11 | Podem emitir **usuário somente-leitura** (subconjunto de rotas GET) por padrão? | Least privilege contratual | F5 |
 | Q12 | Timezone dos campos `horario`/`expire_time`: sempre o fuso do servidor da loja? | Correção de séries por hora | F6 |
@@ -148,3 +148,46 @@ Os testes de borda (`sync-datas.spec.ts`) fixam o comportamento com datas explí
 virada do horário de verão de Nova York e num fuso a leste de Greenwich — casos em que um cálculo
 com offset fixo erraria. A suíte completa foi executada dentro da janela de divergência (02:57
 UTC, quando em São Paulo ainda era o dia anterior).
+
+### 4.6 Três respostas confirmadas contra a fonte real (18/09/2026)
+
+A página `https://api-doc.sgsistemas.com.br/` é uma SPA (Postman-published-docs) — o conteúdo
+inteiro vem de um endpoint JSON que a alimenta. Baixar essa coleção direto (114 endpoints, ~1,2 MB)
+deu evidência concreta para duas das cinco questões que a §4 tratou como configuração por falta de
+resposta, mais uma terceira que nem estava na lista de bloqueio:
+
+- **Q2 (formato do header) confirmado: JWT puro.** Nos 113 dos 114 endpoints da coleção que
+  declaram o header, o valor é o token cru — sem prefixo `Bearer`. Um único endpoint (`GET`
+  Acerto de Estoque de Entrada) carrega um bloco `auth.type: "bearer"` do próprio Postman, mas
+  isso não se repete em nenhum outro item, nem no nível da pasta, nem no da coleção — lido como
+  resíduo de manutenção de quem mantém a coleção do lado da SG, não como o contrato documentado.
+  O padrão `raw` que o produto já usa por default está certo.
+- **Q5 (prefixo `/public`) confirmado: só a autorização.** Em toda a coleção, a única menção a
+  `/public` ou "SG Cloud" está na própria descrição do endpoint de autorização: *"Para utilizar
+  integração no ambiente SG Cloud, usar: `http://base_url/public/integracao/sgsistemas/v1/autorizacao`"*.
+  Nenhuma outra descrição de endpoint cita o prefixo. É evidência por ausência — não uma garantia
+  contratual —, mas é o que o produto já assumia como padrão (`apiPathPrefix` vazio).
+- **Q9 (o `/status` exige token?) confirmado: não exige.** Testado direto contra a homologação:
+  `GET http://sgps.sgsistemas.com.br:8201/sgsistemas/v1/status` respondeu 200 sem nenhum header
+  de autorização, devolvendo versão do ERP, revisão e o CNPJ da filial base.
+
+Q1, Q3 e Q4 continuam sem menção na documentação pública — nada mudou para elas aqui.
+
+**Teste de ponta a ponta contra a homologação real.** Com uma credencial de homologação fornecida
+pelo dono do produto (usuário `homologacao`), a conexão foi cadastrada e testada através da
+própria aplicação — `PUT /tenant/erp-connection` seguido de `POST /tenant/erp-connection/test`,
+com `SG_MOCK=false` só naquele processo — nunca por uma chamada solta fora do caminho auditado e
+cifrado do produto. Resultado: `status: "ok"`, saúde reportando a mesma versão do teste acima, e
+**112 rotas liberadas** — bem mais que as ~28 do conjunto de fixtures do mock, incluindo rotas de
+escrita (`acertoestoque`, `clientes`, `ofertas`, `pedidoscompra`, `pedidosvenda`). Nenhuma escrita
+foi executada; o produto só escreve com `FEATURE_ERP_WRITE=true` (desligada por padrão), e é essa
+flag — não o escopo do token — que segura essa porta.
+
+Um detalhe que valeu a pena conferir: o servidor real devolve a claim `routes` em **maiúsculas**
+(`"GET /SGSISTEMAS/V1/STATUS"`), diferente do mock, que usa minúsculas. `assertRotaContratada`
+(`apps/api/src/integration/sg/sg.client.ts`) já normaliza os dois lados com `.toUpperCase()` antes
+de comparar — não foi preciso mudar nada, mas é exatamente o tipo de variação que quebraria em
+silêncio se essa normalização um dia fosse "simplificada" embora pareça redundante.
+
+Não foi disparado nenhum sync de domínio (produtos, vendas, financeiro) contra o servidor real
+nesta rodada — o teste ficou deliberadamente restrito a autorização e health-check.
