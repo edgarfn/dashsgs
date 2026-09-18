@@ -548,7 +548,9 @@ export class SgClient {
     let totalPaginas = 1;
     // Tamanho efetivo: o teto já aprendido para esta rota vence o pedido, e o pedido vence o
     // padrão. É a resposta da Q4 morando em dado.
-    let itensPorPagina = this.tamanhoDePagina(contexto, rota, opcoes.itensPorPagina);
+    const inicial = this.tamanhoDePagina(contexto, rota, opcoes.itensPorPagina);
+    let itensPorPagina = inicial;
+    let aprendizadoPendente = false;
 
     do {
       let corpo;
@@ -561,7 +563,8 @@ export class SgClient {
         // A SG não documenta o teto de `itensPorPagina` por endpoint (doc 34 Q4), e um endpoint
         // que recusa o tamanho responde 400 — indistinguível, para nós, de "parâmetro errado".
         // Em vez de quarentenar a varredura inteira, cortamos o tamanho pela metade e tentamos
-        // de novo; o valor que passar fica gravado na conexão e vale para as próximas.
+        // de novo. Reduzir aqui é só uma SONDAGEM: o valor só vira fato aprendido depois que
+        // uma resposta a esse tamanho chega inteira (ver abaixo).
         const menor = this.reduzirPagina(itensPorPagina);
         if (!(erro instanceof SgError) || erro.falha !== 'requisicao_invalida' || menor === null) {
           throw erro;
@@ -578,8 +581,18 @@ export class SgClient {
           'sg_pagina_reduzida',
         );
         itensPorPagina = menor;
-        await contexto.aprender?.({ pageSizePorRota: { [rota]: menor } });
+        aprendizadoPendente = true;
         continue;
+      }
+
+      // Só agora o tamanho vira aprendizado. Gravar na hora da redução, como era antes, fazia
+      // com que QUALQUER 400 — inclusive um sobre outro parâmetro — baixasse permanentemente a
+      // página da rota: a homologação recusa `/filiais/vendas` por motivo alheio ao tamanho, e o
+      // cliente ia cortando 200 → 100 → 50 e gravando cada palpite. Como nada nunca aumenta o
+      // valor de volta, era uma catraca só para baixo sobre dado de outro tenant.
+      if (aprendizadoPendente) {
+        aprendizadoPendente = false;
+        await contexto.aprender?.({ pageSizePorRota: { [rota]: itensPorPagina } });
       }
 
       const normalizada = normalizarPagina(corpo, opcoes.chaveItens);

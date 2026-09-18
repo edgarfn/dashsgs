@@ -191,3 +191,93 @@ silêncio se essa normalização um dia fosse "simplificada" embora pareça redu
 
 Não foi disparado nenhum sync de domínio (produtos, vendas, financeiro) contra o servidor real
 nesta rodada — o teste ficou deliberadamente restrito a autorização e health-check.
+
+> **Correção (§4.7, mesma data):** a contagem de "112 rotas liberadas" acima **não se sustentou na
+> medição seguinte** e deve ser lida como errada. Medindo a claim direto no `SgTokenManager`, com
+> token novo e com token de cache, ela vem **vazia (0 rotas)** nas duas situações; o health-check
+> das 15:26 gravou `routes_granted` vazio, e é esse o estado da coluna. A lista de rotas de
+> escrita citada acima veio da coleção Postman pública, não da claim — o risco que ela descreve
+> continua valendo, mas a frase "112 rotas liberadas" atribuía à claim algo que não estava lá.
+
+### 4.7 Primeiro sync real contra a homologação (18/09/2026)
+
+A §4.6 parou de propósito em autorização e health-check. Esta rodada foi adiante: o domínio
+`dimensoes` (11 rotas, só leitura) rodou de verdade contra `http://sgps.sgsistemas.com.br:8201`,
+com `SG_MOCK=false` apenas no processo. Resultado final: **4.546 registros reais gravados, 0
+inválidos, 11 chamadas**. Antes disso, três defeitos precisaram ser corrigidos — todos invisíveis
+para o mock, e é esse o ponto da seção.
+
+#### O que a API respondeu
+
+| Rota | Resposta real |
+|---|---|
+| `GET /filiais` | 1 filial: `erp_id 1`, "SGS DEMONSTRACAO", CNPJ `31875378987` |
+| `GET /departamentos/nivel1..6` | 361 / 58 / 11 / 3 / 1 / 1 |
+| `GET /marcas` | 1.733 |
+| `GET /agrupamentos` | 2.358 |
+| `GET /classes` | 3 |
+| `GET /unidadesmedida` | 17 itens, **16 chaves** — `U` vem duas vezes |
+| `GET /vendas/hoje` | 200, 0 itens |
+| `GET /vendas/finalizadoras` | 200, 0 itens |
+| `GET /finalizadoras/hoje` | **404** |
+| `GET /vendas` (dia fechado) | **5xx** |
+| `GET /filiais/vendas` | **400**, por motivo que não é o tamanho de página |
+
+`invalidos = 0` em todas as coleções: os schemas Zod batem com o payload real sem ajuste. É a
+melhor notícia da rodada — os mappers foram escritos contra a documentação e sobreviveram ao
+contato com o servidor.
+
+#### Defeito 1 — chave repetida derrubava o domínio inteiro
+
+`upsertLote` monta um `INSERT ... ON CONFLICT DO UPDATE` com o lote todo, e o Postgres recusa a
+instrução inteira quando duas linhas propostas disputam a mesma chave (`21000: ON CONFLICT DO
+UPDATE command cannot affect row a second time`). A SG manda a unidade de medida `U` duas vezes —
+ela tem `U` e `UN`, ambas "UNIDADE" —, então **uma única duplicata no cadastro do cliente
+derrubava os 4.546 registros**, com quatro retentativas e DLQ no fim. As fixtures do mock têm id
+único; nenhum dos 298 testes unitários podia acusar isso.
+
+Correção: `colapsarPorChave` colapsa antes de montar o SQL, mantendo a **última** — que é o que o
+`ON CONFLICT DO UPDATE` faria se o Postgres aceitasse. Chave com `NULL` não colapsa, porque no
+Postgres dois `NULL` não conflitam entre si e juntá-los apagaria linha que o banco aceitaria. A
+duplicata não some calada: vai para o log e para a `observacao` do painel.
+
+#### Defeito 2 — a degradação de página era uma catraca só para baixo
+
+A Q4 (teto de `itensPorPagina` por rota) foi resolvida com degradação automática: 400 na rota
+paginada → corta o tamanho pela metade → grava o valor na conexão. Contra o servidor real ficou
+claro que **gravar era cedo demais**. `GET /filiais/vendas` responde 400 por um motivo que não é o
+tamanho, e o cliente foi cortando 200 → 100 → 50 **gravando cada palpite**. Como nada nunca
+aumenta o valor de volta, um 400 sobre outro parâmetro baixava permanentemente a página daquela
+rota, para aquele tenant, sem nunca conseguir sucesso.
+
+Correção: reduzir continua sendo a sondagem, mas o valor só vira fato aprendido **depois que uma
+resposta chega inteira naquele tamanho**. Verificado contra o servidor real: a sequência
+200 → 100 → 50 ainda acontece, e `page_size_por_rota` termina nula.
+
+#### Defeito 3 — o portão de contrato está inerte, e parece ativo
+
+`assertRotaContratada` libera tudo quando `routesGranted` está vazio, com o comentário "conexão
+ainda sem token (primeiro uso)". Mas nesta instalação o token **é obtido com sucesso e a claim
+`routes` vem vazia** — medido com token novo e com token de cache. O resultado é que a proteção
+do doc 12 §5 nunca atua aqui, e nada diz isso: o painel mostra "conexão ok" e o health registra
+"0 rotas", que um operador lê como contagem, não como "o portão está desligado".
+
+Não corrigido nesta rodada, porque a correção é uma decisão de produto e não um reparo: "claim
+vazia" precisa deixar de ser indistinguível de "ainda não sei", e isso muda o que a tela promete.
+Mesmo formato do furo de TLS/VPN da §4.4 — mecanismo de proteção que não se aplica, sem aviso.
+
+#### Resíduos conhecidos
+
+- **Espelho misto.** O sync é upsert: a filial 1 passou a ser a real, e as filiais 2, 3 e 4 do
+  seed sintético continuam na tabela. O painel soma uma loja real com três fictícias. Um
+  `pnpm db:seed` limpa, ou o offboarding do tenant demo.
+- **`vendas_hoje` não funciona nesta instalação** — não por causa da filial, mas porque
+  `GET /finalizadoras/hoje` responde 404. `GET /vendas/hoje` sozinha funciona.
+- **Execução interrompida não é reconciliada.** Um worker morto no meio deixa `sync_job_runs` e
+  `sync_watermarks` em `running` para sempre (6 e 5 linhas, nesta rodada). O `atrasado` do painel
+  se calcula por `last_success_at`, então o alerta de atraso ainda funciona — mas o status, não.
+- **`sync_api_call_log` nunca é escrita.** `registrarChamadas()` não tem um único chamador no
+  produto; só o teste de integração a invoca direto, e passa verde. A contabilidade de custo por
+  tenant do doc 05 §2 não existe, e a retenção purga diariamente uma tabela sempre vazia. O dado
+  por chamada já é medido em `sg-http.client.ts` para o Prometheus — falta uma porta
+  `contabilizar` no contexto, no mesmo idioma de `credenciais` e `aprender`.

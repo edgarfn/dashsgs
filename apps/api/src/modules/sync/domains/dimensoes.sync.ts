@@ -95,6 +95,23 @@ export class DimensoesSync implements JobDeSync {
     let invalid = 0;
     let apiCalls = 0;
     const semContrato: string[] = [];
+    const duplicadas: string[] = [];
+
+    /** Chave repetida pelo ERP na mesma coleção: o upsert resolve, mas alguém precisa saber. */
+    const anotarDuplicadas =
+      (recurso: string) =>
+      (chaves: string[]): void => {
+        duplicadas.push(`${recurso} (${chaves.join(', ')})`);
+        this.logger.warn(
+          {
+            event: 'sync_dimensao_chave_duplicada',
+            tenant_id: contexto.tenantId,
+            recurso,
+            chaves,
+          },
+          'sync_dimensao_chave_duplicada',
+        );
+      };
 
     // Filiais primeiro: é a dimensão que todos os outros domínios usam para saber onde procurar.
     const filiais = await this.sg.listFiliais(contexto.sg);
@@ -104,7 +121,12 @@ export class DimensoesSync implements JobDeSync {
     items += await this.tenantDb.run(contexto.tenantId, (tx) =>
       upsertLote(
         tx,
-        { tabela: 'erp_filiais', colunas: COLUNAS_FILIAL, chave: ['tenant_id', 'erp_id'] },
+        {
+          tabela: 'erp_filiais',
+          colunas: COLUNAS_FILIAL,
+          chave: ['tenant_id', 'erp_id'],
+          aoDuplicar: anotarDuplicadas('filiais'),
+        },
         filiais.itens.map((filial) => ({
           tenant_id: contexto.tenantId,
           erp_id: filial.erpId,
@@ -132,6 +154,7 @@ export class DimensoesSync implements JobDeSync {
               tabela: dimensao.tabela,
               colunas: colunasDimensao(dimensao.hierarquia),
               chave: ['tenant_id', 'erp_id'],
+              aoDuplicar: anotarDuplicadas(dimensao.recurso),
             },
             coleta.itens.map((item) => ({
               tenant_id: contexto.tenantId,
@@ -164,14 +187,21 @@ export class DimensoesSync implements JobDeSync {
       );
     }
 
+    // As duas notas convivem: uma rede pode ter um módulo fora do contrato E um cadastro com
+    // chave repetida, e esconder a segunda deixaria o operador sem saber por que o total de
+    // itens não bate com o que ele vê no ERP.
+    const notas = [
+      semContrato.length > 0 ? `fora do contrato: ${semContrato.join(', ')}` : null,
+      duplicadas.length > 0 ? `chave repetida no ERP: ${duplicadas.join('; ')}` : null,
+    ].filter((nota): nota is string => nota !== null);
+
     return {
       items,
       invalid,
       apiCalls,
       pages: apiCalls,
       watermarkTs: agora,
-      observacao:
-        semContrato.length > 0 ? `fora do contrato: ${semContrato.join(', ')}` : undefined,
+      observacao: notas.length > 0 ? notas.join(' · ') : undefined,
     };
   }
 }

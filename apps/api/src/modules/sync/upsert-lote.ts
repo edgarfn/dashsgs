@@ -39,6 +39,11 @@ export interface OpcoesUpsert {
    * verdade, então o que ele manda agora vale mais do que o que está gravado.
    */
   atualizar?: string[];
+  /**
+   * Avisado quando o ERP mandou a mesma chave mais de uma vez na mesma coleção. Opcional porque
+   * a maioria dos domínios não tem o que fazer a respeito — mas o dado não pode sumir calado.
+   */
+  aoDuplicar?: (chaves: string[]) => void;
 }
 
 export async function upsertLote(
@@ -58,10 +63,12 @@ export async function upsertLote(
   const listaChave = opcoes.chave.map((nome) => `"${nome}"`).join(', ');
   const atribuicoes = atualizar.map((nome) => `"${nome}" = EXCLUDED."${nome}"`).join(', ');
 
+  const unicas = colapsarPorChave(linhas, opcoes);
+
   let gravadas = 0;
 
-  for (let inicio = 0; inicio < linhas.length; inicio += TAMANHO_LOTE) {
-    const fatia = linhas.slice(inicio, inicio + TAMANHO_LOTE);
+  for (let inicio = 0; inicio < unicas.length; inicio += TAMANHO_LOTE) {
+    const fatia = unicas.slice(inicio, inicio + TAMANHO_LOTE);
 
     const valores = Prisma.join(
       fatia.map(
@@ -82,6 +89,61 @@ export async function upsertLote(
   }
 
   return gravadas;
+}
+
+/**
+ * Colapsa linhas que disputam a mesma chave, mantendo a última.
+ *
+ * O Postgres recusa um `INSERT ... ON CONFLICT DO UPDATE` em que duas linhas PROPOSTAS têm a
+ * mesma chave — "ON CONFLICT DO UPDATE command cannot affect row a second time" — e a API da SG
+ * devolve exatamente isso: em `/unidadesmedida` a homologação manda a unidade `U` duas vezes.
+ * Sem este passo, uma única duplicata no cadastro do cliente derruba o domínio inteiro, e depois
+ * de quatro tentativas o job vai para a DLQ. O mock nunca acusaria: fixture tem id único.
+ *
+ * Fica a ÚLTIMA porque é o que o `ON CONFLICT DO UPDATE` faria se o Postgres aceitasse — cada
+ * linha seguinte sobrescreveria a anterior.
+ *
+ * Chave com NULL não colapsa: no Postgres dois NULLs não conflitam entre si, então essas linhas
+ * entram todas, e juntá-las aqui apagaria dado que o banco teria aceitado.
+ */
+function colapsarPorChave(
+  linhas: Array<Record<string, ValorColuna>>,
+  opcoes: OpcoesUpsert,
+): Array<Record<string, ValorColuna>> {
+  if (opcoes.chave.length === 0) return linhas;
+
+  const tipoPorColuna = new Map(opcoes.colunas.map((coluna) => [coluna.nome, coluna.tipo]));
+  const porChave = new Map<string, number>();
+  const resultado: Array<Record<string, ValorColuna>> = [];
+  const repetidas = new Set<string>();
+
+  for (const linha of linhas) {
+    const partes = opcoes.chave.map((nome) =>
+      paraTexto(linha[nome], tipoPorColuna.get(nome) ?? 'text'),
+    );
+
+    if (partes.some((parte) => parte === null)) {
+      resultado.push(linha);
+      continue;
+    }
+
+    // NUL como separador porque o Postgres não aceita esse byte dentro de `text`: nenhuma chave
+    // que chegue a ser gravada pode contê-lo, então ("a", "b|c") nunca colide com ("a|b", "c").
+    const chave = partes.join('\u0000');
+    const posicao = porChave.get(chave);
+
+    if (posicao === undefined) {
+      porChave.set(chave, resultado.length);
+      resultado.push(linha);
+    } else {
+      resultado[posicao] = linha;
+      repetidas.add(partes.join(' | '));
+    }
+  }
+
+  if (repetidas.size > 0) opcoes.aoDuplicar?.([...repetidas]);
+
+  return resultado;
 }
 
 /** Insere sem conflito (usado depois de apagar a fatia — estratégia de substituição do dia). */

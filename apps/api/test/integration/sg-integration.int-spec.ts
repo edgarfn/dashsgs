@@ -1,4 +1,5 @@
 import { API_PREFIX } from '@dashsgs/shared';
+import { Prisma } from '@prisma/client';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
@@ -37,6 +38,13 @@ class TransporteControlado implements SgTransport {
   falharCom: number | 'rede' | null = null;
   chamadas = 0;
 
+  /**
+   * Recusa com 400 as chamadas a um caminho específico — e só as N primeiras, quando `vezes`
+   * for finito. É o que permite distinguir "400 porque a página é grande demais" (some depois
+   * de reduzir) de "400 por outro motivo" (não some nunca), que é a diferença no centro da Q4.
+   */
+  recusar400: { contem: string; vezes: number } | null = null;
+
   constructor(private readonly mock: SgMockTransport) {}
 
   async fetch(url: string, init: RequestInit): Promise<Response> {
@@ -45,6 +53,13 @@ class TransporteControlado implements SgTransport {
     if (typeof this.falharCom === 'number') {
       return new Response(JSON.stringify({ error: 'Erro sintetico' }), {
         status: this.falharCom,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (this.recusar400 && url.includes(this.recusar400.contem) && this.recusar400.vezes > 0) {
+      this.recusar400.vezes -= 1;
+      return new Response(JSON.stringify({ error: 'Ocorreu um erro no envio de parametros' }), {
+        status: 400,
         headers: { 'content-type': 'application/json' },
       });
     }
@@ -108,6 +123,7 @@ describe('integração com a API SG (integração)', () => {
 
   beforeEach(async () => {
     transporte.falharCom = null;
+    transporte.recusar400 = null;
     transporte.chamadas = 0;
     await clearRateLimits(app);
     await limparEstadoSg(redis, tenant.id);
@@ -439,6 +455,65 @@ describe('integração com a API SG (integração)', () => {
       await expect(tokens.getToken(contexto)).rejects.toThrow();
       expect(transporte.chamadas).toBe(1);
     });
+  });
+
+  /**
+   * Degradação de tamanho de página (doc 34 Q4).
+   *
+   * O ponto não é reduzir — é o que fica GRAVADO. A homologação da SG recusa `/filiais/vendas`
+   * com 400 por um motivo que não é o tamanho, e a primeira versão disto gravava cada palpite
+   * enquanto ia cortando 200 → 100 → 50. Como nada nunca aumenta o valor de volta, era uma
+   * catraca só para baixo sobre a configuração de um cliente, a partir de um erro sem relação.
+   */
+  describe('degradação de página (E4-01 / doc 34 Q4)', () => {
+    let contexto: Awaited<ReturnType<ErpConnectionService['callContext']>>;
+
+    const janela = { dataInicial: '2026-09-10', dataFinal: '2026-09-10' };
+
+    const tetoGravado = async (): Promise<number | undefined> =>
+      (await conexoes.callContext(tenant.id)).conexao.pageSizePorRota?.['GET /filiais/vendas'];
+
+    beforeEach(async () => {
+      await salvarConexao().expect(200);
+      await dono
+        .post(`${API_PREFIX}/tenant/erp-connection/test`)
+        .set('x-csrf-token', csrf)
+        .expect(200);
+      // O teto aprendido sobrevive ao `salvarConexao` — é essa a graça dele. Entre cenários,
+      // porém, ele precisa sair: senão o valor gravado por um caso responde pelo outro, e o
+      // teste passaria a medir a ordem dos `it`.
+      await tenantDb.run(tenant.id, (tx) =>
+        tx.erpConnection.updateMany({
+          where: { tenantId: tenant.id },
+          data: { pageSizePorRota: Prisma.DbNull },
+        }),
+      );
+
+      contexto = await conexoes.callContext(tenant.id);
+      await limparEstadoSg(redis, tenant.id, { manterToken: true });
+    });
+
+    it('400 que some depois de reduzir vira teto aprendido', async () => {
+      // Só a primeira chamada recusa: reduzir resolve, então o tamanho menor é um fato.
+      transporte.recusar400 = { contem: '/filiais/vendas', vezes: 1 };
+
+      await sg.getResumoFilial({ ...contexto }, { filiais: [1], ...janela });
+
+      const teto = await tetoGravado();
+      expect(teto).toBeDefined();
+      expect(teto!).toBeLessThan(200);
+    }, 30_000);
+
+    it('400 que NÃO some não grava teto nenhum', async () => {
+      transporte.recusar400 = { contem: '/filiais/vendas', vezes: Number.MAX_SAFE_INTEGER };
+
+      await expect(
+        sg.getResumoFilial({ ...contexto }, { filiais: [1], ...janela }),
+      ).rejects.toThrow(SgError);
+
+      // O erro é de outro parâmetro; o tamanho de página do cliente não tem nada com isso.
+      expect(await tetoGravado()).toBeUndefined();
+    }, 30_000);
   });
 });
 

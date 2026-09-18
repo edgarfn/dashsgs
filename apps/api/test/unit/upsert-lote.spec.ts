@@ -173,6 +173,127 @@ describe('upsertLote', () => {
       ),
     ).rejects.toThrow('identificador inválido');
   });
+
+  /**
+   * Chave repetida na MESMA coleção (doc 33).
+   *
+   * Não é hipótese: a homologação da SG devolve a unidade de medida `U` duas vezes em
+   * `/unidadesmedida`. O Postgres recusa o INSERT inteiro nesse caso ("ON CONFLICT DO UPDATE
+   * command cannot affect row a second time"), então uma duplicata no cadastro do cliente
+   * derrubava o domínio todo. As fixtures do mock têm id único e nunca acusariam.
+   */
+  describe('chave repetida pelo ERP', () => {
+    it('colapsa mantendo a última e avisa quem chamou', async () => {
+      const { tx, capturas } = transacaoFalsa();
+      const avisos: string[][] = [];
+
+      const gravadas = await upsertLote(
+        tx,
+        {
+          tabela: 'erp_unidades_medida',
+          colunas: [
+            { nome: 'tenant_id', tipo: 'uuid' },
+            { nome: 'erp_id', tipo: 'text' },
+            { nome: 'descricao', tipo: 'text' },
+          ],
+          chave: ['tenant_id', 'erp_id'],
+          aoDuplicar: (chaves) => avisos.push(chaves),
+        },
+        [
+          { tenant_id: TENANT, erp_id: 'U', descricao: 'UNIDADE' },
+          { tenant_id: TENANT, erp_id: 'KG', descricao: 'QUILO' },
+          { tenant_id: TENANT, erp_id: 'U', descricao: 'UNIDADE (2)' },
+        ],
+      );
+
+      // Uma instrução só, com duas linhas: 3 colunas × 2 linhas = 6 parâmetros.
+      expect(capturas).toHaveLength(1);
+      expect(capturas[0]?.valores).toHaveLength(6);
+      // Vence a última: é o que o ON CONFLICT DO UPDATE faria se o Postgres aceitasse.
+      expect(capturas[0]?.valores).toContain('UNIDADE (2)');
+      expect(capturas[0]?.valores).not.toContain('UNIDADE');
+      expect(avisos).toEqual([[`${TENANT} | U`]]);
+      expect(gravadas).toBe(1);
+    });
+
+    it('preserva a ordem das linhas que não duplicam', async () => {
+      const { tx, capturas } = transacaoFalsa();
+
+      await upsertLote(
+        tx,
+        {
+          tabela: 'erp_marcas',
+          colunas: [
+            { nome: 'tenant_id', tipo: 'uuid' },
+            { nome: 'erp_id', tipo: 'text' },
+          ],
+          chave: ['tenant_id', 'erp_id'],
+        },
+        [
+          { tenant_id: TENANT, erp_id: 'A' },
+          { tenant_id: TENANT, erp_id: 'B' },
+          { tenant_id: TENANT, erp_id: 'A' },
+          { tenant_id: TENANT, erp_id: 'C' },
+        ],
+      );
+
+      // A duplicata substitui a primeira NO LUGAR dela: A, B, C — e não B, C, A.
+      expect(capturas[0]?.valores).toEqual([TENANT, 'A', TENANT, 'B', TENANT, 'C']);
+    });
+
+    /**
+     * No Postgres dois NULLs não conflitam entre si, então essas linhas entrariam as duas.
+     * Colapsá-las aqui apagaria dado que o banco teria aceitado — seria o upsert inventando
+     * uma restrição que a tabela não tem.
+     */
+    it('não colapsa linhas cuja chave tem NULL', async () => {
+      const { tx, capturas } = transacaoFalsa();
+      const avisos: string[][] = [];
+
+      await upsertLote(
+        tx,
+        {
+          tabela: 'erp_marcas',
+          colunas: [
+            { nome: 'tenant_id', tipo: 'uuid' },
+            { nome: 'erp_id', tipo: 'text' },
+          ],
+          chave: ['tenant_id', 'erp_id'],
+          aoDuplicar: (chaves) => avisos.push(chaves),
+        },
+        [
+          { tenant_id: TENANT, erp_id: null },
+          { tenant_id: TENANT, erp_id: null },
+        ],
+      );
+
+      expect(capturas[0]?.valores).toHaveLength(4);
+      expect(avisos).toEqual([]);
+    });
+
+    it('não confunde chaves compostas que concatenam igual', async () => {
+      const { tx, capturas } = transacaoFalsa();
+
+      await upsertLote(
+        tx,
+        {
+          tabela: 'erp_marcas',
+          colunas: [
+            { nome: 'erp_id', tipo: 'text' },
+            { nome: 'descricao', tipo: 'text' },
+          ],
+          chave: ['erp_id', 'descricao'],
+        },
+        [
+          { erp_id: 'a', descricao: 'bc' },
+          { erp_id: 'ab', descricao: 'c' },
+        ],
+      );
+
+      // Um separador ingênuo (string vazia) leria as duas como "abc" e perderia uma linha.
+      expect(capturas[0]?.valores).toHaveLength(4);
+    });
+  });
 });
 
 describe('inserirLote', () => {
