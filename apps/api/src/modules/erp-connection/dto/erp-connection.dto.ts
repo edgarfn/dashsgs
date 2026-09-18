@@ -17,6 +17,33 @@ export const erpConnectionSchema = z
     maxRps: z.coerce.number().int().min(1).max(20).default(4),
     /** Escape hatch para instalações com caminho de autorização fora do padrão. */
     authPathOverride: z.string().trim().max(255).optional(),
+    /**
+     * Prefixo aplicado a TODAS as rotas (doc 34 Q5).
+     *
+     * A SG não confirmou se o `/public` do SG Cloud vale só para a autorização ou para a API
+     * inteira. Vazio mantém o comportamento observado na homologação; `/public` aqui cobre o
+     * outro cenário sem tocar em código.
+     */
+    apiPathPrefix: z
+      .string()
+      .trim()
+      .max(60)
+      .regex(/^(\/[A-Za-z0-9._~-]+)*$/, 'use um prefixo de caminho, ex.: /public')
+      .optional(),
+    /**
+     * Formato do header Authorization (doc 34 Q2).
+     *
+     * O cliente descobre sozinho no primeiro 401 e grava o que funcionou; este campo serve para
+     * o operador fixar o valor quando já souber, poupando o 401 de aprendizado.
+     */
+    authHeaderMode: z.enum(['raw', 'bearer']).optional(),
+    /**
+     * Itens por página pedidos à API (doc 34 Q4). Ausente = padrão da instalação.
+     *
+     * O teto real por endpoint é a pergunta aberta; quando um endpoint recusa o tamanho, o
+     * cliente reduz sozinho e grava o que passou.
+     */
+    pageSize: z.coerce.number().int().min(10).max(5000).optional(),
     syncWindowStart: z
       .string()
       .regex(/^\d{2}:\d{2}$/)

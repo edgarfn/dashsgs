@@ -11,6 +11,10 @@ interface ValoresAtuais {
   isSgCloud: boolean;
   tlsMode: 'https' | 'vpn';
   maxRps: number;
+  apiPathPrefix: string;
+  authHeaderMode: 'raw' | 'bearer';
+  pageSize: number | null;
+  pageSizePorRota: Record<string, number>;
   senhaCadastrada: boolean;
 }
 
@@ -85,6 +89,80 @@ export function ConexaoForm({ atual }: { atual: ValoresAtuais }) {
         />
         O ERP roda no SG Cloud
       </label>
+
+      {/*
+        Ajustes que existem porque a SG ainda não respondeu (doc 34 Q2/Q4/Q5). Ficam recolhidos:
+        o padrão funciona na homologação, e quem abre o wizard para cadastrar uma loja não deve
+        tropeçar neles. Quem precisa, precisa de verdade — e aí o campo está aqui, com o motivo
+        escrito ao lado em vez de escondido num arquivo de código.
+      */}
+      <details className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
+        <summary className="cursor-pointer text-sm text-slate-300">
+          Ajustes avançados do protocolo
+        </summary>
+
+        <p className="mt-3 text-xs text-slate-500">
+          Estes campos cobrem pontos que a SG Sistemas ainda não confirmou. Os padrões são o que se
+          observa na homologação — mexa apenas se a sua instalação se comportar diferente.
+        </p>
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <Field
+            label="Prefixo das rotas"
+            name="apiPathPrefix"
+            defaultValue={atual.apiPathPrefix}
+            hint="Vazio = só a autorização do SG Cloud usa /public. Se a sua instalação exigir o prefixo em todas as rotas, informe /public."
+          />
+
+          <div className="space-y-1.5">
+            <label
+              htmlFor="campo-authHeaderMode"
+              className="block text-sm font-medium text-slate-200"
+            >
+              Formato do token
+            </label>
+            <select
+              id="campo-authHeaderMode"
+              name="authHeaderMode"
+              defaultValue={atual.authHeaderMode}
+              className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-slate-100 outline-none focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/30"
+            >
+              <option value="raw" className="bg-slate-900">
+                JWT puro
+              </option>
+              <option value="bearer" className="bg-slate-900">
+                Bearer &lt;jwt&gt;
+              </option>
+            </select>
+            <p className="text-xs text-slate-500">
+              O sistema descobre sozinho na primeira recusa e passa a usar o que funcionou.
+            </p>
+          </div>
+
+          <Field
+            label="Itens por página"
+            name="pageSize"
+            type="number"
+            defaultValue={atual.pageSize === null ? '' : String(atual.pageSize)}
+            hint="Em branco usa o padrão da instalação. Endpoint que recusar o tamanho é reduzido automaticamente."
+          />
+        </div>
+
+        {Object.keys(atual.pageSizePorRota).length > 0 ? (
+          <div className="mt-4 space-y-1">
+            <p className="text-xs text-slate-400">
+              Limites que o sistema aprendeu sozinho com a sua instalação:
+            </p>
+            <ul className="space-y-0.5 text-xs text-slate-500">
+              {Object.entries(atual.pageSizePorRota).map(([rota, teto]) => (
+                <li key={rota} className="font-mono">
+                  {rota} — máximo {teto} itens por página
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </details>
 
       <SubmitButton>Salvar conexão</SubmitButton>
     </form>

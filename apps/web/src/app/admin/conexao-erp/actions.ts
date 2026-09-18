@@ -21,6 +21,15 @@ export async function salvarConexaoAction(
     tlsMode: (String(formData.get('tlsMode') ?? 'https') === 'vpn' ? 'vpn' : 'https') as
       'https' | 'vpn',
     maxRps: Number(formData.get('maxRps') ?? 4),
+    // Os três campos abaixo existem porque a SG ainda não respondeu Q2/Q4/Q5 (doc 34): em vez de
+    // a suposição ficar cravada no código, ela fica aqui, ajustável por tenant.
+    apiPathPrefix: String(formData.get('apiPathPrefix') ?? '').trim(),
+    ...(String(formData.get('authHeaderMode') ?? '')
+      ? { authHeaderMode: String(formData.get('authHeaderMode')) as 'raw' | 'bearer' }
+      : {}),
+    ...(String(formData.get('pageSize') ?? '').trim()
+      ? { pageSize: Number(formData.get('pageSize')) }
+      : {}),
   };
 
   const response = await apiRequest('PUT', '/tenant/erp-connection', payload);

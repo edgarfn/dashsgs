@@ -346,6 +346,13 @@ model ErpConnection {
   /// SG Cloud usa o prefixo /public na autorização (doc 02 §1).
   isSgCloud        Boolean    @default(false) @map("is_sg_cloud")
   authPathOverride String?    @map("auth_path_override") @db.VarChar(255)
+  /// Prefixo aplicado a TODAS as rotas, inclusive as de dados (doc 34 Q5).
+  ///
+  /// A SG ainda não confirmou se o `/public` do SG Cloud vale só para `/autorizacao` ou para a
+  /// API inteira. Vazio = só a autorização recebe o prefixo, que é o comportamento observado na
+  /// homologação. Se a resposta for "vale para tudo", o operador grava `/public` aqui e nenhuma
+  /// linha de código muda.
+  apiPathPrefix    String?    @map("api_path_prefix") @db.VarChar(60)
   tlsMode          ErpTlsMode @default(https) @map("tls_mode")
 
   username         String            @db.VarChar(120)
@@ -356,6 +363,14 @@ model ErpConnection {
 
   /// Self-rate-limit por tenant (doc 12 §3) — a API SG não documenta limite (doc 34 Q3).
   maxRps          Int     @default(4) @map("max_rps")
+  /// Itens por página pedidos à API SG. Nulo = usa o padrão da instalação (SG_PAGE_SIZE).
+  ///
+  /// A SG não confirmou o teto por endpoint (doc 34 Q4). Quando um endpoint recusa o tamanho,
+  /// o cliente reduz sozinho e grava o valor que passou em `pageSizePorRota`.
+  pageSize        Int?    @map("page_size")
+  /// Teto aprendido por rota, ex.: `{"GET /vendas": 100}`. Preenchido pela degradação automática
+  /// e ajustável à mão quando a SG responder o limite real de cada endpoint.
+  pageSizePorRota Json?   @map("page_size_por_rota") @db.JsonB
   /// Janela para cargas pesadas, no fuso do tenant (doc 12 §1).
   syncWindowStart String? @map("sync_window_start") @db.VarChar(5)
   syncWindowEnd   String? @map("sync_window_end") @db.VarChar(5)

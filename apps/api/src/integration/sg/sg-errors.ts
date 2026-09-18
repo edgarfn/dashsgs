@@ -29,6 +29,15 @@ export const SG_FALHAS = [
   'erro_servidor',
   /** Rede, DNS, timeout: vale repetir com backoff. */
   'inalcancavel',
+  /**
+   * A API pediu para diminuir o ritmo (429). Vale repetir, respeitando `Retry-After`.
+   *
+   * A SG não documenta limite algum (doc 34 Q3), então este caso pode nunca acontecer — mas se
+   * acontecer, ele precisa ser retentável. Sem esta entrada, 429 caía em `resposta_invalida`,
+   * que na taxonomia significa "não repetir, quarentenar": o produto jogaria a página fora e
+   * marcaria o dado do cliente como inválido porque o servidor pediu calma.
+   */
+  'limite_excedido',
   /** Resposta fora do contrato: não repetir, quarentenar. */
   'resposta_invalida',
 ] as const;
@@ -40,6 +49,8 @@ export class SgError extends Error {
     readonly falha: SgFalha,
     readonly detalhe: {
       status?: number;
+      /** Espera pedida pelo servidor no header `Retry-After`, já convertida para ms. */
+      retryAfterMs?: number;
       endpoint?: string;
       /** Mensagem crua da API SG — vai para log/auditoria, nunca para o usuário final. */
       mensagemOrigem?: string | null;
@@ -63,7 +74,16 @@ export class SgError extends Error {
 
   /** Só faz sentido repetir o que é transitório — e apenas em leitura (doc 12 §3). */
   get retentavel(): boolean {
-    return this.falha === 'erro_servidor' || this.falha === 'inalcancavel';
+    return (
+      this.falha === 'erro_servidor' ||
+      this.falha === 'inalcancavel' ||
+      this.falha === 'limite_excedido'
+    );
+  }
+
+  /** Quanto esperar antes de repetir, quando o próprio servidor disse (header `Retry-After`). */
+  get esperaSugeridaMs(): number | null {
+    return this.detalhe.retryAfterMs ?? null;
   }
 
   /** Falhas que indicam problema de configuração/contrato, e não indisponibilidade. */
@@ -88,6 +108,10 @@ export class SgError extends Error {
       rota_nao_contratada: {
         code: 'ERP_ROUTE_FORBIDDEN',
         message: 'A rota necessária não está contratada nesta conexão com o ERP.',
+      },
+      limite_excedido: {
+        code: 'ERP_UNREACHABLE',
+        message: 'O ERP pediu para reduzir o ritmo das consultas. Tente novamente em instantes.',
       },
       requisicao_invalida: {
         code: 'ERP_UNREACHABLE',
@@ -128,7 +152,12 @@ export class SgError extends Error {
 export function classificarResposta(
   status: number,
   corpo: unknown,
-  contexto: { endpoint: string; autorizacao?: boolean; segundaTentativa?: boolean },
+  contexto: {
+    endpoint: string;
+    autorizacao?: boolean;
+    segundaTentativa?: boolean;
+    retryAfterMs?: number;
+  },
 ): SgError {
   const mensagemOrigem =
     corpo && typeof corpo === 'object' && 'error' in corpo
@@ -166,6 +195,10 @@ export function classificarResposta(
       mensagemOrigem,
       endpoint: contexto.endpoint,
     });
+  }
+
+  if (status === 429) {
+    return new SgError('limite_excedido', { status, mensagemOrigem, ...contexto });
   }
 
   if (status >= 500) {

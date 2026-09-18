@@ -45,6 +45,13 @@ describe('AppConfigService', () => {
       mock: false,
       allowInsecure: false,
       vpnCidr: '10.66.0.0/16',
+      vpnCidrs: ['10.66.0.0/16'],
+      // As três abaixo existem porque a SG ainda não respondeu Q2/Q4/Q5 (doc 34). Os padrões
+      // reproduzem exatamente o comportamento observado na homologação: sem prefixo de rota,
+      // token cru e degradação de página parando em 50 itens.
+      apiPathPrefix: '',
+      authHeaderMode: 'raw',
+      pageSizeMin: 50,
     });
     expect(config.features).toEqual({ erpWrite: false, clientModule: false });
   });

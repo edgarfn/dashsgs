@@ -15,6 +15,10 @@ interface ConexaoView {
   username: string | null;
   senhaCadastrada: boolean;
   maxRps: number;
+  apiPathPrefix: string;
+  authHeaderMode: 'raw' | 'bearer';
+  pageSize: number | null;
+  pageSizePorRota: Record<string, number>;
   status: 'pending' | 'ok' | 'error';
   lastError: string | null;
   lastHealthAt: string | null;
@@ -168,6 +172,10 @@ export default async function ConexaoErpPage() {
             isSgCloud: conexao?.isSgCloud ?? false,
             tlsMode: conexao?.tlsMode ?? 'https',
             maxRps: conexao?.maxRps ?? 4,
+            apiPathPrefix: conexao?.apiPathPrefix ?? '',
+            authHeaderMode: conexao?.authHeaderMode ?? 'raw',
+            pageSize: conexao?.pageSize ?? null,
+            pageSizePorRota: conexao?.pageSizePorRota ?? {},
             senhaCadastrada: conexao?.senhaCadastrada ?? false,
           }}
         />

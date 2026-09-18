@@ -114,6 +114,40 @@ describe('assertSafeErpUrl', () => {
       await expect(assertSafeErpUrl('http://127.0.0.1', vpn)).rejects.toThrow();
       await expect(assertSafeErpUrl('http://169.254.169.254', vpn)).rejects.toThrow();
     });
+
+    /**
+     * Regressão do furo que a auditoria do doc 34 Q1 encontrou.
+     *
+     * O laço de IPs aceitava qualquer endereço **público** com um `continue` antes de chegar à
+     * checagem de faixa, e a regra de protocolo só exige TLS quando o modo é `https`. A
+     * combinação aceitava `http://host-publico` em modo VPN: credencial do ERP e dados de venda
+     * em claro na internet, com a auditoria gravando `tls_mode=vpn` — que se lê como "cifrado".
+     *
+     * No modo VPN o sigilo vem do túnel; logo, o destino tem de estar DENTRO dele. Endereço
+     * público neste modo é configuração errada, com ou sem TLS.
+     */
+    it('recusa endereço público no modo VPN — o túnel é que cifra', async () => {
+      await expect(assertSafeErpUrl('http://example.com:8201', vpn)).rejects.toThrow(
+        'faixa do túnel',
+      );
+      await expect(assertSafeErpUrl('https://example.com', vpn)).rejects.toThrow('faixa do túnel');
+    });
+
+    it('aceita mais de uma faixa de túnel na mesma instalação', async () => {
+      // Uma instalação pode acabar com dois túneis; um CIDR único obrigaria mudar código para
+      // atender o segundo (doc 34 Q1).
+      const dois = {
+        tlsMode: 'vpn' as const,
+        allowInsecure: false,
+        vpnCidrs: ['10.66.0.0/16', '10.77.0.0/16'],
+      };
+
+      expect((await assertSafeErpUrl('http://10.66.3.7:8201', dois)).ips).toEqual(['10.66.3.7']);
+      expect((await assertSafeErpUrl('http://10.77.1.2:8201', dois)).ips).toEqual(['10.77.1.2']);
+      await expect(assertSafeErpUrl('http://10.88.1.2:8201', dois)).rejects.toThrow(
+        'faixa do túnel',
+      );
+    });
   });
 
   it('recusa host inexistente com mensagem acionável', async () => {

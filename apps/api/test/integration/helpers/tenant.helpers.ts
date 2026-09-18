@@ -128,3 +128,27 @@ export async function cleanupTenantFixtures(prisma: PrismaService): Promise<void
   await prisma.user.deleteMany({ where: { email: { endsWith: '@teste.local' } } });
   await prisma.tenant.deleteMany({ where: { slug: { startsWith: 'teste-' } } });
 }
+
+/**
+ * "Hoje" no fuso do tenant — o mesmo cálculo que a API faz.
+ *
+ * Os testes usavam `new Date().toISOString().slice(0, 10)`, que é UTC. O produto usa o fuso do
+ * tenant (`America/Sao_Paulo` nas fixtures), e entre 00h e 03h UTC os dois divergem: a suíte
+ * inteira falhava por três horas todo dia, com mensagens do tipo "esperava 2026-09-18, veio
+ * 2026-09-17" que não têm nada a ver com o que o cenário testa.
+ *
+ * Quem afirma coisas sobre "o dia corrente" precisa perguntar a data ao mesmo relógio que a
+ * aplicação consulta.
+ */
+export const FUSO_DA_FIXTURE = 'America/Sao_Paulo';
+
+export function hojeNoTenant(timeZone: string = FUSO_DA_FIXTURE): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone }).format(new Date());
+}
+
+/** Um dia relativo a hoje, também no fuso do tenant. `-1` = ontem. */
+export function diaNoTenant(offsetDias: number, timeZone: string = FUSO_DA_FIXTURE): string {
+  const base = new Date(`${hojeNoTenant(timeZone)}T12:00:00Z`);
+  base.setUTCDate(base.getUTCDate() + offsetDias);
+  return base.toISOString().slice(0, 10);
+}

@@ -34,8 +34,10 @@ export interface UrlGuardOptions {
   tlsMode: 'https' | 'vpn';
   /** Liberado apenas em dev/homologação, nunca em produção (contrato de ambiente, doc 19 §3). */
   allowInsecure: boolean;
-  /** Faixa do túnel WireGuard provisionado pela plataforma. */
+  /** Faixa única do túnel. Mantido por compatibilidade; prefira `vpnCidrs`. */
   vpnCidr?: string;
+  /** Faixas do WireGuard provisionado pela plataforma (uma instalação pode ter mais de um). */
+  vpnCidrs?: string[];
 }
 
 export interface UrlGuardResult {
@@ -125,20 +127,30 @@ export async function assertSafeErpUrl(
     throw recusa('O endereço não resolve para nenhum IP. Confira o DNS.', { host: url.hostname });
   }
 
+  const faixasDoTunel = (
+    options.vpnCidrs?.length ? options.vpnCidrs : [options.vpnCidr ?? '10.66.0.0/16']
+  ).filter(Boolean);
+
   for (const ip of ips) {
     const { publico, motivo } = classificarIp(ip);
 
-    if (publico) continue;
-
-    // Modo VPN: endereço privado é esperado, mas só dentro do túnel que a plataforma provisiona.
+    // Modo VPN: o sigilo vem do túnel, então o destino precisa estar DENTRO dele — sempre, e não
+    // só quando o IP é privado.
+    //
+    // Antes, um IP público passava neste laço por `continue` e nunca chegava à checagem de
+    // faixa; combinado com a regra de protocolo acima (que só exige TLS quando o modo é
+    // `https`), isso aceitava `http://host-publico` em modo VPN. A credencial do ERP e os dados
+    // de venda iriam em claro pela internet enquanto a auditoria registrava `tls_mode=vpn` —
+    // que qualquer auditor lê como "tráfego cifrado".
     if (options.tlsMode === 'vpn') {
-      const cidr = options.vpnCidr ?? '10.66.0.0/16';
-      if (isIP(ip) === 4 && ipv4InCidr(ip, cidr)) continue;
-      throw recusa(`No modo VPN o endereço precisa estar na faixa do túnel (${cidr}).`, {
-        ip,
-        motivo,
-      });
+      if (isIP(ip) === 4 && faixasDoTunel.some((faixa) => ipv4InCidr(ip, faixa))) continue;
+      throw recusa(
+        `No modo VPN o endereço precisa estar na faixa do túnel (${faixasDoTunel.join(', ')}).`,
+        { ip, motivo: motivo ?? 'endereço público fora do túnel' },
+      );
     }
+
+    if (publico) continue;
 
     throw recusa('O endereço aponta para uma rede interna. Informe o endereço público do ERP.', {
       ip,

@@ -14,7 +14,16 @@ export interface SgConfig {
   heavyTimeoutMs: number;
   mock: boolean;
   allowInsecure: boolean;
+  /** Valor cru do ambiente (pode conter várias faixas separadas por vírgula). */
   vpnCidr: string;
+  /** As mesmas faixas já divididas — é isto que o guarda anti-SSRF consome. */
+  vpnCidrs: string[];
+  /** Prefixo padrão de TODAS as rotas; cada tenant pode sobrescrever (doc 34 Q5). */
+  apiPathPrefix: string;
+  /** Formato inicial do header Authorization, até a descoberta em execução (doc 34 Q2). */
+  authHeaderMode: 'raw' | 'bearer';
+  /** Piso da degradação automática de tamanho de página (doc 34 Q4). */
+  pageSizeMin: number;
 }
 
 /**
@@ -78,6 +87,12 @@ export class AppConfigService {
       mock: this.env.SG_MOCK,
       allowInsecure: this.env.ALLOW_INSECURE_ERP,
       vpnCidr: this.env.SG_VPN_CIDR,
+      vpnCidrs: this.env.SG_VPN_CIDR.split(',')
+        .map((faixa) => faixa.trim())
+        .filter(Boolean),
+      apiPathPrefix: this.env.SG_API_PATH_PREFIX,
+      authHeaderMode: this.env.SG_AUTH_HEADER_MODE,
+      pageSizeMin: this.env.SG_PAGE_SIZE_MIN,
     };
   }
 

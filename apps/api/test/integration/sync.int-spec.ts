@@ -21,6 +21,7 @@ import {
   cleanupTenantFixtures,
   createTenantFixture,
   type TenantFixture,
+  hojeNoTenant,
 } from './helpers/tenant.helpers';
 
 const SENHA = 'Cavalo-Bateria-Grampo-Correto-9';
@@ -48,7 +49,7 @@ describe('sincronização (integração)', () => {
   let dono: TestAgent;
   let csrf: string;
 
-  const hoje = () => new Date().toISOString().slice(0, 10);
+  const hoje = () => hojeNoTenant();
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();

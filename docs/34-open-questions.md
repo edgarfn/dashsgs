@@ -3,6 +3,11 @@
 Destinatário principal: SG Sistemas (contato@sgsistemas.com.br) e/ou tenant piloto.
 Nenhuma resposta bloqueia as fases 2–4 do roadmap; Q1–Q4 bloqueiam a fase 5 em produção.
 
+> **Q1–Q5 deixaram de bloquear (18/09/2026).** Cada uma virou configuração ajustável por tenant,
+> com padrão da instalação por variável de ambiente — ver §4. A resposta da SG, quando vier, é um
+> ajuste na tela de Conexão ERP; não é deploy. O que **não** virou configuração, e por quê, está
+> em §4.3.
+
 ## Para a SG Sistemas (técnico)
 
 | # | Pergunta | Por que importa | Bloqueia |
@@ -44,3 +49,83 @@ Nenhuma resposta bloqueia as fases 2–4 do roadmap; Q1–Q4 bloqueiam a fase 5 
 | D2 | Nome/domínio definitivo do produto | antes F12 |
 | D3 | Designar DPO e jurídico p/ DPA/política | antes F11 |
 | D4 | Política comercial de planos (filiais? usuários? módulos?) | antes F12 |
+
+## 4. Q1–Q5 como configuração (18/09/2026)
+
+O dono do produto perguntou se dava para seguir sem as respostas, tratando cada uma como
+configuração. Dava — e a auditoria do código mostrou que o custo de **não** fazer isso era maior
+do que parecia: três das cinco respostas estavam cravadas como suposição, e uma delas escondia um
+furo de segurança.
+
+### 4.1 O que cada uma virou
+
+| # | Onde se ajusta | Padrão de fábrica | O que acontece se a SG responder diferente |
+|---|---|---|---|
+| Q1 transporte | `tls_mode` por tenant (tela) + `SG_VPN_CIDR` (aceita várias faixas) | `https` | Túnel novo é mais um CIDR na env; HTTP em claro continua recusado |
+| Q2 header | `auth_header_mode` por tenant (tela) + `SG_AUTH_HEADER_MODE` | `raw`, **e o cliente descobre sozinho** | Nada: a primeira recusa ensina e o valor fica gravado |
+| Q3 rate limit | `max_rps` por tenant (tela) + `SG_DEFAULT_MAX_RPS` | 4 rps | 429 agora é falha própria, retentável, que respeita `Retry-After` |
+| Q4 página | `page_size` por tenant + `page_size_por_rota` + `SG_PAGE_SIZE`/`SG_PAGE_SIZE_MIN` | 500, piso 50 | Endpoint que recusar o tamanho é reduzido sozinho e o teto fica gravado |
+| Q5 prefixo `/public` | `api_path_prefix` por tenant (tela) + `SG_API_PATH_PREFIX` | vazio (só a autorização) | `/public` no campo cobre "vale para todas as rotas" |
+
+### 4.2 O que a auditoria encontrou no caminho
+
+- **Q5 estava cravado.** O `/public` só existia colado à constante do caminho de autorização; as
+  rotas de dados eram montadas de um `BASE` fixo. Se a resposta for "vale para a API inteira",
+  todo tenant SG Cloud quebraria — e a correção seria deploy, não configuração.
+- **Q2 se auto-resolvia, mas esquecia.** O cliente já tentava o formato alternativo no 401, só
+  que gravava a descoberta **apenas no cache do token** (50 min). Todo refresh relia a coluna do
+  banco, que nunca deixava de ser `raw`: uma instalação que exige `bearer` pagava um 401 de
+  aprendizado a cada ciclo, para sempre. Agora a descoberta é persistida.
+- **Q3 tratava "reduza o ritmo" como dado corrompido.** Não havia nenhum tratamento de 429 em
+  lugar nenhum: a resposta caía no ramo final e virava `resposta_invalida`, que na taxonomia
+  significa "não repetir, quarentenar". O produto jogaria a página fora e marcaria o dado do
+  cliente como inválido porque o servidor pediu calma.
+- **Q4 tinha número mágico.** `/filiais/vendas` usava `itensPorPagina: 200` escrito no meio de
+  uma chamada, sem nome nem motivo. Virou tabela `TETO_POR_ROTA`, declarada como suposição.
+- **Q1 escondia um furo de segurança — corrigido.** Ver §4.4.
+
+### 4.3 O que **não** virou configuração, e por quê
+
+- **Confiança TLS (CA própria, certificado auto-assinado, mTLS, versão mínima).** É o caso mais
+  provável num ERP de loja, e hoje falha de forma opaca: o `fetch` recusa o certificado, o erro
+  vira `inalcancavel` e o suporte vai caçar rede enquanto o problema é confiança. Não virou
+  configuração porque exige trocar o transporte (`fetch` cru → agente com CA), e porque "aceitar
+  certificado inválido" não pode ser uma caixinha no wizard: é a diferença entre TLS e teatro.
+  Entra como item próprio de backlog, com desenho.
+- **Afrouxar a proibição de HTTP em produção.** `ALLOW_INSECURE_ERP` continua global e continua
+  derrubando o boot em produção. Tornar isso ajustável por tenant transformaria a regra que
+  protege a credencial do cliente numa preferência — e a experiência desta auditoria é
+  justamente que o caminho fácil vira o caminho usado.
+- **Janelas de 30 dias por recurso (Q14) e timezone dos campos (Q12).** Ficam como estão nesta
+  passada; são perguntas de sincronização, não de transporte, e não bloqueiam ninguém hoje.
+
+### 4.4 Correção de segurança encontrada durante a auditoria (Q1)
+
+O guarda anti-SSRF exigia TLS apenas quando `tls_mode = https`:
+
+```ts
+if (url.protocol === 'http:' && options.tlsMode === 'https' && !options.allowInsecure) { recusa }
+```
+
+E no laço de IPs, um endereço **público** era aceito por `continue` **antes** de chegar à
+verificação da faixa do túnel. As duas regras combinadas aceitavam, em produção,
+`http://host-publico` com o modo VPN selecionado: a senha do usuário de integração e os dados de
+venda trafegariam em claro pela internet, enquanto a trilha de auditoria registrava
+`tls_mode: 'vpn'` — que qualquer auditor lê como "tráfego cifrado". Nenhum teste cobria o caso.
+
+A correção inverte a ordem e aperta a regra: **no modo VPN o destino precisa estar dentro do
+túnel**, público ou privado, com ou sem TLS. O sigilo ali vem do túnel; endereço fora dele é
+configuração errada, não uma variação aceitável. `apps/api/test/unit/url-guard.spec.ts` ganhou a
+regressão.
+
+### 4.5 Nota de fuso horário (achado colateral)
+
+Vários testes de integração calculavam "hoje" em UTC enquanto o produto calcula no fuso do
+tenant. Entre 00h e 03h UTC os dois divergem e a suíte falhava por três horas todo dia, com
+mensagens que não tinham relação com o cenário. Os testes passaram a usar `hojeNoTenant()`.
+
+Sobra um resíduo **no produto**, não nos testes: o painel de compras conta "dias em aberto" com
+`CURRENT_DATE` do Postgres (UTC) e o filtro da trilha de auditoria recorta `created_at` por
+instante UTC. Perto da virada do dia, ambos erram por um em relação ao dia do tenant. É defeito
+real, de baixa gravidade, e merece uma passada própria — não foi corrigido aqui para não misturar
+com a questão do transporte.

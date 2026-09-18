@@ -14,12 +14,19 @@ ErpConnection {
   secret: EncryptedRef     // nunca em memória além do uso
   maxRps: number = 4       // self-rate-limit [RECOMENDAÇÃO]
   syncWindow?: { start: '01:00', end: '06:00' } // janelas pesadas (backfill) por tenant
+
+  // As quatro abaixo existem porque a SG ainda não respondeu (doc 34 §4). Nulo/vazio = herda o
+  // padrão da instalação; a resposta, quando vier, é um UPDATE aqui — não um deploy.
+  apiPathPrefix?: string   // Q5: prefixo de TODAS as rotas, ex.: '/public'
+  authHeaderMode: 'raw' | 'bearer'  // Q2: descoberto sozinho no primeiro 401 e persistido
+  pageSize?: number        // Q4: itens por página pedidos à API
+  pageSizePorRota?: Record<string, number>  // Q4: teto que a API confirmou, por rota
 }
 ```
 
-[NECESSITA CONFIRMAÇÃO junto à SG]: suporte a HTTPS no endpoint do cliente; prefixo `/public`
-aplica-se às demais rotas no SG Cloud ou apenas à autorização; limite de RPS tolerado;
-`itensPorPagina` máximo aceito.
+[NECESSITA CONFIRMAÇÃO junto à SG] — **nenhuma delas bloqueia**, todas viraram configuração
+(doc 34 §4): suporte a HTTPS no endpoint do cliente; prefixo `/public` nas demais rotas do SG
+Cloud; limite de RPS tolerado; `itensPorPagina` máximo por endpoint.
 
 ## 2. Autenticação (token manager)
 
@@ -146,11 +153,20 @@ Decisões tomadas na implementação:
   risco que a spec não autoriza (doc 03 §Ações).
 - **A senha do ERP é write-only.** O cofre usa a mesma cifra de envelope do TOTP (E2-04); a UI
   mostra "nova senha" e o valor nunca volta para a tela — testado no E2E pelo HTML inteiro.
-- **O formato do header continua descoberto em execução** (doc 34 Q2 sem resposta): tenta
-  `Authorization: <jwt>`, e em 401 repete uma vez com `Bearer <jwt>`, memorizando o que funcionou
-  por tenant. Quando a SG responder, isto vira configuração.
-- **Modo VPN não é "aceitar rede privada".** Aceita-se apenas a faixa do túnel provisionado
-  (`SG_VPN_CIDR`, padrão `10.66.0.0/16`) — runbook 22 §7.
+- **O formato do header é descoberto em execução e agora PERSISTIDO** (doc 34 Q2): tenta
+  `Authorization: <jwt>`, e em 401 repete uma vez com `Bearer <jwt>`, gravando o que funcionou na
+  conexão do tenant. Antes a descoberta vivia só no cache do token (50 min) e se perdia a cada
+  renovação — uma instalação que exige `bearer` pagava um 401 de aprendizado por ciclo, sempre.
+- **Modo VPN não é "aceitar rede privada": é "estar dentro do túnel".** O destino precisa cair
+  numa das faixas de `SG_VPN_CIDR` (que aceita lista), **público ou privado**. Endereço público
+  em modo VPN é recusado: o sigilo ali vem do túnel, e aceitar fora dele deixava passar
+  `http://host-publico` com a auditoria registrando "vpn" (doc 34 §4.4) — runbook 22 §7.
+- **429 é falha própria e retentável.** O cliente respeita `Retry-After` (em segundos ou data),
+  com teto de 60 s para não prender o worker. Antes, "reduza o ritmo" caía em `resposta_invalida`
+  e a página do cliente ia para a quarentena (doc 34 Q3).
+- **Tamanho de página degrada sozinho.** Endpoint que recusa o tamanho com 400 faz o cliente
+  cortar pela metade, até o piso `SG_PAGE_SIZE_MIN`, e gravar o teto que passou em
+  `pageSizePorRota` — é a Q4 se respondendo sozinha, por endpoint.
 
 Ainda não implementado deste doc: as rotas da coleção que só a Fase 6 consome (financeiro,
 compras, perdas, previsão) entram junto com seus jobs de sync, como manda o doc 24 §7 — tipo sem

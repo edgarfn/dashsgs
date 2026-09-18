@@ -8,7 +8,13 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { TenantDatabase } from '../../common/tenant';
 import { AppConfigService } from '../../config';
 import { assertSafeErpUrl } from '../../integration/sg';
-import { SgClient, SgError, SgTokenManager, type SgCallContext } from '../../integration/sg';
+import {
+  SgClient,
+  SgError,
+  SgTokenManager,
+  type AprendizadoDaConexao,
+  type SgCallContext,
+} from '../../integration/sg';
 import { type ErpConnectionInput } from './dto/erp-connection.dto';
 
 export interface ErpConnectionView {
@@ -17,6 +23,14 @@ export interface ErpConnectionView {
   isSgCloud: boolean;
   tlsMode: 'https' | 'vpn';
   username: string | null;
+  /** Prefixo de todas as rotas; vazio = só a autorização do SG Cloud (doc 34 Q5). */
+  apiPathPrefix: string;
+  /** Formato do header Authorization em uso — pode ter sido aprendido sozinho (doc 34 Q2). */
+  authHeaderMode: 'raw' | 'bearer';
+  /** Itens por página; `null` = padrão da instalação (doc 34 Q4). */
+  pageSize: number | null;
+  /** Teto por rota já confirmado pela API, ex.: `{"GET /vendas": 100}`. */
+  pageSizePorRota: Record<string, number>;
   /** A senha **nunca** volta — nem mascarada. Só se substitui (doc 06 §2). */
   senhaCadastrada: boolean;
   maxRps: number;
@@ -62,6 +76,10 @@ export class ErpConnectionService {
         username: null,
         senhaCadastrada: false,
         maxRps: this.config.sg.maxRps,
+        apiPathPrefix: this.config.sg.apiPathPrefix,
+        authHeaderMode: this.config.sg.authHeaderMode,
+        pageSize: null,
+        pageSizePorRota: {},
         status: 'pending',
         lastError: null,
         lastHealthAt: null,
@@ -81,6 +99,10 @@ export class ErpConnectionService {
       username: conexao.username,
       senhaCadastrada: true,
       maxRps: conexao.maxRps,
+      apiPathPrefix: conexao.apiPathPrefix ?? '',
+      authHeaderMode: conexao.authHeaderMode,
+      pageSize: conexao.pageSize,
+      pageSizePorRota: lerTetosPorRota(conexao.pageSizePorRota),
       status: conexao.status,
       lastError: conexao.lastError,
       lastHealthAt: conexao.lastHealthAt?.toISOString() ?? null,
@@ -135,6 +157,13 @@ export class ErpConnectionService {
           username: input.username.trim(),
           maxRps: input.maxRps,
           authPathOverride: input.authPathOverride?.trim() || null,
+          // `?? null` e não `|| null`: string vazia é escolha válida e explícita ("esta
+          // instalação não usa prefixo"), diferente de "não informei" (doc 34 Q5).
+          apiPathPrefix: input.apiPathPrefix ?? null,
+          pageSize: input.pageSize ?? null,
+          // Só sobrescreve quando o operador escolheu: em branco, preserva o que o cliente
+          // aprendeu sozinho no último 401 (doc 34 Q2).
+          ...(input.authHeaderMode ? { authHeaderMode: input.authHeaderMode } : {}),
           syncWindowStart: input.syncWindowStart ?? null,
           syncWindowEnd: input.syncWindowEnd ?? null,
           // Qualquer mudança volta o estado para "pendente": só o teste diz que está de pé.
@@ -417,6 +446,7 @@ export class ErpConnectionService {
     return {
       conexao: { ...this.contextoDe(conexao), routesGranted: conexao.routesGranted },
       credenciais: () => this.credenciais(tenantId),
+      aprender: (ajuste) => this.aprender(tenantId, ajuste),
     };
   }
 
@@ -465,6 +495,9 @@ export class ErpConnectionService {
     isSgCloud: boolean;
     authPathOverride: string | null;
     authHeaderMode: 'raw' | 'bearer';
+    apiPathPrefix?: string | null;
+    pageSize?: number | null;
+    pageSizePorRota?: unknown;
   }) {
     return {
       tenantId: conexao.tenantId,
@@ -474,8 +507,50 @@ export class ErpConnectionService {
       isSgCloud: conexao.isSgCloud,
       authPathOverride: conexao.authPathOverride,
       authHeaderMode: conexao.authHeaderMode,
+      apiPathPrefix: conexao.apiPathPrefix ?? null,
+      pageSize: conexao.pageSize ?? null,
+      pageSizePorRota: lerTetosPorRota(conexao.pageSizePorRota),
       routesGranted: [] as string[],
     };
+  }
+
+  /**
+   * Grava o que o cliente descobriu conversando com a instalação (doc 34 Q2/Q4).
+   *
+   * Não audita e não falha alto de propósito: é aprendizado de máquina sobre a API do cliente,
+   * não ato de ninguém — poluir a trilha com isso afogaria os eventos que têm ator. Se a escrita
+   * falhar, o pior caso é redescobrir na próxima vez, que é exatamente o que acontecia antes.
+   */
+  private async aprender(tenantId: string, ajuste: AprendizadoDaConexao): Promise<void> {
+    try {
+      const conexao = await this.buscar(tenantId);
+      if (!conexao) return;
+
+      const tetos = {
+        ...lerTetosPorRota(conexao.pageSizePorRota),
+        ...(ajuste.pageSizePorRota ?? {}),
+      };
+
+      await this.tenantDb.run(tenantId, (tx) =>
+        tx.erpConnection.update({
+          where: { tenantId },
+          data: {
+            ...(ajuste.authHeaderMode ? { authHeaderMode: ajuste.authHeaderMode } : {}),
+            ...(ajuste.pageSizePorRota ? { pageSizePorRota: tetos } : {}),
+          },
+        }),
+      );
+
+      this.logger.info(
+        { event: 'erp_conexao_aprendida', tenant_id: tenantId, ...ajuste },
+        'erp_conexao_aprendida',
+      );
+    } catch (erro) {
+      this.logger.warn(
+        { event: 'erp_conexao_aprendizado_falhou', tenant_id: tenantId, err: erro },
+        'erp_conexao_aprendizado_falhou',
+      );
+    }
   }
 
   private async buscar(tenantId: string) {
@@ -494,4 +569,22 @@ export class ErpConnectionService {
     }
     return conexao;
   }
+}
+
+/**
+ * Lê o mapa de tetos por rota gravado como JSON.
+ *
+ * Tolerante de propósito: o campo é ajustável à mão pelo operador quando a SG responder a Q4, e
+ * um valor digitado errado não pode derrubar a sincronização — entrada inválida é simplesmente
+ * ignorada, e o tamanho volta ao padrão.
+ */
+function lerTetosPorRota(bruto: unknown): Record<string, number> {
+  if (!bruto || typeof bruto !== 'object' || Array.isArray(bruto)) return {};
+
+  const tetos: Record<string, number> = {};
+  for (const [rota, valor] of Object.entries(bruto as Record<string, unknown>)) {
+    const numero = Number(valor);
+    if (Number.isInteger(numero) && numero > 0) tetos[rota] = numero;
+  }
+  return tetos;
 }

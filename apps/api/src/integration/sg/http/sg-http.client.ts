@@ -13,6 +13,13 @@ export interface SgConnectionContext {
   baseUrl: string;
   tlsMode: 'https' | 'vpn';
   maxRps: number;
+  /**
+   * Prefixo aplicado a TODAS as rotas deste tenant (doc 34 Q5).
+   *
+   * Ausente = herda o padrão da instalação (`SG_API_PATH_PREFIX`), que por sua vez nasce vazio.
+   * É a resposta da SG sobre o `/public` do SG Cloud morando em dado, não em código.
+   */
+  apiPathPrefix?: string | null;
   /** JWT já obtido pelo token manager. Ausente apenas na própria autorização. */
   token?: string;
   authHeaderMode: 'raw' | 'bearer';
@@ -51,6 +58,47 @@ const RETRIES_GET = 3;
 /** Backoff do doc 12 §3: 1 s → 4 s → 9 s, com jitter para não sincronizar tentativas. */
 const backoffMs = (tentativa: number): number =>
   tentativa * tentativa * 1000 + Math.floor(Math.random() * 400);
+
+/**
+ * Teto da espera entre tentativas, mesmo quando o servidor pede mais.
+ *
+ * `Retry-After: 3600` existe e é legal; respeitá-lo ao pé da letra prenderia um worker por uma
+ * hora segurando o lock do domínio. Acima deste teto a resposta honesta é falhar e deixar a
+ * cadência reagendar (doc 14 §5).
+ */
+const ESPERA_MAXIMA_MS = 60_000;
+
+/**
+ * `Retry-After` em segundos ou como data HTTP (RFC 9110 §10.2.3). Valor ausente, negativo ou
+ * ilegível vira `undefined` — o backoff normal assume.
+ */
+/**
+ * Aplica o prefixo da API a um caminho (doc 34 Q5).
+ *
+ * Idempotente: caminho que já vem prefixado — a autorização do SG Cloud, que carrega `/public`
+ * na própria constante — não recebe o prefixo duas vezes. Sem isso, ligar o prefixo global
+ * transformaria `/public/...` em `/public/public/...` e a autorização pararia de funcionar
+ * justamente na instalação que precisava do ajuste.
+ */
+export function aplicarPrefixo(caminho: string, prefixoBruto: string | null | undefined): string {
+  const prefixo = (prefixoBruto ?? '').replace(/\/+$/, '');
+  if (!prefixo) return caminho;
+  if (caminho === prefixo || caminho.startsWith(`${prefixo}/`)) return caminho;
+  return `${prefixo}${caminho.startsWith('/') ? '' : '/'}${caminho}`;
+}
+
+export function lerRetryAfter(bruto: string | null): number | undefined {
+  if (!bruto) return undefined;
+
+  const segundos = Number(bruto.trim());
+  if (Number.isFinite(segundos)) return segundos > 0 ? segundos * 1000 : undefined;
+
+  const instante = Date.parse(bruto);
+  if (Number.isNaN(instante)) return undefined;
+
+  const espera = instante - Date.now();
+  return espera > 0 ? espera : undefined;
+}
 
 /**
  * Cliente HTTP da API SG: política única de timeout, retry, rate limit e disjuntor (doc 12 §3).
@@ -119,6 +167,7 @@ export class SgHttpClient {
           endpoint,
           autorizacao: opcoes.autorizacao,
           segundaTentativa: opcoes.segundaTentativa,
+          retryAfterMs: resposta.retryAfterMs,
         });
 
         // Só falha de infraestrutura conta para o disjuntor: 401 e 400 são problema de
@@ -153,7 +202,13 @@ export class SgHttpClient {
         ultimoErro = erro;
       }
 
-      const espera = backoffMs(tentativa);
+      // Quando o servidor diz quanto esperar, ele sabe melhor que o nosso backoff: só não o
+      // deixamos encurtar a espera nem segurar a fila indefinidamente (doc 34 Q3).
+      const sugerida = ultimoErro?.esperaSugeridaMs ?? null;
+      const espera =
+        sugerida === null
+          ? backoffMs(tentativa)
+          : Math.min(Math.max(sugerida, backoffMs(tentativa)), ESPERA_MAXIMA_MS);
       this.logger.warn(
         {
           event: 'sg_retry',
@@ -171,18 +226,29 @@ export class SgHttpClient {
     throw ultimoErro ?? new SgError('inalcancavel', { endpoint });
   }
 
+  /**
+   * Aplica o prefixo da API ao caminho (doc 34 Q5).
+   *
+   * O prefixo do tenant vence o da instalação; string vazia é uma escolha válida e explícita
+   * ("esta instalação não usa prefixo"), por isso a checagem é por `null`/`undefined` e não por
+   * valor falso — `?? ` e não `||`.
+   */
+  private comPrefixo(contexto: SgConnectionContext, caminho: string): string {
+    return aplicarPrefixo(caminho, contexto.apiPathPrefix ?? this.config.sg.apiPathPrefix);
+  }
+
   private async executar(
     contexto: SgConnectionContext,
     opcoes: SgRequestOptions,
-  ): Promise<{ status: number; corpo: unknown }> {
+  ): Promise<{ status: number; corpo: unknown; retryAfterMs?: number }> {
     // Revalidação a cada chamada: o DNS pode ter mudado desde o cadastro (rebinding).
     const { url } = await assertSafeErpUrl(contexto.baseUrl, {
       tlsMode: contexto.tlsMode,
       allowInsecure: this.config.sg.allowInsecure,
-      vpnCidr: this.config.sg.vpnCidr,
+      vpnCidrs: this.config.sg.vpnCidrs,
     });
 
-    const alvo = new URL(opcoes.path, url);
+    const alvo = new URL(this.comPrefixo(contexto, opcoes.path), url);
     for (const [chave, valor] of Object.entries(opcoes.query ?? {})) {
       if (valor === undefined || valor === null || valor === '') continue;
       if (Array.isArray(valor)) {
@@ -215,7 +281,11 @@ export class SgHttpClient {
         corpo = { error: texto.slice(0, 200) };
       }
 
-      return { status: resposta.status, corpo };
+      return {
+        status: resposta.status,
+        corpo,
+        retryAfterMs: lerRetryAfter(resposta.headers.get('retry-after')),
+      };
     } finally {
       clearTimeout(timer);
     }

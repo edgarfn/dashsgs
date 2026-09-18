@@ -32,6 +32,7 @@ export const VOCABULARIO_METRICAS: Record<string, Record<string, readonly string
       'nao_encontrado',
       'erro_servidor',
       'inalcancavel',
+      'limite_excedido',
       'resposta_invalida',
     ],
   },

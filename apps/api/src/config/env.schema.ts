@@ -83,12 +83,35 @@ export const envSchema = z
     SG_HTTP_TIMEOUT_MS: z.coerce.number().int().min(1000).max(600_000).default(60_000),
     SG_HEAVY_TIMEOUT_MS: z.coerce.number().int().min(1000).max(900_000).default(180_000),
     ALLOW_INSECURE_ERP: boolFromEnv(false),
-    // Faixa do WireGuard da plataforma: é a única rede privada que o guarda anti-SSRF aceita,
-    // e só para conexões com tls_mode=vpn (runbook 22 §7).
+    // Faixas do WireGuard da plataforma: as únicas redes privadas que o guarda anti-SSRF aceita,
+    // e só para conexões com tls_mode=vpn (runbook 22 §7). Aceita lista separada por vírgula —
+    // uma instalação pode acabar com mais de um túnel, e um só CIDR global obrigaria mudar
+    // código para atender o segundo (doc 34 Q1).
     SG_VPN_CIDR: z
       .string()
-      .regex(/^\d{1,3}(\.\d{1,3}){3}\/\d{1,2}$/, 'informe um CIDR IPv4, ex.: 10.66.0.0/16')
+      .refine(
+        (valor) =>
+          valor
+            .split(',')
+            .map((faixa) => faixa.trim())
+            .filter(Boolean)
+            .every((faixa) => /^\d{1,3}(\.\d{1,3}){3}\/\d{1,2}$/.test(faixa)),
+        'informe um ou mais CIDR IPv4 separados por vírgula, ex.: 10.66.0.0/16,10.67.0.0/16',
+      )
       .default('10.66.0.0/16'),
+    // Prefixo aplicado a TODAS as rotas da API SG. A SG não confirmou se o `/public` do SG Cloud
+    // vale só para a autorização ou para a API inteira (doc 34 Q5); vazio preserva o
+    // comportamento observado na homologação, e cada tenant pode sobrescrever.
+    SG_API_PATH_PREFIX: z
+      .string()
+      .regex(/^(\/[A-Za-z0-9._~-]+)*$/, 'use um prefixo de caminho, ex.: /public')
+      .default(''),
+    // Formato do header Authorization quando ainda não se sabe qual a instalação aceita
+    // (doc 34 Q2). O cliente descobre sozinho no primeiro 401 e grava o que funcionou.
+    SG_AUTH_HEADER_MODE: z.enum(['raw', 'bearer']).default('raw'),
+    // Piso da degradação automática de página: abaixo disso o problema não é tamanho de página,
+    // e insistir só multiplicaria chamadas (doc 34 Q4).
+    SG_PAGE_SIZE_MIN: z.coerce.number().int().min(1).max(1000).default(50),
     SG_MOCK: boolFromEnv(false),
 
     // --- Sincronização (doc 14) ---

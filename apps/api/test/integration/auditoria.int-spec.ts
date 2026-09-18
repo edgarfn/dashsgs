@@ -193,6 +193,7 @@ describe('auditoria (integração)', () => {
     });
 
     it('o período inclui o dia final inteiro', async () => {
+      // UTC: o filtro do serviço recorta `created_at` por instante UTC, não pelo dia do tenant.
       const hoje = new Date().toISOString().slice(0, 10);
       const trilha = await buscar(donoA, `?de=${hoje}&ate=${hoje}&pageSize=200`);
 

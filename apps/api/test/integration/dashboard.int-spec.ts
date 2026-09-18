@@ -15,6 +15,8 @@ import {
   cleanupTenantFixtures,
   createTenantFixture,
   type TenantFixture,
+  hojeNoTenant,
+  diaNoTenant,
 } from './helpers/tenant.helpers';
 
 const SENHA = 'Cavalo-Bateria-Grampo-Correto-9';
@@ -41,8 +43,8 @@ describe('dashboard (integração)', () => {
   let consulta: TestAgent;
   let csrf: string;
 
-  const hoje = () => new Date().toISOString().slice(0, 10);
-  const ontem = () => new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+  const hoje = () => hojeNoTenant();
+  const ontem = () => diaNoTenant(-1);
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -272,7 +274,7 @@ describe('dashboard (integração)', () => {
     });
 
     it('comparativo devolve série, ranking de filiais e corte por departamento', async () => {
-      const de = new Date(Date.now() - 20 * 86_400_000).toISOString().slice(0, 10);
+      const de = diaNoTenant(-20);
       const { body } = await dono
         .get(`${API_PREFIX}/dashboard/vendas/comparativo?de=${de}&ate=${hoje()}`)
         .expect(200);

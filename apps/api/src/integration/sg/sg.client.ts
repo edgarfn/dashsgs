@@ -47,6 +47,19 @@ import {
 
 const BASE = '/integracao/sgsistemas/v1';
 
+/**
+ * Teto de `itensPorPagina` por rota — a resposta que a SG ainda não deu (doc 34 Q4).
+ *
+ * Cada entrada aqui é uma **suposição**, não um fato documentado: o valor foi o que se observou
+ * aguentar na homologação. Estava antes escrito como número solto no meio de uma chamada, onde
+ * ninguém o encontrava nem sabia de onde vinha. Aqui ele tem nome, motivo e um lugar para a
+ * resposta verdadeira entrar quando chegar — e o tenant ainda pode sobrescrever cada linha.
+ */
+const TETO_POR_ROTA: Record<string, number> = {
+  // Resumo diário por filial: a página grande estourava o tempo do lado do ERP.
+  'GET /filiais/vendas': 200,
+};
+
 /** Recorte máximo aceito pela API em séries históricas (doc 03 / doc 12 §3). */
 export const JANELA_MAXIMA_DIAS = 30;
 
@@ -56,9 +69,29 @@ export interface SgCallContext {
     authPathOverride?: string | null;
     /** Claim `routes` do último token — o contrato real deste tenant com a SG. */
     routesGranted: string[];
+    /** Itens por página deste tenant; ausente = padrão da instalação (doc 34 Q4). */
+    pageSize?: number | null;
+    /** Teto por rota já confirmado pela própria API, ex.: `{"GET /vendas": 100}`. */
+    pageSizePorRota?: Record<string, number> | null;
   };
   credenciais: () => Promise<{ usuario: string; senha: string }>;
   prioridade?: PrioridadeChamada;
+  /**
+   * Grava no cadastro do tenant o que o cliente descobriu sozinho em execução (doc 34 Q2/Q4).
+   *
+   * É porta, como `credenciais`: a camada de integração não conhece banco. Quem implementa é o
+   * `ErpConnectionService`, que é dono da conexão. Sem isto, a descoberta vive só no cache do
+   * token (50 min) e se perde a cada renovação — cada ciclo pagaria de novo o 401 de aprendizado.
+   */
+  aprender?: (ajuste: AprendizadoDaConexao) => Promise<void>;
+}
+
+/** O que o cliente aprende conversando com a instalação, e que vale guardar. */
+export interface AprendizadoDaConexao {
+  /** Formato do header Authorization que a instalação de fato aceita (doc 34 Q2). */
+  authHeaderMode?: 'raw' | 'bearer';
+  /** Teto de `itensPorPagina` que a rota aceitou, por rota (doc 34 Q4). */
+  pageSizePorRota?: Record<string, number>;
 }
 
 export interface ResultadoColeta<T> {
@@ -167,7 +200,7 @@ export class SgClient {
       },
       'GET /produtos',
       {
-        itensPorPagina: filtro.itensPorPagina ?? this.config.sg.pageSize,
+        itensPorPagina: filtro.itensPorPagina,
         chaveItens: 'produtos',
       },
     )) {
@@ -198,7 +231,7 @@ export class SgClient {
       { idProduto: filtro.produto },
       'GET /produtos/gtins',
       {
-        itensPorPagina: filtro.itensPorPagina ?? this.config.sg.pageSize,
+        itensPorPagina: filtro.itensPorPagina,
         chaveItens: 'gtins',
         prioridade: 'backfill',
       },
@@ -302,7 +335,7 @@ export class SgClient {
         dataFinal: params.dataFinal,
       },
       'GET /filiais/vendas',
-      { itensPorPagina: 200, chaveItens: 'vendas', prioridade: 'backfill' },
+      { chaveItens: 'vendas', prioridade: 'backfill' },
     )) {
       const coleta = await this.coletar(contexto, resumoFilialSchema, pagina, 'resumo_filial');
       itens.push(...coleta.itens);
@@ -482,7 +515,6 @@ export class SgClient {
     let paginas = 0;
 
     for await (const pagina of this.paginar(contexto, caminho, query, rota, {
-      itensPorPagina: this.config.sg.pageSize,
       chaveItens,
       prioridade: 'backfill',
     })) {
@@ -505,7 +537,8 @@ export class SgClient {
     query: Record<string, unknown>,
     rota: string,
     opcoes: {
-      itensPorPagina: number;
+      /** Ausente = o tamanho sai da configuração do tenant/instalação (doc 34 Q4). */
+      itensPorPagina?: number;
       chaveItens?: string;
       pesado?: boolean;
       prioridade?: PrioridadeChamada;
@@ -513,15 +546,41 @@ export class SgClient {
   ): AsyncGenerator<unknown[]> {
     let pagina = 1;
     let totalPaginas = 1;
+    // Tamanho efetivo: o teto já aprendido para esta rota vence o pedido, e o pedido vence o
+    // padrão. É a resposta da Q4 morando em dado.
+    let itensPorPagina = this.tamanhoDePagina(contexto, rota, opcoes.itensPorPagina);
 
     do {
-      const corpo = await this.get(
-        contexto,
-        caminho,
-        { ...query, pagina, itensPorPagina: opcoes.itensPorPagina },
-        rota,
-        { pesado: opcoes.pesado, prioridade: opcoes.prioridade },
-      );
+      let corpo;
+      try {
+        corpo = await this.get(contexto, caminho, { ...query, pagina, itensPorPagina }, rota, {
+          pesado: opcoes.pesado,
+          prioridade: opcoes.prioridade,
+        });
+      } catch (erro) {
+        // A SG não documenta o teto de `itensPorPagina` por endpoint (doc 34 Q4), e um endpoint
+        // que recusa o tamanho responde 400 — indistinguível, para nós, de "parâmetro errado".
+        // Em vez de quarentenar a varredura inteira, cortamos o tamanho pela metade e tentamos
+        // de novo; o valor que passar fica gravado na conexão e vale para as próximas.
+        const menor = this.reduzirPagina(itensPorPagina);
+        if (!(erro instanceof SgError) || erro.falha !== 'requisicao_invalida' || menor === null) {
+          throw erro;
+        }
+
+        this.logger.warn(
+          {
+            event: 'sg_pagina_reduzida',
+            tenant_id: contexto.conexao.tenantId,
+            rota,
+            de: itensPorPagina,
+            para: menor,
+          },
+          'sg_pagina_reduzida',
+        );
+        itensPorPagina = menor;
+        await contexto.aprender?.({ pageSizePorRota: { [rota]: menor } });
+        continue;
+      }
 
       const normalizada = normalizarPagina(corpo, opcoes.chaveItens);
       totalPaginas = normalizada.quantidadePaginas;
@@ -532,6 +591,28 @@ export class SgClient {
       if (normalizada.itens.length === 0) break;
       pagina += 1;
     } while (pagina <= totalPaginas);
+  }
+
+  /**
+   * Tamanho de página efetivo para uma rota (doc 34 Q4).
+   *
+   * Precedência: teto aprendido para a rota → tamanho pedido pelo chamador → configuração do
+   * tenant → padrão da instalação. O aprendido vem primeiro porque é o único dos quatro que foi
+   * confirmado pela própria API.
+   */
+  private tamanhoDePagina(contexto: SgCallContext, rota: string, pedido?: number): number {
+    const desejado = pedido ?? contexto.conexao.pageSize ?? this.config.sg.pageSize;
+    // O teto aprendido veio da própria API recusando um valor maior; o padrão da rota é só a
+    // nossa suposição. Por isso o aprendido vence quando existe.
+    const teto = contexto.conexao.pageSizePorRota?.[rota] ?? TETO_POR_ROTA[rota];
+    return teto ? Math.min(teto, desejado) : desejado;
+  }
+
+  /** Metade, até o piso da instalação. `null` quando já se está no piso — aí o 400 é outro. */
+  private reduzirPagina(atual: number): number | null {
+    const piso = this.config.sg.pageSizeMin;
+    if (atual <= piso) return null;
+    return Math.max(piso, Math.floor(atual / 2));
   }
 
   /**
@@ -628,6 +709,9 @@ export class SgClient {
         const alternativo = renovado.headerMode === 'raw' ? 'bearer' : 'raw';
         const resposta = await executar(alternativo, true);
         await this.tokens.registrarHeaderMode(contexto.conexao.tenantId, alternativo);
+        // Além do cache: o cadastro do tenant passa a nascer no formato certo, e a instalação
+        // deixa de pagar um 401 de aprendizado a cada renovação de token.
+        await contexto.aprender?.({ authHeaderMode: alternativo });
         this.logger.info(
           {
             event: 'sg_header_mode_descoberto',

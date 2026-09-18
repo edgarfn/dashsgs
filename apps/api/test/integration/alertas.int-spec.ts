@@ -14,6 +14,8 @@ import {
   cleanupTenantFixtures,
   createTenantFixture,
   type TenantFixture,
+  hojeNoTenant,
+  diaNoTenant,
 } from './helpers/tenant.helpers';
 
 const SENHA = 'Cavalo-Bateria-Grampo-Correto-9';
@@ -39,9 +41,8 @@ describe('alertas (integração)', () => {
   let csrf: string;
   let csrfGerente: string;
 
-  const hoje = () => new Date().toISOString().slice(0, 10);
-  const diasAtras = (dias: number) =>
-    new Date(Date.now() - dias * 86_400_000).toISOString().slice(0, 10);
+  const hoje = () => hojeNoTenant();
+  const diasAtras = (dias: number) => diaNoTenant(-dias);
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -277,7 +278,12 @@ describe('alertas (integração)', () => {
       const queda = lista.find((regra) => regra.type === 'queda_de_venda')!;
 
       // Antes da hora de corte, a regra fica quieta: toda loja está "abaixo da média" às 9h.
-      await regras.atualizar(tenant.id, queda.id, { params: { horaDeCorte: 23 } });
+      //
+      // 24 e não 23: o avaliador compara `horaLocal < horaDeCorte`, e com 23 este cenário
+      // passava a depender da hora em que a suíte roda — às 23h no fuso do tenant a regra
+      // disparava e o teste falhava. 24 é maior que qualquer hora possível, então "antes do
+      // corte" é sempre verdade e o que se testa volta a ser a regra, não o relógio.
+      await regras.atualizar(tenant.id, queda.id, { params: { horaDeCorte: 24 } });
       await engine.avaliar(tenant.id);
       expect((await eventos()).some((evento) => evento.rule.type === 'queda_de_venda')).toBe(false);
 

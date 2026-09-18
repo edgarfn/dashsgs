@@ -17,6 +17,7 @@ import {
   cleanupTenantFixtures,
   createTenantFixture,
   type TenantFixture,
+  hojeNoTenant,
 } from './helpers/tenant.helpers';
 
 const SENHA = 'Cavalo-Bateria-Grampo-Correto-9';
@@ -66,7 +67,7 @@ describe('metas (integração)', () => {
   let dono: TestAgent;
   let csrf: string;
 
-  const hoje = () => new Date().toISOString().slice(0, 10);
+  const hoje = () => hojeNoTenant();
   const competencia = () => hoje().slice(0, 7);
 
   beforeAll(async () => {
