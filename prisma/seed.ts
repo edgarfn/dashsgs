@@ -103,12 +103,29 @@ async function upsertMember(
 /**
  * Filiais são dado de TENANT: a RLS estrita recusa a escrita sem `app.tenant_id` fixado
  * (doc 08 §3). O seed abre o contexto exatamente como a aplicação faz.
+ *
+ * `FILIAIS.erpId` é numérico pequeno (1–4) porque é assim que o produto numera filial — e é
+ * exatamente essa faixa que uma instalação real da SG também usa (doc 34 §4.7: a homologação
+ * tem UMA filial real com `erp_id = 1`). Diferente do departamento fictício, não dá para
+ * renomear o `erpId` para fugir da colisão sem reescrever vendas, financeiro e metas sintéticos
+ * que dependem dele.
+ *
+ * O seed nunca escreve `cnpj` (nem aqui, nem em nenhuma outra função deste arquivo) — só o
+ * sync real preenche essa coluna. É por isso um sinal já existente, sem precisar de coluna nova:
+ * `cnpj` presente significa "esta filial já tem dado real do ERP", e o seed pula ela inteira em
+ * vez de escrever por cima com o nome fictício, como aconteceu duas vezes em 18/09/2026.
  */
 async function seedFiliais(tenantId: string, marca: string): Promise<void> {
   await prisma.$transaction(async (tx) => {
     await tx.$executeRawUnsafe(`SET LOCAL app.tenant_id = '${tenantId}'`);
 
     for (const filial of FILIAIS) {
+      const existente = await tx.erpFilial.findUnique({
+        where: { tenantId_erpId: { tenantId, erpId: filial.erpId } },
+        select: { cnpj: true },
+      });
+      if (existente?.cnpj) continue;
+
       const razaoSocial = `${marca} Supermercados LTDA — ${filial.sufixo}`;
       const nomeFantasia = `${marca} ${filial.fantasia}`;
       await tx.erpFilial.upsert({
@@ -130,16 +147,61 @@ async function seedFiliais(tenantId: string, marca: string): Promise<void> {
  * É dado **sintético**, como todo o resto deste arquivo: nada aqui sai de cliente nenhum.
  */
 const DIAS_DE_HISTORICO = 30;
+/**
+ * Prefixo que nenhum código real da SG usaria — evita a colisão que já aconteceu duas vezes
+ * (18/09/2026, doc 34 §4.7): o código de departamento fictício era `'1'`/`'2'`, e a homologação
+ * real também usa `'1'`/`'2'` para departamentos verdadeiros. `pnpm db:seed` sobrescrevia a
+ * descrição real com "MERCEARIA"/"LIMPEZA" toda vez que rodava, sem tocar `synced_at` — silencioso.
+ * `FILIAIS.erpId` tem o mesmo risco (a homologação usa `1` para a filial real) mas não dá para
+ * renomear sem reescrever todo o resto do seed que depende de `erpId` numérico pequeno; fica
+ * anotado, não corrigido.
+ */
+const PREFIXO_DEMO = 'DEMO-';
 const PRODUTOS_DEMO = [
-  { erpId: 1001, descricao: 'ARROZ TIPO 1 5KG', dep: '1', preco: 24.9, custo: 19.4, curva: 'A' },
-  { erpId: 1002, descricao: 'FEIJAO CARIOCA 1KG', dep: '1', preco: 8.49, custo: 6.2, curva: 'A' },
-  { erpId: 1003, descricao: 'DETERGENTE NEUTRO', dep: '2', preco: 2.99, custo: 1.95, curva: 'B' },
-  { erpId: 1004, descricao: 'CAFE TORRADO 500G', dep: '1', preco: 18.9, custo: 14.1, curva: 'A' },
-  { erpId: 1005, descricao: 'SABAO EM PO 1KG', dep: '2', preco: 15.5, custo: 11.9, curva: 'C' },
+  {
+    erpId: 1001,
+    descricao: 'ARROZ TIPO 1 5KG',
+    dep: `${PREFIXO_DEMO}MERCEARIA`,
+    preco: 24.9,
+    custo: 19.4,
+    curva: 'A',
+  },
+  {
+    erpId: 1002,
+    descricao: 'FEIJAO CARIOCA 1KG',
+    dep: `${PREFIXO_DEMO}MERCEARIA`,
+    preco: 8.49,
+    custo: 6.2,
+    curva: 'A',
+  },
+  {
+    erpId: 1003,
+    descricao: 'DETERGENTE NEUTRO',
+    dep: `${PREFIXO_DEMO}LIMPEZA`,
+    preco: 2.99,
+    custo: 1.95,
+    curva: 'B',
+  },
+  {
+    erpId: 1004,
+    descricao: 'CAFE TORRADO 500G',
+    dep: `${PREFIXO_DEMO}MERCEARIA`,
+    preco: 18.9,
+    custo: 14.1,
+    curva: 'A',
+  },
+  {
+    erpId: 1005,
+    descricao: 'SABAO EM PO 1KG',
+    dep: `${PREFIXO_DEMO}LIMPEZA`,
+    preco: 15.5,
+    custo: 11.9,
+    curva: 'C',
+  },
 ];
 const DEPARTAMENTOS_DEMO = [
-  { erpId: '1', descricao: 'MERCEARIA' },
-  { erpId: '2', descricao: 'LIMPEZA' },
+  { erpId: `${PREFIXO_DEMO}MERCEARIA`, descricao: 'MERCEARIA' },
+  { erpId: `${PREFIXO_DEMO}LIMPEZA`, descricao: 'LIMPEZA' },
 ];
 
 /** Ruído determinístico: o mesmo par (dia, filial) devolve sempre o mesmo fator. */
