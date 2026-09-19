@@ -5,6 +5,11 @@
 > arquitetura e operação de rotina, e o resto do código do projeto cita estas seções por número
 > (`doc 19 §3`, `§4`, `§7`...) — não renumere.
 >
+> **Usando Nginx Proxy Manager (ou outro proxy) no lugar do Caddy?** O roteiro específico é o
+> [doc 35](35-deploy-vps-npm.md): o Caddy não sobe (`DEPLOY_EDGE=none`), o proxy entra na rede
+> `dashsgs_app`, e há duas coisas que o Caddy fazia e o app não faz sozinho — bloquear
+> `/metrics` e emitir HSTS no front.
+>
 > **E antes de qualquer coisa: isto não é o gate de produção.** O checklist de GA (doc 32) tem 19
 > itens `[BLOQ]` abertos hoje, e a Q1 do doc 34 (HTTPS ou VPN obrigatório da SG) segue sem
 > resposta — sem ela nenhum tenant com ERP em HTTP puro conecta em produção, por desenho
@@ -388,10 +393,18 @@ um gate, não um relatório informativo para ignorar.
 
 Não existe hoje. Para criar, o caminho natural (mesma mecânica, ambiente novo):
 
-1. Repita 9.1–9.5 numa VM **diferente**, com `.env.production` e domínios de produção.
+1. Repita 9.1–9.5 numa VM **diferente**, com domínios de produção.
 2. `cp .github/workflows/deploy-staging.yml .github/workflows/deploy-production.yml`, trocando
-   `staging` por `production` nos nomes de ambiente/secrets, e o `.env.staging` do script SSH
-   por `.env.production`.
+   `staging` por `production` nos nomes de ambiente/secrets.
+
+   **Atenção — o arquivo de ambiente continua se chamando `.env.staging`, mesmo em produção.**
+   `docker/compose.staging.yml` traz `env_file: [../.env.staging]` *fixo* em três serviços
+   (`api-migrate`, `api`, `workers`), e isso é o que os containers de fato leem. O argumento
+   `[env-file]` do `deploy.sh` alimenta só a interpolação de `${VAR}` no YAML — são dois
+   mecanismos diferentes. Verificado empiricamente: passando `--env-file .env.staging.example`
+   com um `.env.staging` de conteúdo distinto ao lado, os três serviços receberam o valor do
+   `.env.staging`. Renomear o arquivo sem editar as três linhas do compose faz o deploy subir
+   com a configuração errada, ou falhar por arquivo ausente.
 3. No ambiente `production` do GitHub (Settings → Environments → New environment), ligue
    **required reviewers** — é o botão de aprovação manual antes de qualquer deploy em produção
    tocar clientes de verdade, e o GitHub já faz isso nativamente, sem escrever nada a mais.

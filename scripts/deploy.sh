@@ -27,9 +27,18 @@ echo "==> aplicando migrações (papel app_migrator)"
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up --exit-code-from api-migrate api-migrate
 
 echo "==> subindo serviços"
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --no-deps api web caddy
+# Borda: Caddy por padrão. `DEPLOY_EDGE=none` quando um proxy externo (Nginx Proxy Manager,
+# Traefik, o proxy do provedor) já ocupa 80/443 — os dois brigariam pela porta. É variável de
+# ambiente, e não edição neste arquivo, porque o workflow de deploy roda `git checkout --force`
+# na VM: alteração local em arquivo versionado é apagada no deploy seguinte (doc 19 §9.6.4).
+SERVICOS=(api web)
+[[ "${DEPLOY_EDGE:-caddy}" == "caddy" ]] && SERVICOS+=(caddy)
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --no-deps "${SERVICOS[@]}"
 
 echo "==> smoke"
+# ATENÇÃO ao default: NENHUM serviço deste compose publica 3001 no host — só o Caddy publica
+# porta (80/443). `localhost:3001` só responde se você publicou a porta por fora. Na VM, aponte
+# SMOKE_BASE_URL para a URL pública que a borda serve (doc 19 §9.5.5).
 ./scripts/smoke.sh "${SMOKE_BASE_URL:-http://localhost:3001}"
 
 echo "==> deploy concluído: $APP_VERSION"
