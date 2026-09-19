@@ -1,7 +1,17 @@
 # DashSGS — staging/produção no MVP (ADR-013: Docker Compose; K8s adiado).
 # A mesma imagem sobe em staging e em produção; só muda a configuração (12-factor, doc 19 §1).
 #
-# Uso:  APP_VERSION=<digest> docker compose -f docker/compose.staging.yml --env-file .env.staging up -d
+# Uso normal — via ./scripts/deploy.sh, que exporta as três variáveis abaixo a partir de um
+# digest real antes de chamar compose (doc 19 §4):
+#   API_IMAGE=ghcr.io/.../dashsgs-api@sha256:... WEB_IMAGE=ghcr.io/.../dashsgs-web@sha256:... \
+#   APP_VERSION=<digest> docker compose -f docker/compose.staging.yml --env-file .env.staging up -d
+#
+# `API_IMAGE`/`WEB_IMAGE`/`APP_VERSION` têm um valor-placeholder de fallback (`:-...`) só para
+# que comandos que NÃO tocam `api`/`web`/`workers` — `build postgres backup`, `up -d postgres`,
+# `up -d redis` (doc 19 §9.5.3–9.5.4) — não precisem deles: sem algum valor, mesmo vazio, o
+# Compose recusa o projeto inteiro com "invalid compose project", porque valida TODOS os
+# serviços antes de filtrar os pedidos. O placeholder nunca é usado de verdade: `deploy.sh`
+# sempre define os três com valor real antes de subir `api`/`web`/`workers`.
 name: dashsgs
 
 x-logging: &logging
@@ -30,19 +40,19 @@ services:
     logging: *logging
 
   web:
-    image: ${WEB_IMAGE}
+    image: ${WEB_IMAGE:-ghcr.io/edgarfn/dashsgs-web:nao-definido}
     restart: unless-stopped
     environment:
       NODE_ENV: production
       INTERNAL_API_URL: http://api:3001
       NEXT_PUBLIC_APP_NAME: DashSGS
-      APP_VERSION: ${APP_VERSION}
+      APP_VERSION: ${APP_VERSION:-nao-definido}
     networks: [app]
     logging: *logging
 
   # Job de migração: roda com o papel app_migrator e termina (doc 19 §4, passo 2).
   api-migrate:
-    image: ${API_IMAGE}
+    image: ${API_IMAGE:-ghcr.io/edgarfn/dashsgs-api:nao-definido}
     restart: 'no'
     command: ['node', 'node_modules/prisma/build/index.js', 'migrate', 'deploy']
     # O Prisma migra pelo `directUrl` do schema, que aponta para DATABASE_URL_MIGRATOR:
@@ -56,11 +66,11 @@ services:
     logging: *logging
 
   api:
-    image: ${API_IMAGE}
+    image: ${API_IMAGE:-ghcr.io/edgarfn/dashsgs-api:nao-definido}
     restart: unless-stopped
     env_file: [../.env.staging]
     environment:
-      APP_VERSION: ${APP_VERSION}
+      APP_VERSION: ${APP_VERSION:-nao-definido}
     depends_on:
       api-migrate:
         condition: service_completed_successfully
@@ -75,12 +85,12 @@ services:
   # Worker de sincronização (doc 04 §2): mesma imagem da API, outro comando. Fica fora do
   # caminho HTTP para que um backfill de 26 meses não dispute CPU com o dashboard.
   workers:
-    image: ${API_IMAGE}
+    image: ${API_IMAGE:-ghcr.io/edgarfn/dashsgs-api:nao-definido}
     command: ['node', 'dist/worker.js']
     restart: unless-stopped
     env_file: [../.env.staging]
     environment:
-      APP_VERSION: ${APP_VERSION}
+      APP_VERSION: ${APP_VERSION:-nao-definido}
       # Só um processo registra as cadências; escalar réplicas não multiplica os agendamentos.
       SYNC_SCHEDULER_ENABLED: 'true'
       WORKER_PORT: '3002'

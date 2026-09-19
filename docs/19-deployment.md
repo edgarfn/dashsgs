@@ -128,8 +128,10 @@ conexão recusada em runtime, mais difícil de rastrear até o arquivo de ambien
    (varejo).
 5. `workers` não é tocado pelo `deploy.sh` — de propósito, o job de sincronização é operado à
    parte (doc 14 §1: nunca deve competir pela mesma disciplina de rollout que a API HTTP). Suba a
-   imagem nova manualmente quando o worker mudar:
-   `docker compose -f docker/compose.staging.yml --env-file .env.staging up -d --no-deps workers`.
+   imagem nova manualmente quando o worker mudar, com o **mesmo digest** que você acabou de
+   passar ao `deploy.sh` (ele não fica disponível no shell sozinho — §9.5.5):
+   `API_IMAGE=<mesmo digest do deploy.sh> docker compose -f docker/compose.staging.yml
+   --env-file .env.staging up -d --no-deps workers`.
 
 `/readyz` (readiness — dependências ok, é o portão que o smoke e um eventual balanceador usam) e
 `/healthz` (liveness) vêm de `apps/api/src/common/health/`; `/api/v1/meta` (versão/nome do
@@ -292,7 +294,14 @@ grep -E '^(SESSION_SECRET|CSRF_SECRET|PII_PEPPER|MASTER_KEY_CURRENT)=' .env.stag
 **9.5.3 Construir a imagem do Postgres (não vem do GHCR)**
 
 Diferente de `api`/`web`, a imagem do Postgres com WAL-G embutido (`docker/postgres/Dockerfile`)
-**não** é publicada pelo CI — é construída localmente, porque não muda a cada release do produto:
+**não** é publicada pelo CI — é construída localmente, porque não muda a cada release do produto.
+
+Os comandos `docker compose` daqui em diante **não** precisam de `API_IMAGE`/`WEB_IMAGE`/
+`APP_VERSION` — o compose tem um valor-placeholder de fallback para os três justamente para que
+comandos como este, que não tocam `api`/`web`/`workers`, funcionem sem eles. Sem esse fallback, o
+Compose recusa o arquivo inteiro com `invalid compose project` mesmo pedindo só `postgres`,
+porque valida todos os serviços antes de filtrar os pedidos — é o erro que aparece se você rodar
+isto contra uma cópia mais antiga do repositório.
 
 ```bash
 docker compose -f docker/compose.staging.yml --env-file .env.staging build postgres backup
@@ -324,24 +333,30 @@ docker compose -f docker/compose.staging.yml --env-file .env.staging up -d redis
 
 **9.5.5 Puxar `api`/`web` e rodar o primeiro deploy**
 
-A partir daqui é exatamente a §4 — primeiro deploy ou centésimo, mesmo comando:
+A partir daqui é exatamente a §4 — primeiro deploy ou centésimo, mesmo comando. Guarde o digest
+numa variável de shell antes de chamar o script — você vai precisar dele de novo no passo
+seguinte, e `deploy.sh` não deixa essa variável disponível depois que termina (o `export` de
+dentro dele não sobe para o shell que o chamou):
 
 ```bash
 # pegue os digests das imagens já publicadas (§9.0) no output do job "Publicar imagens", ou:
 #   gh run view <run-id> --repo edgarfn/dashsgs --json jobs
-./scripts/deploy.sh \
-  ghcr.io/edgarfn/dashsgs-api@sha256:<digest> \
-  ghcr.io/edgarfn/dashsgs-web@sha256:<digest> \
-  .env.staging
+API_IMAGE=ghcr.io/edgarfn/dashsgs-api@sha256:<digest>
+WEB_IMAGE=ghcr.io/edgarfn/dashsgs-web@sha256:<digest>
+
+./scripts/deploy.sh "$API_IMAGE" "$WEB_IMAGE" .env.staging
 ```
 
 Se o smoke falhar, `deploy.sh` diz qual verificação e `docker compose logs <serviço>` explica o
 resto — normalmente um dos três acoplamentos da §3.
 
-Depois, suba o worker (fora do `deploy.sh` de propósito, §4 passo 5) e a observabilidade/backup:
+Depois, suba o worker (fora do `deploy.sh` de propósito, §4 passo 5) e a observabilidade/backup.
+`workers` usa a mesma imagem da API — reaproveite `$API_IMAGE`; sem ela, o comando cairia no
+placeholder do compose (§9.5.3) e falharia por imagem inexistente:
 
 ```bash
-docker compose -f docker/compose.staging.yml --env-file .env.staging up -d --no-deps workers
+API_IMAGE="$API_IMAGE" docker compose -f docker/compose.staging.yml --env-file .env.staging \
+  up -d --no-deps workers
 pnpm obs:up
 docker compose -f docker/compose.staging.yml --env-file .env.staging up -d backup
 

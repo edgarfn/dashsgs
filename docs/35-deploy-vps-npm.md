@@ -114,6 +114,12 @@ Ela não vem do GHCR (o CI publica só `api` e `web`):
 docker compose -f docker/compose.staging.yml --env-file .env.staging build postgres backup
 ```
 
+Este comando não precisa de `API_IMAGE`/`WEB_IMAGE`/`APP_VERSION` — o compose tem um
+valor-placeholder de fallback para os três, exatamente para que comandos que não tocam
+`api`/`web`/`workers` funcionem sem eles (sem isso, `docker compose` recusa o arquivo inteiro com
+`invalid compose project`, mesmo pedindo só `postgres`/`backup`, porque valida todos os serviços
+antes de filtrar o que foi pedido).
+
 ### 5.4 Subir o banco e criar os papéis
 
 ```bash
@@ -140,18 +146,20 @@ Pegue os digests no job "Publicar imagens" do último workflow verde:
 gh run list --workflow=deploy-staging.yml --repo edgarfn/dashsgs --limit 1
 ```
 
-E rode o deploy com a borda desligada:
+E rode o deploy com a borda desligada. Guarde o digest da API numa variável — você precisa dele
+de novo logo abaixo, e `deploy.sh` não deixa essa variável disponível depois que termina (o
+`export` de dentro do script não sobe para o shell que o chamou):
 
 ```bash
+API_IMAGE=ghcr.io/edgarfn/dashsgs-api@sha256:<digest-api>
+WEB_IMAGE=ghcr.io/edgarfn/dashsgs-web@sha256:<digest-web>
+
 DEPLOY_EDGE=none \
 SMOKE_BASE_URL=https://app.seudominio.com.br \
-./scripts/deploy.sh \
-  ghcr.io/edgarfn/dashsgs-api@sha256:<digest-api> \
-  ghcr.io/edgarfn/dashsgs-web@sha256:<digest-web> \
-  .env.staging
+./scripts/deploy.sh "$API_IMAGE" "$WEB_IMAGE" .env.staging
 ```
 
-Duas variáveis, dois motivos concretos:
+Duas variáveis de ambiente do `deploy.sh`, dois motivos concretos:
 
 - `DEPLOY_EDGE=none` — sem isso o script sobe o `caddy` junto e ele bate de frente com o NPM na
   porta 80/443.
@@ -159,10 +167,13 @@ Duas variáveis, dois motivos concretos:
   compose**: nada publica 3001 no host. Na primeira execução o NPM ainda não está configurado,
   então o smoke vai falhar aqui; siga para §5.6 e rode o smoke de novo depois (§6).
 
-Depois, o worker (fica fora do `deploy.sh` de propósito — doc 19 §4 passo 5):
+Depois, o worker (fica fora do `deploy.sh` de propósito — doc 19 §4 passo 5). Ele usa a mesma
+imagem da API — reaproveite `$API_IMAGE`; sem ela, o compose cairia no valor-placeholder de
+fallback (§5.3) e falharia por imagem inexistente:
 
 ```bash
-docker compose -f docker/compose.staging.yml --env-file .env.staging up -d --no-deps workers
+API_IMAGE="$API_IMAGE" docker compose -f docker/compose.staging.yml --env-file .env.staging \
+  up -d --no-deps workers
 ```
 
 ### 5.6 Ligar o NPM à rede do DashSGS
@@ -303,7 +314,8 @@ DEPLOY_EDGE=none SMOKE_BASE_URL=https://app.seudominio.com.br \
   ./scripts/deploy.sh <digest-api-novo> <digest-web-novo> .env.staging
 ```
 
-Rollback é o mesmo comando com os digests anteriores — a imagem é imutável (doc 19 §8).
+Rollback é o mesmo comando com os digests anteriores — a imagem é imutável (doc 19 §8). Se o
+worker também mudou, suba-o com o mesmo digest logo em seguida, do jeito mostrado em §5.5.
 
 Se for automatizar pelo GitHub Actions, os cinco secrets/variáveis do ambiente `staging` estão
 em doc 19 §9.6.2 — e o script SSH do workflow precisa levar `DEPLOY_EDGE=none` junto, senão o
