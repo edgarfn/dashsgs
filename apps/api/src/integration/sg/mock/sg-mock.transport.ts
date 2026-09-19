@@ -82,7 +82,12 @@ export class SgMockTransport implements SgTransport {
     if (caminho.endsWith('/produtos/gtins')) return this.paginado(alvo, FIXTURE_GTINS, 'gtins');
     if (caminho.endsWith('/produtos')) return this.paginado(alvo, FIXTURE_PRODUTOS, 'produtos');
     if (caminho.endsWith('/vendas/hoje')) return this.exigeFilial(alvo, FIXTURE_VENDAS_HOJE);
-    if (caminho.endsWith('/finalizadoras/hoje'))
+    // `endsWith('/finalizadoras/hoje')` sozinho casava com QUALQUER prefixo, inclusive o
+    // caminho que faltava o segmento `/vendas` — o mock aceitava a chamada errada como se
+    // fosse a documentada, e só o servidor real (que confere o caminho inteiro) acusou o 404.
+    // Ver `getFinalizadoras` em sg.client.ts e doc 34 §4.7: o cliente já foi corrigido, isto
+    // aqui é para a mesma regressão não voltar a passar despercebida pelo mock.
+    if (caminho.endsWith('/vendas/finalizadoras/hoje'))
       return this.exigeFilial(alvo, FIXTURE_FINALIZADORAS_HOJE);
     if (caminho.endsWith('/vendas/finalizadoras')) return this.finalizadorasDoDia(alvo);
     if (caminho.endsWith('/vendas')) return this.vendasDoDia(alvo);

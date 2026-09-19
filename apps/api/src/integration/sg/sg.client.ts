@@ -299,7 +299,14 @@ export class SgClient {
     contexto: SgCallContext,
     params: { filial: number; data?: string; hoje?: boolean },
   ): Promise<ResultadoColeta<SgFinalizadora>> {
-    const caminho = params.hoje ? `${BASE}/finalizadoras/hoje` : `${BASE}/vendas/finalizadoras`;
+    // A rota "hoje" é uma FILHA de /vendas/finalizadoras, não uma irmã — a documentação da SG
+    // (Postman: "Vendas / Finalizadoras Hoje") mostra `/vendas/finalizadoras/hoje`. Faltava o
+    // segmento `/vendas` aqui; o mock nunca acusou porque casa por `endsWith('/finalizadoras/hoje')`,
+    // que aceita o caminho certo e o errado igualmente — só o servidor real, que confere o
+    // caminho inteiro, devolve 404 pra essa diferença (doc 34 §4.7).
+    const caminho = params.hoje
+      ? `${BASE}/vendas/finalizadoras/hoje`
+      : `${BASE}/vendas/finalizadoras`;
     const corpo = await this.get(
       contexto,
       caminho,

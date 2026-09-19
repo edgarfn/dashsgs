@@ -28,6 +28,7 @@ Nenhuma resposta bloqueia as fases 2–4 do roadmap; Q1–Q4 bloqueiam a fase 5 
 | Q14 | Período máx. de 30 dias vale também para /produtos/vendas, /perdas, /contas/*? (documentado só p/ movimentações, trocas e /filiais/vendas) | Janelas de sync | F6 |
 | Q15 | Encoding garantido UTF-8? Campos texto podem vir em CP850/Latin1 de bases antigas (ERP Harbour)? | Normalização de acentuação | F6 |
 | Q16 | Homologação: dados são resetados? Podemos usá-la p/ testes nightly contínuos? | Contrato nightly (doc 12 §7) | — |
+| Q17 | `/vendas`, `/vendas/hoje`, `/vendas/finalizadoras(/hoje)` e `/filiais/vendas` devolvem 403 nesta homologação mesmo com as 5 rotas presentes na claim `routes` do token — é módulo de PDV/vendas não provisionado nesta conta, ou outra coisa? (medido 19/09/2026, ver doc 34 §4.8) | Sem isso não dá para saber se 403-com-claim-positiva é "nunca vai responder" ou "tentar depois" | F6 |
 
 ## Para o tenant piloto (negócio/infra)
 
@@ -289,3 +290,67 @@ Mesmo formato do furo de TLS/VPN da §4.4 — mecanismo de proteção que não s
   tenant do doc 05 §2 não existe, e a retenção purga diariamente uma tabela sempre vazia. O dado
   por chamada já é medido em `sg-http.client.ts` para o Prometheus — falta uma porta
   `contabilizar` no contexto, no mesmo idioma de `credenciais` e `aprender`.
+
+### 4.8 Por que 3 de 5 rotas de venda falhavam (19/09/2026)
+
+A §4.7 registrou cinco falhas em rotas de venda sem investigar a causa de cada uma — ficou como
+próximo passo. Esta rodada foi atrás de cada uma, usando a coleção Postman pública da SG (a
+mesma da §4.6) como fonte de contrato, e mediu contra o servidor real em vez de supor.
+
+#### Um bug de verdade, achado e corrigido
+
+`getFinalizadoras` montava `/finalizadoras/hoje` para a variante "hoje" — a coleção da SG mostra
+`/vendas/finalizadoras/hoje`; faltava o segmento `/vendas`. Era 404 garantido contra o servidor
+real, sempre. O mock nunca acusou porque casava por `caminho.endsWith('/finalizadoras/hoje')`,
+que aceita o caminho certo e o errado igualmente — comparado ao resto do arquivo (que evita essa
+colisão por ordem, como `/previsaovendas/diaria` antes de `/previsaovendas`, ou por sufixo único),
+esta era a única linha frouxa o bastante para esconder um segmento de caminho inteiro faltando.
+
+Corrigido em dois lugares: o caminho em `sg.client.ts` (`/vendas/finalizadoras/hoje`) e o casador
+do mock, apertado para o caminho completo — não porque o caminho certo dependa disso, mas para
+que a MESMA classe de regressão não volte a passar despercebida se alguém reintroduzir o bug.
+
+#### Um beco sem saída que valeu a pena percorrer até o fim
+
+A hipótese inicial era que `assertRotaContratada` (o portão de contrato client-side, doc 12 §5)
+estivesse rejeitando essas rotas por engano — a claim `routes` chegou a ser medida com 114
+entradas, incluindo `GET /INTEGRACAO/SGSISTEMAS/V1/VENDAS/HOJE` e as outras quatro, literalmente.
+Instrumentação elemento-a-elemento da comparação confirmou: `assertRotaContratada` casava
+corretamente e **nunca** lançava para essas chamadas. O erro `rota_nao_contratada` que aparecia
+tinha origem completamente diferente — a mesma etiqueta de falha é usada em dois lugares do
+código (`sg.client.ts` para o portão client-side; `sg-errors.ts` para classificar uma resposta
+HTTP 403 do servidor), e só o `detalhe` do erro (`status`, `mensagemOrigem`, `segundaTentativa`)
+distingue as duas origens. Vale a lição: quando o mesmo nome de falha pode nascer de dois lugares
+diferentes, depurar pelo nome sozinho engana — foi preciso instrumentar de verdade para achar.
+
+#### A causa real: 403 do servidor, direto na primeira tentativa
+
+Capturado o `detalhe` do erro: `{"status":403,"mensagemOrigem":null,"segundaTentativa":false}`.
+403 na primeira tentativa, sem retry (a lógica de renovar token e trocar formato de header só
+dispara em 401 — `classificarResposta` manda 403 direto para `rota_nao_contratada`, sem chance de
+ser confusão de header), corpo de resposta sem mensagem. Isto é o servidor recusando de propósito,
+não um formato de chamada errado nosso: as mesmas 5 rotas, incluindo a já corrigida
+`/vendas/finalizadoras/hoje`, devolveram 403 de forma consistente em duas rodadas seguidas,
+minutos depois de o token ter sido obtido com as 5 rotas explicitamente listadas na claim.
+
+A claim do token e o que o servidor de fato deixa passar **não concordam** para esta família de
+rotas nesta instalação de homologação — o token diz "pode", o servidor recusa. Isso não é
+contraditório com o resto: a claim `routes` já era conhecida por variar entre chamadas (§4.7,
+Defeito 3), e agora fica mais um sintoma da mesma instabilidade — o RECORTE de conteúdo muda, e
+aparentemente o que é de fato ENFORÇADO no servidor não é garantido bater com o que a claim lista.
+
+Dado colateral: um teste anterior, horas antes desta rodada (registrado na §4.7), tinha medido
+`GET /vendas/hoje` e `GET /vendas/finalizadoras` como **200 com 0 itens** — não 403. Mesma conta,
+mesmas rotas, resultado diferente em momentos diferentes. Não há, do nosso lado, nenhuma mudança
+de código ou de configuração entre as duas medições que explique a diferença.
+
+#### O que isso significa
+
+Nada a corrigir no cliente além do bug do caminho. As outras quatro rotas (`/vendas`,
+`/vendas/hoje`, `/vendas/finalizadoras`, `/filiais/vendas`) — mais a quinta depois da correção do
+caminho — dependem de uma resposta do lado da SG: por que a claim lista rotas que o servidor
+recusa com 403, e se isso é um estado permanente desta conta de homologação (módulo de
+vendas/PDV não provisionado) ou mais uma variação temporária como as já catalogadas. Sem essa
+resposta, o produto não tem como saber se deve tratar 403-com-claim-positiva como "quarentena
+definitiva" ou "tentar de novo mais tarde" — e arriscar o segundo sem saber é gerar alerta falso
+de integração quebrada para um cliente real cujo módulo simplesmente não inclui vendas via API.
