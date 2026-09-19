@@ -10,11 +10,16 @@ git clone <repo> dashsgs && cd dashsgs
 pnpm install
 cp .env.example .env           # já preenchido p/ dev (sem segredos reais)
 pnpm infra:up                  # postgres + redis + mailpit (docker/compose.dev.yml)
-pnpm db:migrate && pnpm db:seed                  # schema + tenant demo com dados sintéticos
+pnpm db:migrate && pnpm db:seed                  # schema + tenant demo (só infra: users/papéis)
 pnpm dev                                         # api :3001, web :3000, workers
 ```
 Login demo: `owner@demo.local` / senha do seed (impressa no console). Mailpit em :8025 captura
 e-mails (convites/reset).
+
+`pnpm db:seed` sozinho **não** povoa filial/produto/venda/financeiro/metas — desde 19/09/2026 isso
+é opt-in (`SEED_SYNTHETIC_DATA=true pnpm db:seed`), para não sobrescrever dado real trazido por um
+sync de verdade (doc 34 §4.7). Sem a flag, o dashboard abre honesto e quase vazio: só o que algum
+sync real trouxer.
 
 Notas de ambiente (Fase 2):
 - `pnpm infra:up` passa `--env-file .env` de propósito: é dali que vêm `POSTGRES_PORT`,

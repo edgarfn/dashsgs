@@ -730,6 +730,24 @@ async function seedFinanceiro(tenantId: string): Promise<void> {
   );
 }
 
+/**
+ * Liga filiais, produtos, vendas, financeiro e metas SINTÉTICOS — o dado de negócio que enche o
+ * dashboard de números plausíveis e falsos.
+ *
+ * Desligado por padrão (19/09/2026, a pedido do dono do produto): depois que o sync real trouxe
+ * filial e dimensões verdadeiras da homologação SG (doc 34 §4.7), continuar semeando vendas
+ * fictícias por cima do dado real virava "painel mentindo por padrão" — e a Fase 11 existe
+ * justamente para olhar dado de verdade. `pnpm db:seed` sem a flag continua necessário: é ele
+ * que cria tenant, usuários e papéis — sem isso ninguém loga —, e continua sendo o reparo para
+ * MFA/senha travados, sem o efeito colateral de reescrever números de negócio.
+ *
+ * CI liga explicitamente: a suíte E2E (doc "sobre os 30 dias sintéticos que o seed grava",
+ * `e2e/dashboard.spec.ts`) e o restore-test (`restore-test.yml`, que verifica contagem de linha
+ * — banco vazio provaria pouco) dependem de volume. Ver `SEED_SYNTHETIC_DATA: 'true'` em
+ * `.github/workflows/ci.yml` e `.github/workflows/restore-test.yml`.
+ */
+const SEMEAR_DADOS_DE_NEGOCIO = process.env.SEED_SYNTHETIC_DATA === 'true';
+
 async function main(): Promise<void> {
   // O seed redefine senha e desliga o segundo fator das contas sintéticas. Em desenvolvimento é
   // exatamente o que se quer; num banco de produção seria um incidente.
@@ -748,14 +766,16 @@ async function main(): Promise<void> {
   for (const member of DEMO_USERS) await upsertMember(demo.id, passwordHash, member);
   for (const member of VIZINHO_USERS) await upsertMember(vizinho.id, passwordHash, member);
 
-  await seedFiliais(demo.id, 'Demo');
-  await seedFiliais(vizinho.id, 'Vizinha');
+  if (SEMEAR_DADOS_DE_NEGOCIO) {
+    await seedFiliais(demo.id, 'Demo');
+    await seedFiliais(vizinho.id, 'Vizinha');
 
-  // Só o tenant demo recebe movimento: o vizinho existe para provar isolamento, e um tenant
-  // vazio ao lado de um cheio é justamente o contraste que denuncia vazamento.
-  await seedVendas(demo.id);
-  await seedPrevisao(demo.id);
-  await seedFinanceiro(demo.id);
+    // Só o tenant demo recebe movimento: o vizinho existe para provar isolamento, e um tenant
+    // vazio ao lado de um cheio é justamente o contraste que denuncia vazamento.
+    await seedVendas(demo.id);
+    await seedPrevisao(demo.id);
+    await seedFinanceiro(demo.id);
+  }
 
   // Conta de operação da plataforma: papel global, sem membership em tenant nenhum (doc 07 §2).
   const operacao = await prisma.user.upsert({
@@ -778,14 +798,25 @@ async function main(): Promise<void> {
   await limparResiduoDeAcesso(operacao.id);
 
   console.log('');
-  console.log('Seed concluído (dados sintéticos).');
-  console.log(`  tenant : ${demo.name} (${demo.slug}) — ${FILIAIS.length} filiais`);
   console.log(
-    `  tenant : ${vizinho.name} (${vizinho.slug}) — ${FILIAIS.length} filiais (sem movimento)`,
+    SEMEAR_DADOS_DE_NEGOCIO
+      ? 'Seed concluído (com dados sintéticos de negócio).'
+      : 'Seed concluído (só infraestrutura — tenants, usuários, papéis).',
   );
-  console.log(`  vendas : ${DIAS_DE_HISTORICO} dias sintéticos no tenant demo`);
-  console.log('  financ.: contas, despesas, cartões e pedidos de compra sintéticos');
-  console.log('  metas  : previsão do mês corrente e do anterior (filial 3 abaixo da meta)');
+  if (SEMEAR_DADOS_DE_NEGOCIO) {
+    console.log(`  tenant : ${demo.name} (${demo.slug}) — ${FILIAIS.length} filiais`);
+    console.log(
+      `  tenant : ${vizinho.name} (${vizinho.slug}) — ${FILIAIS.length} filiais (sem movimento)`,
+    );
+    console.log(`  vendas : ${DIAS_DE_HISTORICO} dias sintéticos no tenant demo`);
+    console.log('  financ.: contas, despesas, cartões e pedidos de compra sintéticos');
+    console.log('  metas  : previsão do mês corrente e do anterior (filial 3 abaixo da meta)');
+  } else {
+    console.log(`  tenant : ${demo.name} (${demo.slug})`);
+    console.log(`  tenant : ${vizinho.name} (${vizinho.slug})`);
+    console.log('  filiais/produtos/vendas/financeiro/metas: NÃO semeados nesta execução.');
+    console.log('  SEED_SYNTHETIC_DATA=true pnpm db:seed  — para religar o dado sintético.');
+  }
   for (const user of [...DEMO_USERS, ...VIZINHO_USERS]) {
     const recorte = user.filiais.length > 0 ? ` — filiais ${user.filiais.join(', ')}` : '';
     console.log(`  usuário: ${user.email} — papel ${user.role}${recorte}`);

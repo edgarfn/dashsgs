@@ -307,6 +307,9 @@ jobs:
       PII_PEPPER: ci_pepper_ci_pepper_24ch
       INTERNAL_API_URL: http://127.0.0.1:3001
       SEED_PASSWORD: Senha-De-Teste-Bem-Longa-2026
+      # Desligado por padrão desde 19/09/2026 (prisma/seed.ts) — o E2E abaixo precisa dos 30 dias
+      # sintéticos (e2e/dashboard.spec.ts e cia.), então liga explicitamente aqui.
+      SEED_SYNTHETIC_DATA: 'true'
       # Sem ERP de verdade no CI: as fixtures respondem no lugar dele (doc 12 §7).
       SG_MOCK: 'true'
       ALLOW_INSECURE_ERP: 'true'

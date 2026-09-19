@@ -4,7 +4,9 @@ import { defineConfig, devices } from '@playwright/test';
  * E2E dos fluxos críticos (doc 17 §1): login + MFA, recuperação de senha, convite e perfil.
  *
  * Os testes rodam contra a aplicação de verdade — API, banco, Redis e Mailpit do compose. A
- * suíte assume `pnpm db:migrate && pnpm db:seed` executados com `SEED_PASSWORD` conhecida.
+ * suíte assume `pnpm db:migrate && SEED_SYNTHETIC_DATA=true pnpm db:seed` executados com
+ * `SEED_PASSWORD` conhecida — os 30 dias sintéticos de vendas são o que os cenários de dashboard
+ * olham (doc 15), e `SEED_SYNTHETIC_DATA` está desligada por padrão desde 19/09/2026.
  */
 const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
 

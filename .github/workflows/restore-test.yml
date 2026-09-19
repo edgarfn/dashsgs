@@ -105,6 +105,9 @@ jobs:
           DATABASE_URL: postgresql://postgres:ci_only_password@127.0.0.1:5432/dashsgs
           DATABASE_URL_MIGRATOR: postgresql://postgres:ci_only_password@127.0.0.1:5432/dashsgs
           SEED_PASSWORD: Senha-De-Teste-Bem-Longa-2026
+          # Desligado por padrão desde 19/09/2026 (prisma/seed.ts) — este job compara CONTAGEM de
+          # linha entre origem e restauração, e banco vazio provaria pouco (comentário acima).
+          SEED_SYNTHETIC_DATA: 'true'
         run: |
           docker exec -i origem psql -U postgres -d dashsgs -v ON_ERROR_STOP=1 \
             < docker/postgres/init/01-roles.sql

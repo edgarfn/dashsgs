@@ -51,6 +51,11 @@ sintéticas: devolve a senha, desliga o MFA e encerra as sessões. É o caminho 
 um código de 6 dígitos de um autenticador que você nunca cadastrou — sinal de que a suíte E2E
 cadastrou um, e o segredo dela morreu com o teste.
 
+Filial/produto/venda/financeiro/metas sintéticos vêm **desligados por padrão** (19/09/2026):
+`pnpm db:seed` sozinho só cria tenant, usuários e papéis — o necessário para logar — sem inventar
+número de negócio. Para o dado de demonstração completo (o que a suíte E2E espera), defina
+`SEED_SYNTHETIC_DATA=true pnpm db:seed`.
+
 Se a máquina já tiver Postgres/Redis locais, defina `POSTGRES_PORT`/`REDIS_PORT` no `.env` e
 ajuste as URLs. Verificação rápida: `curl localhost:3001/readyz` e `./scripts/smoke.sh`.
 Detalhes, tutoriais e padrões de código no [24-development-guide.md](docs/24-development-guide.md).
