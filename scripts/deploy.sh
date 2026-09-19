@@ -35,11 +35,25 @@ SERVICOS=(api web)
 [[ "${DEPLOY_EDGE:-caddy}" == "caddy" ]] && SERVICOS+=(caddy)
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --no-deps "${SERVICOS[@]}"
 
-echo "==> smoke"
+# As quatro verificações do smoke batem em rotas da API (/healthz, /readyz, /api/v1/*). Ele
+# precisa, portanto, de uma URL que chegue à API — não à do front.
+#
 # ATENÇÃO ao default: NENHUM serviço deste compose publica 3001 no host — só o Caddy publica
-# porta (80/443). `localhost:3001` só responde se você publicou a porta por fora. Na VM, aponte
-# SMOKE_BASE_URL para a URL pública que a borda serve (doc 19 §9.5.5).
-./scripts/smoke.sh "${SMOKE_BASE_URL:-http://localhost:3001}"
+# porta (80/443). `localhost:3001` só responde se você publicou a porta por fora (doc 19 §9.5.5).
+#
+# `SMOKE_BASE_URL=none` pula a verificação, para a topologia em que a API não tem endereço
+# público — caso do front como BFF atrás de um proxy externo, em que só o domínio do app é
+# publicado (doc 35 §3). Pular é explícito de propósito: melhor um aviso do que ensinar alguém
+# a conviver com um passo que falha sempre.
+if [[ "${SMOKE_BASE_URL:-}" == "none" ]]; then
+  echo "==> smoke PULADO (SMOKE_BASE_URL=none)"
+  echo "    Verifique à mão que a API subiu — o healthcheck do container já testa /healthz:"
+  echo "      docker compose -f $COMPOSE_FILE --env-file $ENV_FILE ps"
+  echo "    A coluna STATUS deve mostrar (healthy) para api."
+else
+  echo "==> smoke"
+  ./scripts/smoke.sh "${SMOKE_BASE_URL:-http://localhost:3001}"
+fi
 
 echo "==> deploy concluído: $APP_VERSION"
 echo "    acompanhe o painel de SLO por 15 minutos (doc 19 §4, passo 3)"

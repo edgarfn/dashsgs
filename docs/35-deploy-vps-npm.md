@@ -155,7 +155,7 @@ API_IMAGE=ghcr.io/edgarfn/dashsgs-api@sha256:<digest-api>
 WEB_IMAGE=ghcr.io/edgarfn/dashsgs-web@sha256:<digest-web>
 
 DEPLOY_EDGE=none \
-SMOKE_BASE_URL=https://app.seudominio.com.br \
+SMOKE_BASE_URL=none \
 ./scripts/deploy.sh "$API_IMAGE" "$WEB_IMAGE" .env.staging
 ```
 
@@ -163,9 +163,11 @@ Duas variáveis de ambiente do `deploy.sh`, dois motivos concretos:
 
 - `DEPLOY_EDGE=none` — sem isso o script sobe o `caddy` junto e ele bate de frente com o NPM na
   porta 80/443.
-- `SMOKE_BASE_URL` — o padrão do script é `http://localhost:3001`, que **não funciona neste
-  compose**: nada publica 3001 no host. Na primeira execução o NPM ainda não está configurado,
-  então o smoke vai falhar aqui; siga para §5.6 e rode o smoke de novo depois (§6).
+- `SMOKE_BASE_URL=none` — o padrão do script é `http://localhost:3001`, que **não funciona neste
+  compose** (nada publica 3001 no host), e o domínio do app também não serve: as quatro
+  verificações do smoke batem em rotas da API, que aqui não tem endereço público (§3). Pular é
+  explícito em vez de conviver com um passo que falharia sempre; a conferência equivalente está
+  em §6. Se você expôs a API (§5.8), troque por `SMOKE_BASE_URL=https://api.seudominio.com.br`.
 
 Depois, o worker (fica fora do `deploy.sh` de propósito — doc 19 §4 passo 5). Ele usa a mesma
 imagem da API — reaproveite `$API_IMAGE`; sem ela, o compose cairia no valor-placeholder de
@@ -271,13 +273,19 @@ curl -sS -o /dev/null -w '%{http_code} %{ssl_verify_result}\n' https://app.seudo
 # 2. HSTS presente (só aparece se você marcou a caixa em §5.7)
 curl -sSI https://app.seudominio.com.br/ | grep -i strict-transport-security
 
-# 3. o smoke do projeto, agora pela URL pública
-./scripts/smoke.sh https://app.seudominio.com.br
+# 3. a API está de pé — o healthcheck do container chama /healthz de 30 em 30s por dentro
+docker compose -f docker/compose.staging.yml --env-file .env.staging ps
+#    a coluna STATUS deve trazer (healthy) em postgres e api
 ```
 
-O `smoke.sh` confere `/healthz`, `/readyz`, `/api/v1/meta` e o formato do erro 404 — mas essas
-rotas são da **API**. Se você expôs só o front (§3), aponte o smoke para o host da API apenas
-quando ele existir; caso contrário, valide pelo navegador e pelos logs:
+**Sobre o `smoke.sh`:** as quatro verificações dele batem em rotas da **API** (`/healthz`,
+`/readyz`, `/api/v1/meta` e o formato do 404). Se você expôs só o front (§3, o caminho
+recomendado), não existe URL pública que as sirva — por isso o `deploy.sh` é chamado com
+`SMOKE_BASE_URL=none` em §5.5, e a conferência equivalente é o `(healthy)` acima, que vem do
+healthcheck declarado no `Dockerfile.api`. Se você expôs a API, aí sim:
+`./scripts/smoke.sh https://api.seudominio.com.br`.
+
+Para acompanhar o que a aplicação está dizendo:
 
 ```bash
 docker compose -f docker/compose.staging.yml --env-file .env.staging logs -f api web
@@ -296,8 +304,10 @@ Todas confirmadas na prática, não deduzidas:
 1. **`deploy.sh` subia o Caddy sempre.** Resolvido com `DEPLOY_EDGE=none`. A opção é variável de
    ambiente, e não edição do script, porque o workflow de deploy roda `git checkout --force` na
    VM — qualquer alteração local em arquivo versionado é apagada no deploy seguinte.
-2. **O smoke padrão aponta para `localhost:3001`, que nunca funcionou nesta topologia.** Nenhum
-   serviço publica 3001; só o Caddy publicava porta. Use `SMOKE_BASE_URL`.
+2. **O smoke padrão aponta para `localhost:3001`, que nunca funcionou nesta topologia** — nenhum
+   serviço publica 3001, só o Caddy publicava porta. E o domínio do app também não serve: as
+   quatro verificações batem em rotas da API, que aqui não é pública. Daí `SMOKE_BASE_URL=none`
+   (§5.5), com a conferência equivalente pelo `(healthy)` do container (§6).
 3. **O arquivo precisa se chamar `.env.staging`.** O `env_file:` está fixo no compose, em três
    serviços. Renomear sem editar o compose sobe a aplicação com a configuração errada.
 4. **`/metrics` é público sem o Caddy.** §5.8.
@@ -310,7 +320,7 @@ Todas confirmadas na prática, não deduzidas:
 
 ```bash
 cd /opt/dashsgs && git pull
-DEPLOY_EDGE=none SMOKE_BASE_URL=https://app.seudominio.com.br \
+DEPLOY_EDGE=none SMOKE_BASE_URL=none \
   ./scripts/deploy.sh <digest-api-novo> <digest-web-novo> .env.staging
 ```
 

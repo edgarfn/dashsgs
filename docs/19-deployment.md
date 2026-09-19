@@ -10,6 +10,10 @@
 > `dashsgs_app`, e há duas coisas que o Caddy fazia e o app não faz sozinho — bloquear
 > `/metrics` e emitir HSTS no front.
 >
+> **Nunca fez um deploy antes?** O [doc 36](36-primeiro-deploy-iniciante.md) é o mesmo caminho do
+> doc 35 escrito do zero, sem pressupor Docker, Linux ou linha de comando — cada passo diz o que
+> faz, o que digitar e o que você deve ver.
+>
 > **E antes de qualquer coisa: isto não é o gate de produção.** O checklist de GA (doc 32) tem 19
 > itens `[BLOQ]` abertos hoje, e a Q1 do doc 34 (HTTPS ou VPN obrigatório da SG) segue sem
 > resposta — sem ela nenhum tenant com ERP em HTTP puro conecta em produção, por desenho
@@ -120,7 +124,10 @@ conexão recusada em runtime, mais difícil de rastrear até o arquivo de ambien
 1. Release taggeada → CI publica imagem por digest + SBOM.
 2. `deploy.sh <digest-api> <digest-web> [.env-file]`: pull → `docker compose up --exit-code-from
    api-migrate api-migrate` (job de migração com `DATABASE_URL_MIGRATOR`) → sobe `api`/`web`/
-   `caddy` → smoke (`/healthz`, `/readyz`, `/api/v1/meta`, erro 404 padronizado).
+   `caddy` → smoke (`/healthz`, `/readyz`, `/api/v1/meta`, erro 404 padronizado). As quatro
+   verificações são de rotas da **API**: numa topologia em que a API não tem endereço público
+   (front como BFF atrás de proxy externo — doc 35 §3), use `SMOKE_BASE_URL=none` e confira pelo
+   `(healthy)` do container.
 3. Verificação pós-deploy 15 min (painel SLO — `DashSGS · SLO board`, uid `dashsgs-slo`);
    rollback: `deploy.sh <digest-anterior>`
    (migrações são expand/contract — compatíveis com N-1; doc 11 §3).
