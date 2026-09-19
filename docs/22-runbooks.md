@@ -4,6 +4,24 @@ Cada runbook: pré-condições → passos → verificação → rollback. Comand
 bastion e `dashsgs-cli` (utilitário administrativo interno a construir junto do backend —
 subcomandos citados abaixo fazem parte do backlog).
 
+## 0. Provisionar papéis do banco (VM nova)
+Quando usar: primeira subida de um Postgres de staging/produção — `docker/postgres/init/01-roles.sql`
+só roda sozinho em desenvolvimento (script de inicialização de volume); o compose de
+staging/produção não monta init script de propósito, porque os papéis de lá levam senha de
+cofre, não a fixa do arquivo de dev (doc 19 §3).
+1. Banco no ar e saudável: `docker compose -f docker/compose.staging.yml --env-file .env.staging
+   up -d postgres` → aguardar `healthy`.
+2. `APP_RW_PASSWORD=... APP_MIGRATOR_PASSWORD=... APP_READONLY_PASSWORD=... APP_MONITOR_PASSWORD=...
+   ./scripts/provision-roles.sh .env.staging` — as quatro senhas são as mesmas já escritas em
+   `DATABASE_URL`/`DATABASE_URL_MIGRATOR`/`POSTGRES_EXPORTER_DSN` no arquivo de ambiente
+   (doc 19 §3, acoplamento #2); nada lê de volta, nada confere sozinho.
+3. Verificação: `docker compose ... up --exit-code-from api-migrate api-migrate` (a migração)
+   passa — antes deste runbook, ela falha porque `app_migrator` não existe.
+4. Rollback: nenhum — papel criado errado se corrige com `ALTER ROLE ... PASSWORD` ou `DROP ROLE`
+   e rodando o script de novo; não há dado para perder neste passo.
+
+Passo a passo completo, com pré-requisitos de VM/DNS/bucket, em doc 19 §9.
+
 ## 1. Provisionar tenant
 1. Painel platform-admin → Novo tenant (nome, slug, plano) → convite ao owner.
 2. Owner: wizard de conexão ERP (doc 19 §7). Exigir HTTPS ou VPN (ver §7).

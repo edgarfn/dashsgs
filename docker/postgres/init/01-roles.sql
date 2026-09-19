@@ -1,6 +1,7 @@
 -- Papéis do banco (doc 08 §3 / doc 09 §1 "Banco").
 -- Executado uma única vez na criação do volume do Postgres de DESENVOLVIMENTO.
--- Em produção estes papéis são criados pelo runbook 22 com senhas do cofre.
+-- Em staging/produção estes mesmos papéis são criados por ./scripts/provision-roles.sh, com
+-- senhas do cofre em vez da fixa abaixo — runbook 22 §0 / doc 19 §9.5.4.
 
 -- Papel da aplicação: NUNCA com BYPASSRLS (a RLS é a última linha de defesa).
 CREATE ROLE app_rw LOGIN PASSWORD 'dev_only_password' NOSUPERUSER NOCREATEDB NOCREATEROLE

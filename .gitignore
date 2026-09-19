@@ -14,10 +14,12 @@ coverage/
 test-results/
 playwright-report/
 
-# env & segredos (NUNCA commitar) — apenas .env.example e *.enc.env são versionáveis
+# env & segredos (NUNCA commitar) — apenas .env.example, .env.staging.example e *.enc.env
+# são versionáveis (todo valor sensível neles é CHANGE_ME; o real é .env.staging, fora do repo).
 .env
 .env.*
 !.env.example
+!.env.staging.example
 !*.enc.env
 *.pem
 *.key
