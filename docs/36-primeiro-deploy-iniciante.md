@@ -294,20 +294,29 @@ outro (passo 3) com as duas caixas e repita.
 > que você está fazendo à mão aqui. A etapa que interessa, "Publicar imagens", está verde.
 
 Clique na execução mais recente, depois no item **"Publicar imagens (por digest) + SBOM"** (deve
-estar com ✅), e procure no meio do texto duas linhas parecidas com:
+estar com ✅). Vai abrir um texto longo — **não role procurando**; use a busca do navegador
+(`Ctrl+F` no Windows/Linux, `Cmd+F` no Mac). As duas imagens ficam em pontos bem distantes desse
+texto — a do `web` aparece mais de um minuto depois da do `api`, então rolando é fácil parar
+cedo demais e achar só a primeira.
+
+Busque por `pushing manifest for ghcr.io/edgarfn/dashsgs-api`. Vai achar uma linha parecida com:
 
 ```
-ghcr.io/edgarfn/dashsgs-api@sha256:0b4879a341e9...
-ghcr.io/edgarfn/dashsgs-web@sha256:890a2b231d42...
+#29 pushing manifest for ghcr.io/edgarfn/dashsgs-api:f25ea9ebc2ee...@sha256:5c8d30038240a4b7...
 ```
 
-Copie as duas.
+Copie **a linha inteira**, a partir de `ghcr.io` (sem o `#29 pushing manifest for ` do início,
+sem nada que vier depois do fim do código, tipo `done`). Não precisa editar nada no meio — pode
+copiar com a parte entre `:` e `@sha256:` junto, funciona do mesmo jeito.
+
+Agora busque por `pushing manifest for ghcr.io/edgarfn/dashsgs-web` e copie a linha da mesma
+forma.
 
 **9.2 — Guardar as duas numa variável** (isso evita ter que colar tudo de novo no passo 10):
 
 ```bash
-API_IMAGE=ghcr.io/edgarfn/dashsgs-api@sha256:COLE_AQUI
-WEB_IMAGE=ghcr.io/edgarfn/dashsgs-web@sha256:COLE_AQUI
+API_IMAGE=cole_aqui_a_linha_do_dashsgs-api
+WEB_IMAGE=cole_aqui_a_linha_do_dashsgs-web
 ```
 
 **9.3 — Subir:**
