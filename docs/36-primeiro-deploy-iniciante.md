@@ -507,6 +507,53 @@ docker compose -f docker/compose.staging.yml --env-file .env.staging logs --tail
 docker compose -f docker/compose.staging.yml --env-file .env.staging restart api web
 ```
 
+## Como atualizar depois do primeiro deploy
+
+**O que faz:** toda vez que sair uma versão nova no GitHub, o CI já constrói e publica as
+imagens sozinho — falta só aplicá-las aqui no servidor. É repetir os passos 9 e 10, só que com
+a imagem nova. Nenhum dos passos 5 a 8 (DNS, senhas, papéis do banco, login no ghcr) ou 11 a 13
+(proxy, domínio, HTTPS) precisa ser refeito — aquilo é infraestrutura, feita uma vez só.
+
+**1. Pegue os digests novos.** Igual ao passo 9.1: abra
+`github.com/edgarfn/dashsgs/actions/workflows/deploy-staging.yml`, entre na execução mais
+recente, clique em **"Publicar imagens (por digest) + SBOM"**, busque (`Ctrl+F`) por
+`pushing manifest for ghcr.io/edgarfn/dashsgs-api` e depois por `...dashsgs-web`, e copie as
+duas linhas inteiras.
+
+**2. Guarde nas variáveis.** É sessão nova de terminal — as variáveis do primeiro deploy não
+sobrevivem até aqui, redefina:
+
+```bash
+API_IMAGE=cole_aqui_a_linha_nova_do_dashsgs-api
+WEB_IMAGE=cole_aqui_a_linha_nova_do_dashsgs-web
+```
+
+**3. Suba:**
+
+```bash
+DEPLOY_EDGE=none SMOKE_BASE_URL=none ./scripts/deploy.sh "$API_IMAGE" "$WEB_IMAGE" .env.staging
+```
+
+**O que você deve ver:** as mesmas etapas do passo 9 — `puxando imagens`, `aplicando
+migrações`, `subindo serviços`, `deploy concluído`. Se não houver migração nova, aparece
+`No pending migrations to apply` — é normal, não é erro.
+
+**4. Atualize o worker.** O `deploy.sh` não mexe nele de propósito (o job de sincronização
+fica fora do rollout da API), então repita o passo 10 com o **mesmo** digest:
+
+```bash
+API_IMAGE="$API_IMAGE" docker compose -f docker/compose.staging.yml --env-file .env.staging \
+  up -d --no-deps workers
+```
+
+> **Token expirado?** O token do passo 3 vale 90 dias. Quando vencer, o passo 8
+> (`docker login ghcr.io`) volta a falhar com `unauthorized` — gere um token novo (mesmas duas
+> caixas: `repo` e `read:packages`) e refaça o login antes de tentar de novo.
+
+**Se algo der errado:** rollback é rodar o mesmo comando do passo 3 acima, trocando pelo
+**digest anterior** — por isso vale anotar, nem que seja num bloco de notas, o digest de cada
+deploy que funcionou.
+
 ## O que ainda falta (e por que importa)
 
 | Pendência | Consequência de deixar assim |

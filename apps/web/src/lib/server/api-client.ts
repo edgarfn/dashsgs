@@ -11,8 +11,12 @@ import { getWebEnv } from './env';
  * BFF do doc 04 §1 — o token de sessão nunca passa por JavaScript de página.
  */
 
-export const SESSION_COOKIE = 'dashsgs_session';
-export const CSRF_COOKIE = 'dashsgs_csrf';
+// Mesmo prefixo `__Host-` que a API usa em produção (doc 06 §Estratégia) — sem isto, o cookie
+// que o navegador de fato tem (`__Host-dashsgs_session`) nunca bate com o nome procurado aqui.
+const { isProduction } = getWebEnv();
+
+export const SESSION_COOKIE = isProduction ? '__Host-dashsgs_session' : 'dashsgs_session';
+export const CSRF_COOKIE = isProduction ? '__Host-dashsgs_csrf' : 'dashsgs_csrf';
 
 export interface ApiResponse<T> {
   ok: boolean;

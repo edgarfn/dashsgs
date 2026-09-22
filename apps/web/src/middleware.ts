@@ -16,7 +16,10 @@ const PUBLIC_PATHS = ['/entrar', '/esqueci-senha', '/redefinir-senha', '/convite
 /** Rotas do fluxo de MFA: exigem cookie, mas a sessão ainda é parcial. */
 const MFA_PATHS = ['/mfa'];
 
-const SESSION_COOKIE = 'dashsgs_session';
+// Mesmo prefixo `__Host-` que a API usa em produção (doc 06 §Estratégia) — sem isto, o cookie
+// que o navegador de fato tem (`__Host-dashsgs_session`) nunca bate com o nome procurado aqui.
+const SESSION_COOKIE =
+  process.env.NODE_ENV === 'production' ? '__Host-dashsgs_session' : 'dashsgs_session';
 
 export function middleware(request: NextRequest): NextResponse {
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
