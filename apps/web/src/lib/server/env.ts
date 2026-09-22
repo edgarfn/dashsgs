@@ -29,3 +29,11 @@ export function getWebEnv(): WebEnv {
     isProduction: process.env.NODE_ENV === 'production',
   };
 }
+
+/**
+ * Só o NODE_ENV, sem validar o resto do contrato (`getWebEnv` exige `INTERNAL_API_URL`, que não
+ * existe em tempo de build do Next — usar `getWebEnv()` aqui quebraria `next build`).
+ */
+export function isWebProduction(): boolean {
+  return process.env.NODE_ENV === 'production';
+}

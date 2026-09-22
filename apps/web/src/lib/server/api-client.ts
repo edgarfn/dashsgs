@@ -1,7 +1,7 @@
 import 'server-only';
 import { CORRELATION_ID_HEADER, CSRF_HEADER, type ApiErrorBody } from '@dashsgs/shared';
 import { cookies, headers } from 'next/headers';
-import { getWebEnv } from './env';
+import { getWebEnv, isWebProduction } from './env';
 
 /**
  * Cliente da API interna usado pelos Server Actions e Server Components.
@@ -13,7 +13,7 @@ import { getWebEnv } from './env';
 
 // Mesmo prefixo `__Host-` que a API usa em produção (doc 06 §Estratégia) — sem isto, o cookie
 // que o navegador de fato tem (`__Host-dashsgs_session`) nunca bate com o nome procurado aqui.
-const { isProduction } = getWebEnv();
+const isProduction = isWebProduction();
 
 export const SESSION_COOKIE = isProduction ? '__Host-dashsgs_session' : 'dashsgs_session';
 export const CSRF_COOKIE = isProduction ? '__Host-dashsgs_csrf' : 'dashsgs_csrf';
