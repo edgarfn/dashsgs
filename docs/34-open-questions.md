@@ -93,10 +93,14 @@ furo de segurança.
   configuração porque exige trocar o transporte (`fetch` cru → agente com CA), e porque "aceitar
   certificado inválido" não pode ser uma caixinha no wizard: é a diferença entre TLS e teatro.
   Entra como item próprio de backlog, com desenho.
-- **Afrouxar a proibição de HTTP em produção.** `ALLOW_INSECURE_ERP` continua global e continua
-  derrubando o boot em produção. Tornar isso ajustável por tenant transformaria a regra que
-  protege a credencial do cliente numa preferência — e a experiência desta auditoria é
-  justamente que o caminho fácil vira o caminho usado.
+- ~~**Afrouxar a proibição de HTTP em produção.**~~ **Revertido por decisão de produto
+  (22/09/2026).** O argumento acima continua válido em geral — por isso a mudança foi feita como
+  exceção explícita, não como preferência silenciosa: o suporte da SG confirmou que a instalação
+  deste tenant não fala HTTPS (nem SG Cloud, nem certificado próprio), então exigir TLS aqui
+  bloquearia a integração sem alternativa real, já que VPN também não existe hoje (doc 22 §7).
+  `ALLOW_INSECURE_ERP` deixou de derrubar o boot em produção (doc 09 §1, doc 32); continua
+  `false` por padrão para qualquer tenant novo — a mudança destrava o caso confirmado, não vira
+  norma geral.
 - **Janelas de 30 dias por recurso (Q14) e timezone dos campos (Q12).** Ficam como estão nesta
   passada; são perguntas de sincronização, não de transporte, e não bloqueiam ninguém hoje.
 

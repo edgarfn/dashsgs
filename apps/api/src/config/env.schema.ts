@@ -140,13 +140,10 @@ export const envSchema = z
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== 'production') return;
 
-    if (env.ALLOW_INSECURE_ERP) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['ALLOW_INSECURE_ERP'],
-        message: 'proibido em produção: a API SG só pode ser acessada por HTTPS ou VPN (doc 09 §1)',
-      });
-    }
+    // ALLOW_INSECURE_ERP=true é aceito em produção por decisão de produto (22/09/2026): a
+    // integração da SG com este tenant é HTTP puro, confirmado com o suporte deles — não há
+    // HTTPS do lado do ERP para exigir. Continua registrado como risco aceito, não removido em
+    // silêncio (doc 09 §1, doc 32 "HTTP público p/ ERP").
     if (env.SG_MOCK) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

@@ -75,9 +75,17 @@ describe('contrato de ambiente', () => {
       expect(parseEnv(prodEnv()).ok).toBe(true);
     });
 
-    it('bloqueia HTTP para o ERP e mocks da API SG (doc 09 §1)', () => {
-      const result = parseEnv({ ...prodEnv(), ALLOW_INSECURE_ERP: 'true', SG_MOCK: 'true' });
-      expect(issuePaths(result)).toEqual(expect.arrayContaining(['ALLOW_INSECURE_ERP', 'SG_MOCK']));
+    it('bloqueia mocks da API SG em produção', () => {
+      const result = parseEnv({ ...prodEnv(), SG_MOCK: 'true' });
+      expect(issuePaths(result)).toContain('SG_MOCK');
+    });
+
+    // Decisão de produto (22/09/2026): a integração da SG com este tenant é HTTP puro, sem
+    // HTTPS do lado do ERP — confirmado com o suporte deles. Risco aceito, não removido em
+    // silêncio (doc 09 §1, doc 32 "HTTP público p/ ERP").
+    it('aceita ALLOW_INSECURE_ERP em produção (decisão de produto, doc 09 §1)', () => {
+      const result = parseEnv({ ...prodEnv(), ALLOW_INSECURE_ERP: 'true' });
+      expect(result.ok).toBe(true);
     });
 
     it('bloqueia http:// nas URLs públicas e banco local', () => {

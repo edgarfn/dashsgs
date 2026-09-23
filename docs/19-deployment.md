@@ -14,11 +14,11 @@
 > doc 35 escrito do zero, sem pressupor Docker, Linux ou linha de comando — cada passo diz o que
 > faz, o que digitar e o que você deve ver.
 >
-> **E antes de qualquer coisa: isto não é o gate de produção.** O checklist de GA (doc 32) tem 19
-> itens `[BLOQ]` abertos hoje, e a Q1 do doc 34 (HTTPS ou VPN obrigatório da SG) segue sem
-> resposta — sem ela nenhum tenant com ERP em HTTP puro conecta em produção, por desenho
-> (`ALLOW_INSECURE_ERP` é recusado fora de dev, §3). Este documento é a mecânica de deploy; "estar
-> pronto para clientes reais" é o doc 32.
+> **E antes de qualquer coisa: isto não é o gate de produção.** O checklist de GA (doc 32) tem
+> itens `[BLOQ]` abertos hoje. `ALLOW_INSECURE_ERP` aceita HTTP puro em produção só como exceção
+> explícita por tenant, quando o suporte da SG confirma que a instalação não fala HTTPS (doc 09
+> §1, doc 34 §4.3) — continua `false` por padrão para qualquer tenant novo. Este documento é a
+> mecânica de deploy; "estar pronto para clientes reais" é o doc 32.
 
 ## 1. Ambientes
 
@@ -93,7 +93,8 @@ OTEL_EXPORTER_OTLP_ENDPOINT, SENTRY_DSN, METRICS_ENABLED
 SG_DEFAULT_MAX_RPS=4, SG_PAGE_SIZE=500, SG_PAGE_SIZE_MIN=50
 SG_HTTP_TIMEOUT_MS=60000, SG_HEAVY_TIMEOUT_MS=180000
 SG_VPN_CIDR=10.66.0.0/16 (aceita lista — runbook 22 §7), SG_API_PATH_PREFIX, SG_AUTH_HEADER_MODE
-ALLOW_INSECURE_ERP=false, SG_MOCK=false  # produção recusa qualquer outro valor
+ALLOW_INSECURE_ERP=false  # true só como exceção explícita por tenant (doc 09 §1, doc 34 §4.3)
+SG_MOCK=false  # produção recusa qualquer outro valor
 # Sincronização (worker)
 SYNC_CONCURRENCY=4, SYNC_SCHEDULER_ENABLED=true, WORKER_PORT=3002
 # Flags

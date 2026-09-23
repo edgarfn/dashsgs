@@ -24,7 +24,11 @@ Nenhum item [BLOQ] pode estar aberto no go-live.
 - [ ] [BLOQ] Pentest externo sem High/Critical abertos
 - [ ] [BLOQ] Secrets fora de git/imagens (gitleaks histórico completo verde)
 - [ ] [BLOQ] Anti-SSRF de base_url ativo; egress allowlist aplicada no firewall
-- [ ] [BLOQ] HTTP público p/ ERP recusado (flag prod)
+- [x] [BLOQ] HTTP público p/ ERP: recusado por padrão (flag prod); **exceção aberta e
+      documentada** para o tenant cuja instalação da SG não fala HTTPS (confirmado com o
+      suporte deles, 22/09/2026) — `ALLOW_INSECURE_ERP=true` nesse ambiente, risco aceito
+      conscientemente, não uma falha de configuração (doc 09 §1). Novos tenants continuam
+      exigindo HTTPS ou VPN por padrão.
 - [ ] Firewall default-deny; SSH por chave; fail2ban; atualizações automáticas
 - [ ] Imagens non-root; Trivy sem CRITICAL; SBOM publicado
 - [ ] Dependências: zero CRITICAL conhecidas sem waiver com prazo

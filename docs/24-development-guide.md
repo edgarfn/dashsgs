@@ -35,7 +35,9 @@ Notas de ambiente (Fase 2):
 1. Obter credenciais de homologação com a SG (contato@sgsistemas.com.br) [DOCUMENTADO: ambiente
    `sgps.sgsistemas.com.br:8201`, usuário `homologacao`].
 2. No app (tenant demo) → Admin→Conexão ERP: base_url `http://sgps.sgsistemas.com.br:8201`
-   *(dev aceita http apenas com `ALLOW_INSECURE_ERP=true`; produção nunca)*.
+   *(dev aceita http com `ALLOW_INSECURE_ERP=true`; em produção também aceita, mas só como
+   exceção explícita por tenant, quando o suporte da SG confirma que a instalação não fala
+   HTTPS — doc 09 §1, doc 32)*.
 3. Testar conexão → conferir rotas detectadas → rodar `pnpm sync:run --domain dimensoes`
    *(a partir da Fase 6; hoje o teste de conexão já valida credencial, rotas e versão do ERP)*.
 4. Alternativa offline: `SG_MOCK=true` responde pelas fixtures em

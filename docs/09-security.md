@@ -30,7 +30,9 @@ CIS Benchmarks (Docker/PostgreSQL/OS).
   registrados e serviços de e-mail (firewall de saída/proxy).
 
 ### Integração SG
-- TLS obrigatório ou VPN (recusa HTTP público).
+- TLS ou VPN por padrão (recusa HTTP público). Exceção deliberada por tenant via
+  `ALLOW_INSECURE_ERP=true`, quando o suporte da SG confirma que a instalação não fala HTTPS —
+  risco aceito conscientemente (doc 32), não um modo de desenvolvimento vazando para produção.
 - Redaction automática: `senha`, `token`, `Authorization` jamais em logs (processor no logger).
 - Circuit breaker por tenant; self-rate-limit configurável (padrão 4 req/s por tenant
   [RECOMENDAÇÃO — sem limite documentado pela SG]).
