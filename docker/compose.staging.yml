@@ -47,6 +47,9 @@ services:
       INTERNAL_API_URL: http://api:3001
       NEXT_PUBLIC_APP_NAME: DashSGS
       APP_VERSION: ${APP_VERSION:-nao-definido}
+      # Site key do Turnstile (doc 06) — pública por design, mas ainda assim do .env.staging
+      # do host: cada domínio tem a sua. Sem ela, cai na chave de teste "sempre aprova".
+      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
     networks: [app]
     logging: *logging
 

@@ -22,6 +22,10 @@ export const loginSchema = z
     password,
     /** Enviado junto quando o usuário já sabe que tem MFA — evita uma ida e volta. */
     totp: totpCode.optional(),
+    /** Token do widget Cloudflare Turnstile (doc 06). Ausente/inválido = login recusado — a
+     * obrigatoriedade de fato vem do CaptchaService, não daqui (permite chave de teste em
+     * dev/CI sem precisar mexer neste contrato). */
+    captchaToken: z.string().optional(),
   })
   .strict();
 export type LoginInput = z.infer<typeof loginSchema>;

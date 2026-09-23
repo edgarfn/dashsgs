@@ -34,11 +34,15 @@ export function middleware(request: NextRequest): NextResponse {
   const csp = [
     "default-src 'self'",
     // O Next injeta scripts próprios; em dev ele também usa eval para o refresh rápido.
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${isDev ? "'unsafe-eval'" : ''}`.trim(),
+    // challenges.cloudflare.com: script do widget Turnstile na tela de login (doc 06) — o host
+    // explícito é rede de segurança para navegador sem suporte a 'strict-dynamic'.
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://challenges.cloudflare.com ${isDev ? "'unsafe-eval'" : ''}`.trim(),
     `style-src 'self' 'nonce-${nonce}'${isDev ? " 'unsafe-inline'" : ''}`,
     "img-src 'self' data:",
     "font-src 'self'",
-    "connect-src 'self'",
+    // O widget do Turnstile chama o Cloudflare por trás (challenge) e roda dentro de um iframe.
+    "connect-src 'self' https://challenges.cloudflare.com",
+    'frame-src https://challenges.cloudflare.com',
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

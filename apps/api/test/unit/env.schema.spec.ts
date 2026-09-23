@@ -1,4 +1,4 @@
-import { parseEnv } from '../../src/config/env.schema';
+import { parseEnv, TURNSTILE_TEST_SECRET_ALWAYS_PASS } from '../../src/config/env.schema';
 
 const validEnv = (): Record<string, string> => ({
   NODE_ENV: 'development',
@@ -30,6 +30,7 @@ describe('contrato de ambiente', () => {
     expect(result.env.SG_DEFAULT_MAX_RPS).toBe(4);
     expect(result.env.METRICS_ENABLED).toBe(true);
     expect(result.env.FEATURE_ERP_WRITE).toBe(false);
+    expect(result.env.TURNSTILE_SECRET_KEY).toBe(TURNSTILE_TEST_SECRET_ALWAYS_PASS);
   });
 
   it('recusa segredo curto e chave mestra fora de 32 bytes', () => {
@@ -67,6 +68,7 @@ describe('contrato de ambiente', () => {
       APP_URL: 'https://app.dashsgs.com.br',
       API_URL: 'https://api.dashsgs.com.br',
       DATABASE_URL: 'postgresql://app_rw:pwd@db.interna:5432/dashsgs?sslmode=require',
+      TURNSTILE_SECRET_KEY: '0x'.repeat(20),
     });
 
     it('aceita uma configuração de produção coerente', () => {
@@ -90,6 +92,14 @@ describe('contrato de ambiente', () => {
     it('bloqueia segredo de desenvolvimento promovido sem querer', () => {
       const result = parseEnv({ ...prodEnv(), CSRF_SECRET: `dev_only_${'z'.repeat(40)}` });
       expect(issuePaths(result)).toContain('CSRF_SECRET');
+    });
+
+    it('bloqueia a chave de teste do Turnstile (sempre aprova) em produção', () => {
+      const result = parseEnv({
+        ...prodEnv(),
+        TURNSTILE_SECRET_KEY: TURNSTILE_TEST_SECRET_ALWAYS_PASS,
+      });
+      expect(issuePaths(result)).toContain('TURNSTILE_SECRET_KEY');
     });
   });
 });

@@ -76,6 +76,10 @@ código autorizado a ler `process.env` — lint bloqueia o resto):
 # App
 NODE_ENV, APP_URL, API_URL, PORT
 SESSION_SECRET (32+ caract.), CSRF_SECRET, COOKIE_DOMAIN
+# Anti-automação (login — doc 06)
+TURNSTILE_SECRET_KEY (API)  # + TURNSTILE_SITE_KEY no ambiente do `web` — MESMO widget Cloudflare,
+                            # os dois têm que vir do mesmo par (site key ≠ secret key de outro
+                            # widget = todo login recusado, sem erro óbvio no log)
 # Banco/Cache
 DATABASE_URL (TLS), DATABASE_URL_MIGRATOR, REDIS_URL
 # Cripto
@@ -290,13 +294,19 @@ chmod 600 .env.staging
 ```
 
 Gere cada segredo com os comandos comentados no próprio arquivo (`openssl rand -base64 ...` /
-`-hex ...`) e edite `.env.staging`. Confirme os quatro campos que a guarda de produção verifica
+`-hex ...`) e edite `.env.staging`. Confirme os cinco campos que a guarda de produção verifica
 antes de seguir:
 
 ```bash
-grep -E '^(SESSION_SECRET|CSRF_SECRET|PII_PEPPER|MASTER_KEY_CURRENT)=' .env.staging
+grep -E '^(SESSION_SECRET|CSRF_SECRET|PII_PEPPER|MASTER_KEY_CURRENT|TURNSTILE_SECRET_KEY)=' .env.staging
 # nenhuma linha deve conter CHANGE_ME
 ```
+
+`TURNSTILE_SECRET_KEY` vem do painel Cloudflare (Turnstile → Add widget, hostname = `APP_DOMAIN`)
+— junto com ela sai uma site key, que vai na linha `TURNSTILE_SITE_KEY`, mais abaixo no mesmo
+`.env.staging` (seção Frontend). As duas são do MESMO widget; a diferença é só que o compose só
+repassa `TURNSTILE_SITE_KEY` para dentro do container `web` — a API nunca a recebe nem precisa
+dela.
 
 **9.5.3 Construir a imagem do Postgres (não vem do GHCR)**
 

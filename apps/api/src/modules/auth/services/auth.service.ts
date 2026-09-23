@@ -2,6 +2,7 @@ import { requiresMfa, type LoginStatus, type MeResponse, type Role } from '@dash
 import { Injectable } from '@nestjs/common';
 import type { Response } from 'express';
 import { AuditService } from '../../../common/audit';
+import { CaptchaService } from '../../../common/captcha';
 import { HashingService } from '../../../common/crypto';
 import { AppException } from '../../../common/errors/app.exception';
 import { MailService, securityNoticeEmail } from '../../../common/mail';
@@ -45,6 +46,7 @@ export class AuthService {
     private readonly sessions: SessionService,
     private readonly totp: TotpService,
     private readonly rateLimiter: RateLimiterService,
+    private readonly captcha: CaptchaService,
     private readonly audit: AuditService,
     private readonly mail: MailService,
     private readonly metrics: MetricsService,
@@ -58,6 +60,11 @@ export class AuthService {
    */
   async login(input: LoginInput, identity: RequestIdentity, res: Response): Promise<LoginResult> {
     await this.enforceRateLimit(`login:ip:${identity.ip ?? 'desconhecido'}`, RATE_LIMITS.loginByIp);
+
+    if (!(await this.captcha.verify(input.captchaToken, identity.ip))) {
+      await this.auditLoginFailure(null, identity, 'captcha_invalido');
+      throw new AppException('AUTH_INVALID_CREDENTIALS');
+    }
 
     const user = await this.prisma.user.findUnique({
       where: { email: input.email },

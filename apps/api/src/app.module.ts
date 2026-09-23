@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuditModule } from './common/audit';
+import { CaptchaModule } from './common/captcha';
 import { CryptoModule } from './common/crypto';
 import { ErrorsModule } from './common/errors/errors.module';
 import { MailModule } from './common/mail';
@@ -34,6 +35,7 @@ import { TenantModule } from './modules/tenant/tenant.module';
     RedisModule,
     CryptoModule,
     RateLimitModule,
+    CaptchaModule,
     TenantContextModule,
     MailModule,
     AuditModule,

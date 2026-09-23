@@ -28,7 +28,7 @@ Dois domínios distintos de autenticação, que **nunca se misturam**:
 ### Fluxos
 | Fluxo | Regras |
 |---|---|
-| Login | Rate limit por IP (10/min) e por conta (5 falhas → lock incremental 1→15 min); mensagem genérica "credenciais inválidas"; auditar sucesso e falha |
+| Login | Cloudflare Turnstile (widget na tela) verificado antes de tocar o banco; rate limit por IP (10/min) e por conta (5 falhas → lock incremental 1→15 min); mensagem genérica "credenciais inválidas" para captcha inválido, conta inexistente OU senha errada; auditar sucesso e falha |
 | Logout | Revoga sessão no servidor; limpa cookie |
 | Recuperação de senha | Token single-use 30 min (hash no banco), e-mail com link; resposta idêntica exista ou não a conta; invalida sessões ao redefinir |
 | Troca de senha | Exige senha atual; invalida todas as outras sessões |
@@ -100,7 +100,8 @@ getToken(tenant):
 
 | Ameaça | Controle |
 |---|---|
-| Credential stuffing no login | Rate limit IP+conta, lock incremental, MFA, monitorar picos de 401 |
+| Credential stuffing no login | Cloudflare Turnstile, rate limit IP+conta, lock incremental, MFA, monitorar picos de 401 |
+| Automação/bot na tela de login | Turnstile fail-closed: Cloudflare fora do ar = login recusado, não bypass silencioso. Chave de teste (sempre aprova) só fora de produção — banida no boot em `NODE_ENV=production` (doc 19 §3) |
 | Session hijacking | Cookie HttpOnly+Secure, rotação de id de sessão no login, binding suave a UA |
 | CSRF | SameSite=Lax + token anti-CSRF em mutações (double-submit) |
 | Vazamento da senha ERP | Cifra em repouso, chave fora do banco, redaction em logs, sem reexibição, auditoria de leitura |

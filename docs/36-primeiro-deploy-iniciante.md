@@ -202,12 +202,20 @@ APP_MIGRATOR_PASSWORD='...' \
 > As senhas mostradas no fim **não aparecem de novo**. Copie aquele bloco inteiro e cole num
 > gerenciador de senhas (ou num lugar seguro) antes de continuar. Você vai usá-lo no passo 7.
 
-**Sobre os dois "CHANGE_ME" que sobraram:**
+**Sobre os "CHANGE_ME" que sobraram:**
 
 - `SMTP_*` — é o servidor de e-mail. O sistema **sobe normalmente sem ele**, mas convite de
   usuário e "esqueci minha senha" não chegam a ninguém. Dá para preencher depois.
 - `WALG_*` — é o backup automático. O sistema **sobe normalmente sem ele**, mas não haverá
   backup. Para um teste, tudo bem; para uso de verdade, não fique assim.
+- `TURNSTILE_SECRET_KEY` — é o captcha da tela de login (Cloudflare Turnstile). **Diferente
+  dos dois acima, este não é opcional**: deixado como `CHANGE_ME`, o passo 9 (subir a API) vai
+  falhar com "configuracao de ambiente invalida". Antes do passo 9, crie um widget grátis em
+  `dash.cloudflare.com` → **Turnstile** → **Add widget**, com o hostname do domínio do passo 5.
+  Ele te dá duas chaves, do mesmo widget — as duas vão neste MESMO arquivo `.env.staging`
+  (a secret key na linha `TURNSTILE_SECRET_KEY`, mais acima; a site key na linha
+  `TURNSTILE_SITE_KEY`, lá embaixo, na seção "Frontend"), mesmo a site key sendo só lida pelo
+  container `web` (ver doc 19 §3).
 
 ---
 
@@ -542,6 +550,9 @@ migrações`, `subindo serviços`, `deploy concluído`. Se não houver migraçã
 fica fora do rollout da API), então repita o passo 10 com o **mesmo** digest:
 
 ```bash
+API_IMAGE="$(docker inspect dashsgs-api-1 --format='{{.Config.Image}}')"
+echo "$API_IMAGE"
+
 API_IMAGE="$API_IMAGE" docker compose -f docker/compose.staging.yml --env-file .env.staging \
   up -d --no-deps workers
 ```

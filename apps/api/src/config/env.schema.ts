@@ -33,6 +33,13 @@ const postgresUrl = z
     'deve ser uma URL postgresql://',
   );
 
+/**
+ * Chave de teste oficial da Cloudflare para o Turnstile: sempre aprova, sem precisar de conta
+ * real (doc do Cloudflare, "Testing"). É o default fora de produção — mesmo raciocínio do
+ * `SG_MOCK`: atalho de dev, banido no boot quando `NODE_ENV=production` (ver superRefine abaixo).
+ */
+export const TURNSTILE_TEST_SECRET_ALWAYS_PASS = '1x0000000000000000000000000000000AA';
+
 /** Valores-sentinela que só existem em desenvolvimento — proibidos em produção. */
 const DEV_SENTINELS = ['dev_only', 'CHANGE_ME', 'changeme'];
 
@@ -53,6 +60,9 @@ export const envSchema = z
     SESSION_SECRET: z.string().min(32, 'SESSION_SECRET precisa de 32+ caracteres'),
     CSRF_SECRET: z.string().min(32, 'CSRF_SECRET precisa de 32+ caracteres'),
     COOKIE_DOMAIN: z.string().min(1),
+
+    // --- Anti-automação (Cloudflare Turnstile na tela de login — doc 06) ---
+    TURNSTILE_SECRET_KEY: z.string().min(1).default(TURNSTILE_TEST_SECRET_ALWAYS_PASS),
 
     // --- Banco / Cache ---
     DATABASE_URL: postgresUrl,
@@ -158,6 +168,7 @@ export const envSchema = z
       'CSRF_SECRET',
       'PII_PEPPER',
       'MASTER_KEY_CURRENT',
+      'TURNSTILE_SECRET_KEY',
     ] as const;
     for (const field of secretFields) {
       if (hasDevSentinel(env[field])) {
@@ -167,6 +178,14 @@ export const envSchema = z
           message: 'valor de desenvolvimento detectado; use o segredo do cofre (doc 09 §2)',
         });
       }
+    }
+    if (env.TURNSTILE_SECRET_KEY === TURNSTILE_TEST_SECRET_ALWAYS_PASS) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['TURNSTILE_SECRET_KEY'],
+        message:
+          'proibido em produção: chave de teste do Turnstile (sempre aprova) — use o segredo real do Cloudflare',
+      });
     }
     if (env.DATABASE_URL.includes('localhost')) {
       ctx.addIssue({

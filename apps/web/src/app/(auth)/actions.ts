@@ -30,6 +30,8 @@ const readString = (formData: FormData, field: string): string =>
 export async function loginAction(_state: FormState, formData: FormData): Promise<FormState> {
   const email = readString(formData, 'email');
   const password = String(formData.get('password') ?? '');
+  // Nome padrão do input que o widget Cloudflare Turnstile injeta sozinho no form (doc 06).
+  const captchaToken = readString(formData, 'cf-turnstile-response');
 
   if (!email || !password) {
     return { error: 'Informe e-mail e senha.' };
@@ -38,7 +40,7 @@ export async function loginAction(_state: FormState, formData: FormData): Promis
   const response = await apiRequest<LoginResponse>(
     'POST',
     '/auth/login',
-    { email, password },
+    { email, password, ...(captchaToken ? { captchaToken } : {}) },
     { authenticated: false },
   );
   await relaySetCookies(response.setCookies);

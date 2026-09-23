@@ -1,5 +1,6 @@
 import { AppConfigService } from '../../src/config/app-config.service';
 import { parseEnv, type Env } from '../../src/config/env.schema';
+import { randomBytes } from 'node:crypto';
 
 const SESSION_SECRET = 'sessao-super-secreta-de-40-caracteres-ok';
 const CSRF_SECRET = 'csrf-super-secreto-de-40-caracteres-okay';
@@ -62,6 +63,7 @@ describe('AppConfigService', () => {
         NODE_ENV: 'production',
         APP_URL: 'https://app.dashsgs.com.br',
         API_URL: 'https://api.dashsgs.com.br',
+        TURNSTILE_SECRET_KEY: randomBytes(24).toString('hex'),
       }),
     );
     expect(config.isProduction).toBe(true);

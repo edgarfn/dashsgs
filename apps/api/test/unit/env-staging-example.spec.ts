@@ -38,7 +38,13 @@ describe('.env.staging.example', () => {
     if (result.ok) return;
 
     const campos = result.issues.map((issue) => issue.path);
-    for (const campo of ['SESSION_SECRET', 'CSRF_SECRET', 'PII_PEPPER', 'MASTER_KEY_CURRENT']) {
+    for (const campo of [
+      'SESSION_SECRET',
+      'CSRF_SECRET',
+      'PII_PEPPER',
+      'MASTER_KEY_CURRENT',
+      'TURNSTILE_SECRET_KEY',
+    ]) {
       expect(campos).toContain(campo);
     }
   });
@@ -46,14 +52,15 @@ describe('.env.staging.example', () => {
   it('com segredos reais no lugar dos placeholders, a estrutura satisfaz o contrato inteiro', () => {
     const values = parseDotEnv(readFileSync(ENV_STAGING_EXAMPLE, 'utf8'));
 
-    // Só os quatro campos que a guarda de sentinela confere (doc 09 §2) — o resto do arquivo
-    // não deveria precisar de ajuste nenhum para passar; se precisar, é o arquivo que está errado.
+    // Só os campos que a guarda de sentinela confere (doc 09 §2) — o resto do arquivo não
+    // deveria precisar de ajuste nenhum para passar; se precisar, é o arquivo que está errado.
     const preenchido: Record<string, string> = {
       ...values,
       SESSION_SECRET: randomBytes(48).toString('base64'),
       CSRF_SECRET: randomBytes(48).toString('base64'),
       PII_PEPPER: randomBytes(24).toString('base64'),
       MASTER_KEY_CURRENT: randomBytes(32).toString('base64'),
+      TURNSTILE_SECRET_KEY: randomBytes(24).toString('hex'),
     };
 
     const result = parseEnv(preenchido);
