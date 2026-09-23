@@ -20,7 +20,7 @@ export default async function EnrollMfaPage() {
   if ('error' in setup) {
     return (
       <div className="space-y-4">
-        <h1 className="text-xl font-semibold text-white">Verificação em duas etapas</h1>
+        <h1 className="text-xl font-semibold text-app-fg">Verificação em duas etapas</h1>
         <Alert kind="error">{setup.error}</Alert>
       </div>
     );
@@ -29,15 +29,17 @@ export default async function EnrollMfaPage() {
   return (
     <div className="space-y-5">
       <div className="space-y-1">
-        <h1 className="text-xl font-semibold text-white">Ative a verificação em duas etapas</h1>
-        <p className="text-sm text-slate-400">
+        <h1 className="text-xl font-semibold text-app-fg">Ative a verificação em duas etapas</h1>
+        <p className="text-sm text-app-muted">
           Seu papel exige segundo fator. Aponte o aplicativo autenticador para o QR abaixo e
           confirme com o código gerado.
         </p>
       </div>
 
-      <div className="flex flex-col items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-4">
-        {/* O QR vem como data: URI — permitido pela CSP (img-src 'self' data:). */}
+      <div className="flex flex-col items-center gap-3 rounded-lg border border-app-border bg-app-surface p-4">
+        {/* O QR vem como data: URI — permitido pela CSP (img-src 'self' data:). Fundo branco
+            fixo de propósito: QR code precisa de contraste real para ser lido pela câmera,
+            independente do tema da página. */}
         <Image
           src={setup.qrCodeDataUrl}
           alt="QR code para configurar o aplicativo autenticador"
@@ -47,8 +49,8 @@ export default async function EnrollMfaPage() {
           className="rounded bg-white p-2"
         />
         <details className="w-full text-center">
-          <summary className="cursor-pointer text-xs text-slate-400">Não consigo ler o QR</summary>
-          <p className="mt-2 break-all rounded bg-black/30 px-2 py-1.5 font-mono text-xs text-slate-300">
+          <summary className="cursor-pointer text-xs text-app-muted">Não consigo ler o QR</summary>
+          <p className="mt-2 break-all rounded bg-app-hover px-2 py-1.5 font-mono text-xs text-app-fg">
             {setup.secret}
           </p>
         </details>

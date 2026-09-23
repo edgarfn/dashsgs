@@ -46,8 +46,8 @@ export function SeloDeFrescor({
   className?: string;
 }) {
   const estilo = frescor.atrasado
-    ? 'bg-amber-500/10 text-amber-300 ring-amber-500/30'
-    : 'bg-slate-500/10 text-slate-300 ring-slate-500/20';
+    ? 'bg-app-warning/10 text-app-warning ring-app-warning/30'
+    : 'bg-app-muted/10 text-app-muted ring-app-muted/20';
 
   const quando = frescor.atualizadoEm
     ? `dados de ${dataHora.format(new Date(frescor.atualizadoEm))}`
@@ -81,15 +81,15 @@ export function CardKpi({
   const sobe = (variacaoPct ?? 0) >= 0;
 
   return (
-    <article className="space-y-1 rounded-xl border border-white/10 bg-white/[0.02] p-5">
-      <h3 className="text-xs uppercase tracking-wider text-slate-500">{titulo}</h3>
-      <p className="text-2xl font-semibold tabular-nums text-white">{restrito ? '—' : valor}</p>
+    <article className="space-y-1 rounded-xl border border-app-border bg-app-surface p-5">
+      <h3 className="text-xs uppercase tracking-wider text-app-muted">{titulo}</h3>
+      <p className="text-2xl font-semibold tabular-nums text-app-fg">{restrito ? '—' : valor}</p>
       {restrito ? (
-        <p className="text-xs text-slate-500">Disponível para gerentes e administradores.</p>
+        <p className="text-xs text-app-muted">Disponível para gerentes e administradores.</p>
       ) : null}
-      {!restrito && detalhe ? <p className="text-xs text-slate-400">{detalhe}</p> : null}
+      {!restrito && detalhe ? <p className="text-xs text-app-muted">{detalhe}</p> : null}
       {!restrito && variacaoPct !== undefined && variacaoPct !== null ? (
-        <p className={`text-xs ${sobe ? 'text-emerald-300' : 'text-rose-300'}`}>
+        <p className={`text-xs ${sobe ? 'text-app-success' : 'text-app-danger'}`}>
           {/* Seta + sinal: nunca só cor (doc 16 §5). */}
           {sobe ? '▲' : '▼'} {formatar.percentual(Math.abs(variacaoPct))} vs. semana anterior
         </p>
@@ -109,7 +109,7 @@ export interface PontoDaCurva {
 export function CurvaDoDia({ pontos }: { pontos: PontoDaCurva[] }) {
   if (pontos.length === 0) {
     return (
-      <p className="text-sm text-slate-400">
+      <p className="text-sm text-app-muted">
         Ainda não há vendas registradas hoje. A curva aparece na primeira sincronização do dia.
       </p>
     );
@@ -152,7 +152,7 @@ export function CurvaDoDia({ pontos }: { pontos: PontoDaCurva[] }) {
               stroke="currentColor"
               strokeWidth="2"
               strokeDasharray="4 4"
-              className="text-slate-600"
+              className="text-app-muted"
             />
           ) : null}
           <polyline
@@ -160,7 +160,7 @@ export function CurvaDoDia({ pontos }: { pontos: PontoDaCurva[] }) {
             fill="none"
             stroke="currentColor"
             strokeWidth="2.5"
-            className="text-sky-400"
+            className="text-app-accent"
           />
           {pontos.map((ponto, i) => (
             <circle
@@ -170,7 +170,7 @@ export function CurvaDoDia({ pontos }: { pontos: PontoDaCurva[] }) {
                 altura - margem.base - (ponto.valor / maximo) * (altura - margem.topo - margem.base)
               }
               r="3"
-              className="fill-sky-300"
+              className="fill-app-accent"
             >
               <title>{`${String(ponto.hora).padStart(2, '0')}h — ${formatar.moeda(ponto.valor)} em ${ponto.cupons} cupons`}</title>
             </circle>
@@ -181,7 +181,7 @@ export function CurvaDoDia({ pontos }: { pontos: PontoDaCurva[] }) {
               x={margem.lado + i * passo}
               y={altura - 6}
               textAnchor="middle"
-              className="fill-slate-500 text-[10px]"
+              className="fill-app-muted text-[10px]"
             >
               {String(ponto.hora).padStart(2, '0')}
             </text>
@@ -189,14 +189,14 @@ export function CurvaDoDia({ pontos }: { pontos: PontoDaCurva[] }) {
         </svg>
       </div>
 
-      <figcaption className="flex flex-wrap items-center gap-4 text-xs text-slate-400">
+      <figcaption className="flex flex-wrap items-center gap-4 text-xs text-app-muted">
         <span className="inline-flex items-center gap-1">
-          <span className="h-0.5 w-4 bg-sky-400" aria-hidden="true" /> hoje
+          <span className="h-0.5 w-4 bg-app-accent" aria-hidden="true" /> hoje
         </span>
         {linhaMedia ? (
           <span className="inline-flex items-center gap-1">
             <span
-              className="h-0.5 w-4 border-t-2 border-dashed border-slate-600"
+              className="h-0.5 w-4 border-t-2 border-dashed border-app-muted"
               aria-hidden="true"
             />{' '}
             média das 4 semanas anteriores
@@ -204,12 +204,12 @@ export function CurvaDoDia({ pontos }: { pontos: PontoDaCurva[] }) {
         ) : null}
       </figcaption>
 
-      <details className="text-sm text-slate-300">
-        <summary className="cursor-pointer text-xs text-slate-400 hover:text-slate-200">
+      <details className="text-sm text-app-fg">
+        <summary className="cursor-pointer text-xs text-app-muted hover:text-app-fg">
           Ver dados da curva
         </summary>
         <table className="mt-2 w-full text-left text-sm">
-          <thead className="text-xs uppercase tracking-wider text-slate-500">
+          <thead className="text-xs uppercase tracking-wider text-app-muted">
             <tr>
               <th className="py-1 pr-4 font-medium">Hora</th>
               <th className="py-1 pr-4 font-medium">Venda</th>
@@ -217,7 +217,7 @@ export function CurvaDoDia({ pontos }: { pontos: PontoDaCurva[] }) {
               <th className="py-1 pr-4 font-medium">Média 4 semanas</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/5">
+          <tbody className="divide-y divide-app-border">
             {pontos.map((ponto) => (
               <tr key={`linha-${ponto.hora}`}>
                 <td className="py-1 pr-4 tabular-nums">{String(ponto.hora).padStart(2, '0')}h</td>
@@ -244,7 +244,7 @@ export function BarrasHorizontais({
   rotuloValor?: (valor: number) => string;
 }) {
   if (itens.length === 0) {
-    return <p className="text-sm text-slate-400">Sem dados no período selecionado.</p>;
+    return <p className="text-sm text-app-muted">Sem dados no período selecionado.</p>;
   }
 
   const maximo = Math.max(...itens.map((item) => item.valor), 1);
@@ -254,7 +254,7 @@ export function BarrasHorizontais({
       {itens.map((item) => (
         <li key={item.chave} className="space-y-1">
           <div className="flex items-baseline justify-between gap-3 text-sm">
-            <span className="text-slate-200">
+            <span className="text-app-fg">
               {item.href ? (
                 <Link href={item.href} className="hover:underline">
                   {item.rotulo}
@@ -263,18 +263,18 @@ export function BarrasHorizontais({
                 item.rotulo
               )}
             </span>
-            <span className="tabular-nums text-slate-300">{rotuloValor(item.valor)}</span>
+            <span className="tabular-nums text-app-fg">{rotuloValor(item.valor)}</span>
           </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-white/5">
+          <div className="h-2 w-full overflow-hidden rounded-full bg-app-surface">
             <div
               data-barra
-              className={`h-full rounded-full bg-sky-500/70 medida-largura ${classeProporcao(
+              className={`h-full rounded-full bg-app-accent/70 medida-largura ${classeProporcao(
                 item.valor,
                 maximo,
               )}`}
             />
           </div>
-          {item.detalhe ? <p className="text-xs text-slate-500">{item.detalhe}</p> : null}
+          {item.detalhe ? <p className="text-xs text-app-muted">{item.detalhe}</p> : null}
         </li>
       ))}
     </ul>
@@ -292,13 +292,13 @@ export function EstadoVazio({
   acao?: { href: string; rotulo: string };
 }) {
   return (
-    <div className="space-y-3 rounded-xl border border-dashed border-white/15 bg-white/[0.01] p-8 text-center">
-      <h3 className="text-base font-medium text-white">{titulo}</h3>
-      <p className="mx-auto max-w-lg text-sm text-slate-400">{descricao}</p>
+    <div className="space-y-3 rounded-xl border border-dashed border-app-border bg-app-surface p-8 text-center">
+      <h3 className="text-base font-medium text-app-fg">{titulo}</h3>
+      <p className="mx-auto max-w-lg text-sm text-app-muted">{descricao}</p>
       {acao ? (
         <Link
           href={acao.href}
-          className="inline-block rounded-lg border border-white/15 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/5"
+          className="inline-block rounded-lg border border-app-border px-3 py-2 text-sm text-app-fg transition hover:bg-app-hover"
         >
           {acao.rotulo}
         </Link>

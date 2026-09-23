@@ -49,8 +49,8 @@ export default async function RelatorioBreakGlassPage({
   if (!me.user.platformAdmin || resposta.status === 404) {
     return (
       <main className="mx-auto w-full max-w-lg space-y-4 px-6 py-16">
-        <h1 className="text-2xl font-semibold text-white">Página não encontrada</h1>
-        <Link href="/" className="text-sm text-sky-300 underline-offset-4 hover:underline">
+        <h1 className="text-2xl font-semibold text-app-fg">Página não encontrada</h1>
+        <Link href="/" className="text-sm text-app-accent underline-offset-4 hover:underline">
           Voltar para a home
         </Link>
       </main>
@@ -60,7 +60,7 @@ export default async function RelatorioBreakGlassPage({
   if (!resposta.ok || !resposta.data) {
     return (
       <main className="mx-auto w-full max-w-lg space-y-4 px-6 py-16">
-        <h1 className="text-2xl font-semibold text-white">Relatório indisponível</h1>
+        <h1 className="text-2xl font-semibold text-app-fg">Relatório indisponível</h1>
         <Alert kind="error">Não foi possível carregar o relatório desta concessão.</Alert>
       </main>
     );
@@ -73,39 +73,39 @@ export default async function RelatorioBreakGlassPage({
       <header className="space-y-1">
         <Link
           href="/plataforma/break-glass"
-          className="text-xs uppercase tracking-[0.2em] text-slate-500 hover:text-slate-300"
+          className="text-xs uppercase tracking-[0.2em] text-app-muted hover:text-app-fg"
         >
           DashSGS · break-glass
         </Link>
-        <h1 className="text-2xl font-semibold text-white">
+        <h1 className="text-2xl font-semibold text-app-fg">
           {concessao.ticket} · {concessao.tenantSlug}
         </h1>
-        <p className="text-sm text-slate-400">{concessao.justificativa}</p>
+        <p className="text-sm text-app-muted">{concessao.justificativa}</p>
       </header>
 
-      <section className="grid gap-4 rounded-xl border border-white/10 bg-white/[0.02] p-6 text-sm sm:grid-cols-2">
-        <p className="text-slate-400">
+      <section className="grid gap-4 rounded-xl border border-app-border bg-app-surface p-6 text-sm sm:grid-cols-2">
+        <p className="text-app-muted">
           Solicitante:{' '}
-          <span className="text-slate-200">
+          <span className="text-app-fg">
             {concessao.solicitante.nome} ({concessao.solicitante.email})
           </span>
         </p>
-        <p className="text-slate-400">
-          Aprovador: <span className="text-slate-200">{concessao.aprovador?.nome ?? '—'}</span>
+        <p className="text-app-muted">
+          Aprovador: <span className="text-app-fg">{concessao.aprovador?.nome ?? '—'}</span>
         </p>
-        <p className="text-slate-400">
-          Papel: <span className="text-slate-200">{concessao.papel}</span>
+        <p className="text-app-muted">
+          Papel: <span className="text-app-fg">{concessao.papel}</span>
         </p>
-        <p className="text-slate-400">
-          Situação: <span className="text-slate-200">{concessao.status}</span>
+        <p className="text-app-muted">
+          Situação: <span className="text-app-fg">{concessao.status}</span>
         </p>
-        <p className="text-slate-400">
+        <p className="text-app-muted">
           Aberto em:{' '}
-          <span className="text-slate-200">{quando.format(new Date(concessao.criadaEm))}</span>
+          <span className="text-app-fg">{quando.format(new Date(concessao.criadaEm))}</span>
         </p>
-        <p className="text-slate-400">
+        <p className="text-app-muted">
           Fim:{' '}
-          <span className="text-slate-200">
+          <span className="text-app-fg">
             {concessao.revogadaEm
               ? `${quando.format(new Date(concessao.revogadaEm))} (revogado)`
               : concessao.expiraEm
@@ -115,33 +115,33 @@ export default async function RelatorioBreakGlassPage({
         </p>
       </section>
 
-      <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+      <section className="space-y-4 rounded-xl border border-app-border bg-app-surface p-6">
+        <h2 className="text-sm font-medium uppercase tracking-wider text-app-muted">
           Acessos ({acessos.length})
         </h2>
 
         {acessos.length === 0 ? (
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-app-muted">
             Nenhuma requisição a dado do cliente foi feita sob esta concessão.
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase tracking-wider text-slate-500">
+              <thead className="text-xs uppercase tracking-wider text-app-muted">
                 <tr>
                   <th className="py-2 pr-4">Quando</th>
                   <th className="py-2 pr-4">Rota</th>
                   <th className="py-2">Origem</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
+              <tbody className="divide-y divide-app-border">
                 {acessos.map((acesso, indice) => (
                   <tr key={`${acesso.quando}-${indice}`}>
-                    <td className="py-2 pr-4 tabular-nums text-slate-300">
+                    <td className="py-2 pr-4 tabular-nums text-app-fg">
                       {quando.format(new Date(acesso.quando))}
                     </td>
-                    <td className="py-2 pr-4 font-mono text-xs text-slate-400">{acesso.rota}</td>
-                    <td className="py-2 font-mono text-xs text-slate-500">{acesso.ip ?? '—'}</td>
+                    <td className="py-2 pr-4 font-mono text-xs text-app-muted">{acesso.rota}</td>
+                    <td className="py-2 font-mono text-xs text-app-muted">{acesso.ip ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>

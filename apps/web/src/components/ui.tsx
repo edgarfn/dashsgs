@@ -42,7 +42,7 @@ export function Field({
   const id = `${useId()}-${name}`;
   return (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="block text-sm font-medium text-slate-200">
+      <label htmlFor={id} className="block text-sm font-medium text-app-fg">
         {label}
       </label>
       <input
@@ -57,10 +57,10 @@ export function Field({
         autoFocus={autoFocus}
         readOnly={readOnly}
         aria-describedby={hint ? `${id}-ajuda` : undefined}
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-slate-100 outline-none transition placeholder:text-slate-500 read-only:text-slate-400 focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/30"
+        className="w-full rounded-lg border border-app-border bg-app-surface px-3 py-2.5 text-app-fg outline-none transition placeholder:text-app-muted read-only:text-app-muted focus:border-app-accent/60 focus:ring-2 focus:ring-app-accent/30"
       />
       {hint ? (
-        <p id={`${id}-ajuda`} className="text-xs text-slate-400">
+        <p id={`${id}-ajuda`} className="text-xs text-app-muted">
           {hint}
         </p>
       ) : null}
@@ -77,9 +77,9 @@ export function SubmitButton({
 }) {
   const { pending } = useFormStatus();
   const styles = {
-    primary: 'bg-sky-500 text-slate-950 hover:bg-sky-400',
-    danger: 'bg-rose-500/90 text-white hover:bg-rose-500',
-    ghost: 'border border-white/15 text-slate-200 hover:bg-white/5',
+    primary: 'bg-app-accent text-app-accent-fg hover:opacity-90',
+    danger: 'bg-app-danger/90 text-white hover:bg-app-danger',
+    ghost: 'border border-app-border text-app-fg hover:bg-app-hover',
   }[variant];
 
   return (
@@ -101,9 +101,9 @@ export function Alert({
   children: ReactNode;
 }) {
   const styles = {
-    error: 'border-rose-500/30 bg-rose-500/10 text-rose-200',
-    success: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
-    info: 'border-sky-500/30 bg-sky-500/10 text-sky-200',
+    error: 'border-app-danger/30 bg-app-danger/10 text-app-danger',
+    success: 'border-app-success/30 bg-app-success/10 text-app-success',
+    info: 'border-app-accent/30 bg-app-accent/10 text-app-accent',
   }[kind];
 
   return (

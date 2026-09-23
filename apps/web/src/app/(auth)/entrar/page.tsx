@@ -19,8 +19,8 @@ export default async function LoginPage({
   return (
     <div className="space-y-5">
       <div className="space-y-1">
-        <h1 className="text-xl font-semibold text-white">Entrar</h1>
-        <p className="text-sm text-slate-400">Use a conta que recebeu por convite.</p>
+        <h1 className="text-xl font-semibold text-app-fg">Entrar</h1>
+        <p className="text-sm text-app-muted">Use a conta que recebeu por convite.</p>
       </div>
 
       {params.redefinida ? (
@@ -31,8 +31,8 @@ export default async function LoginPage({
 
       <LoginForm siteKey={turnstileSiteKey} nonce={nonce} />
 
-      <p className="text-sm text-slate-400">
-        <Link href="/esqueci-senha" className="text-sky-300 underline-offset-4 hover:underline">
+      <p className="text-sm text-app-muted">
+        <Link href="/esqueci-senha" className="text-app-accent underline-offset-4 hover:underline">
           Esqueci minha senha
         </Link>
       </p>

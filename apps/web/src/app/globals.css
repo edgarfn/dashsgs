@@ -1,8 +1,92 @@
 @import 'tailwindcss';
 
-/* Tokens visuais mínimos do esqueleto. O design system completo entra na Fase 7 (doc 16). */
+/*
+ * Tema claro/escuro: claro é o padrão de `:root`; o escuro entra por duas portas — a media
+ * query cobre a primeira visita (antes de existir cookie, cada navegador decide sozinho pelo
+ * SO) e o atributo `data-theme` cobre a escolha manual salva depois (vence sempre, nos dois
+ * sentidos, por especificidade de seletor — não depende de ordem no arquivo).
+ *
+ * A coluna escura é o valor já em produção, mantido literal: zero regressão visual para quem
+ * já usa o sistema. `app-surface` não é a mesma cor nos dois temas por design, não por
+ * inconsistência: no escuro é uma sobreposição translúcida de branco (só existe por cima de um
+ * fundo escuro); no claro vira branco sólido, com `app-border` fazendo a separação. `app-hover`
+ * é token à parte de `app-surface`: os dois pareciam a mesma ideia só porque tudo clareava no
+ * escuro — no claro, feedback de interação precisa ESCURECER, não clarear.
+ */
 :root {
+  color-scheme: light;
+  --app-bg: #f8fafc;
+  --app-surface: #ffffff;
+  --app-hover: rgba(15, 23, 42, 0.05);
+  --app-fg: #0f172a;
+  --app-muted: #475569;
+  --app-border: rgba(15, 23, 42, 0.1);
+  --app-accent: #0369a1;
+  --app-accent-fg: #ffffff;
+  --app-danger: #e11d48;
+  --app-success: #047857;
+  --app-warning: #b45309;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --app-bg: #020617;
+    --app-surface: rgba(255, 255, 255, 0.02);
+    --app-hover: rgba(255, 255, 255, 0.05);
+    --app-fg: #f1f5f9;
+    --app-muted: #94a3b8;
+    --app-border: rgba(255, 255, 255, 0.1);
+    --app-accent: #38bdf8;
+    --app-accent-fg: #020617;
+    --app-danger: #fb7185;
+    --app-success: #34d399;
+    --app-warning: #fbbf24;
+  }
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --app-bg: #f8fafc;
+  --app-surface: #ffffff;
+  --app-hover: rgba(15, 23, 42, 0.05);
+  --app-fg: #0f172a;
+  --app-muted: #475569;
+  --app-border: rgba(15, 23, 42, 0.1);
+  --app-accent: #0369a1;
+  --app-accent-fg: #ffffff;
+  --app-danger: #e11d48;
+  --app-success: #047857;
+  --app-warning: #b45309;
+}
+
+:root[data-theme='dark'] {
   color-scheme: dark;
+  --app-bg: #020617;
+  --app-surface: rgba(255, 255, 255, 0.02);
+  --app-hover: rgba(255, 255, 255, 0.05);
+  --app-fg: #f1f5f9;
+  --app-muted: #94a3b8;
+  --app-border: rgba(255, 255, 255, 0.1);
+  --app-accent: #38bdf8;
+  --app-accent-fg: #020617;
+  --app-danger: #fb7185;
+  --app-success: #34d399;
+  --app-warning: #fbbf24;
+}
+
+@theme inline {
+  --color-app-bg: var(--app-bg);
+  --color-app-surface: var(--app-surface);
+  --color-app-hover: var(--app-hover);
+  --color-app-fg: var(--app-fg);
+  --color-app-muted: var(--app-muted);
+  --color-app-border: var(--app-border);
+  --color-app-accent: var(--app-accent);
+  --color-app-accent-fg: var(--app-accent-fg);
+  --color-app-danger: var(--app-danger);
+  --color-app-success: var(--app-success);
+  --color-app-warning: var(--app-warning);
 }
 
 html,

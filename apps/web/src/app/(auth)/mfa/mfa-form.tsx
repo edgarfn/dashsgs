@@ -36,7 +36,7 @@ export function MfaForm() {
       <button
         type="button"
         onClick={() => setUsarRecuperacao((atual) => !atual)}
-        className="w-full text-center text-sm text-sky-300 underline-offset-4 hover:underline"
+        className="w-full text-center text-sm text-app-accent underline-offset-4 hover:underline"
       >
         {usarRecuperacao ? 'Usar o código do aplicativo' : 'Perdi o acesso ao aplicativo'}
       </button>

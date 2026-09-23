@@ -59,10 +59,10 @@ function desde(segundos: number | null): string {
 }
 
 const SELO = {
-  idle: { rotulo: 'em dia', estilo: 'bg-emerald-500/10 text-emerald-300 ring-emerald-500/30' },
-  running: { rotulo: 'rodando', estilo: 'bg-sky-500/10 text-sky-300 ring-sky-500/30' },
-  error: { rotulo: 'com erro', estilo: 'bg-rose-500/10 text-rose-300 ring-rose-500/30' },
-  nunca: { rotulo: 'nunca rodou', estilo: 'bg-slate-500/10 text-slate-300 ring-slate-500/30' },
+  idle: { rotulo: 'em dia', estilo: 'bg-app-success/10 text-app-success ring-app-success/30' },
+  running: { rotulo: 'rodando', estilo: 'bg-app-accent/10 text-app-accent ring-app-accent/30' },
+  error: { rotulo: 'com erro', estilo: 'bg-app-danger/10 text-app-danger ring-app-danger/30' },
+  nunca: { rotulo: 'nunca rodou', estilo: 'bg-app-muted/10 text-app-muted ring-app-muted/30' },
 } as const;
 
 /**
@@ -78,11 +78,11 @@ export default async function SincronizacaoPage() {
   if (!me.permissions.includes('erp_connection.manage')) {
     return (
       <main className="mx-auto w-full max-w-lg space-y-4 px-6 py-16">
-        <h1 className="text-2xl font-semibold text-white">Sem acesso a esta área</h1>
+        <h1 className="text-2xl font-semibold text-app-fg">Sem acesso a esta área</h1>
         <Alert kind="info">
           A sincronização é acompanhada por quem administra o tenant. Fale com o owner da sua rede.
         </Alert>
-        <Link href="/" className="text-sm text-sky-300 underline-offset-4 hover:underline">
+        <Link href="/" className="text-sm text-app-accent underline-offset-4 hover:underline">
           Voltar para a home
         </Link>
       </main>
@@ -101,12 +101,12 @@ export default async function SincronizacaoPage() {
       <header className="space-y-1">
         <Link
           href="/"
-          className="text-xs uppercase tracking-[0.2em] text-slate-500 hover:text-slate-300"
+          className="text-xs uppercase tracking-[0.2em] text-app-muted hover:text-app-fg"
         >
           DashSGS
         </Link>
-        <h1 className="text-2xl font-semibold text-white">Sincronização</h1>
-        <p className="text-sm text-slate-400">
+        <h1 className="text-2xl font-semibold text-app-fg">Sincronização</h1>
+        <p className="text-sm text-app-muted">
           De quanto em quanto tempo cada informação é buscada no seu ERP, e quando ela chegou pela
           última vez.
         </p>
@@ -133,26 +133,26 @@ export default async function SincronizacaoPage() {
         {painel?.dominios.map((dominio) => (
           <article
             key={dominio.domain}
-            className="space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-6"
+            className="space-y-3 rounded-xl border border-app-border bg-app-surface p-6"
           >
             <div className="space-y-1">
-              <h2 className="text-base font-medium text-white">{dominio.label}</h2>
-              <p className="text-sm text-slate-400">{dominio.descricao}</p>
+              <h2 className="text-base font-medium text-app-fg">{dominio.label}</h2>
+              <p className="text-sm text-app-muted">{dominio.descricao}</p>
             </div>
 
-            <ul className="divide-y divide-white/5">
+            <ul className="divide-y divide-app-border">
               {dominio.escopos.map((escopo) => (
                 <li
                   key={`${dominio.domain}-${escopo.filialErpId}`}
                   className="flex flex-wrap items-center justify-between gap-3 py-3"
                 >
                   <div className="space-y-0.5">
-                    <p className="text-sm text-slate-200">
+                    <p className="text-sm text-app-fg">
                       {dominio.porFilial
                         ? (escopo.filialNome ?? `Filial ${escopo.filialErpId}`)
                         : 'Toda a rede'}
                     </p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-app-muted">
                       Atualizado {desde(escopo.atrasoSegundos)}
                       {escopo.ultimoSucesso
                         ? ` · ${dataHora.format(new Date(escopo.ultimoSucesso))}`
@@ -160,7 +160,7 @@ export default async function SincronizacaoPage() {
                       {escopo.watermarkDate ? ` · até ${escopo.watermarkDate}` : ''}
                     </p>
                     {escopo.ultimoErro ? (
-                      <p className="text-xs text-rose-300">Última falha: {escopo.ultimoErro}</p>
+                      <p className="text-xs text-app-danger">Última falha: {escopo.ultimoErro}</p>
                     ) : null}
                   </div>
 
@@ -190,10 +190,10 @@ export default async function SincronizacaoPage() {
         ))}
       </section>
 
-      <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
+      <section className="space-y-4 rounded-xl border border-app-border bg-app-surface p-6">
         <div className="space-y-1">
-          <h2 className="text-base font-medium text-white">Histórico</h2>
-          <p className="text-sm text-slate-400">
+          <h2 className="text-base font-medium text-app-fg">Histórico</h2>
+          <p className="text-sm text-app-muted">
             O dia a dia entra sozinho. Para ver comparativos com meses anteriores, é preciso trazer
             o histórico uma vez.
           </p>
@@ -205,15 +205,15 @@ export default async function SincronizacaoPage() {
         />
       </section>
 
-      <section className="space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+      <section className="space-y-3 rounded-xl border border-app-border bg-app-surface p-6">
+        <h2 className="text-sm font-medium uppercase tracking-wider text-app-muted">
           Últimas execuções
         </h2>
 
         {painel && painel.execucoes.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[36rem] text-left text-sm">
-              <thead className="text-xs uppercase tracking-wider text-slate-500">
+              <thead className="text-xs uppercase tracking-wider text-app-muted">
                 <tr>
                   <th className="py-2 pr-4 font-medium">Quando</th>
                   <th className="py-2 pr-4 font-medium">O quê</th>
@@ -221,27 +221,30 @@ export default async function SincronizacaoPage() {
                   <th className="py-2 pr-4 font-medium">Linhas</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5 text-slate-300">
+              <tbody className="divide-y divide-app-border text-app-fg">
                 {painel.execucoes.map((execucao) => (
                   <tr key={execucao.id}>
-                    <td className="py-2 pr-4 text-slate-400">
+                    <td className="py-2 pr-4 text-app-muted">
                       {dataHora.format(new Date(execucao.startedAt))}
                     </td>
                     <td className="py-2 pr-4">
                       {execucao.domain}
                       {execucao.filialNome ? ` · ${execucao.filialNome}` : ''}
-                      <span className="text-slate-500"> ({execucao.trigger})</span>
+                      <span className="text-app-muted"> ({execucao.trigger})</span>
                     </td>
                     <td className="py-2 pr-4">
                       {execucao.status}
                       {execucao.error ? (
-                        <span className="block text-xs text-rose-300">{execucao.error}</span>
+                        <span className="block text-xs text-app-danger">{execucao.error}</span>
                       ) : null}
                     </td>
                     <td className="py-2 pr-4 tabular-nums">
                       {execucao.items}
                       {execucao.invalid > 0 ? (
-                        <span className="text-amber-300"> ({execucao.invalid} em quarentena)</span>
+                        <span className="text-app-warning">
+                          {' '}
+                          ({execucao.invalid} em quarentena)
+                        </span>
                       ) : null}
                     </td>
                   </tr>
@@ -250,7 +253,7 @@ export default async function SincronizacaoPage() {
             </table>
           </div>
         ) : (
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-app-muted">
             Nenhuma execução ainda. Assim que a conexão estiver testada, a sincronização começa
             sozinha.
           </p>

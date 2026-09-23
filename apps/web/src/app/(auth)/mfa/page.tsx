@@ -13,8 +13,8 @@ export default async function MfaPage() {
   return (
     <div className="space-y-5">
       <div className="space-y-1">
-        <h1 className="text-xl font-semibold text-white">Verificação em duas etapas</h1>
-        <p className="text-sm text-slate-400">
+        <h1 className="text-xl font-semibold text-app-fg">Verificação em duas etapas</h1>
+        <p className="text-sm text-app-muted">
           Digite o código de 6 dígitos do seu aplicativo autenticador.
         </p>
       </div>

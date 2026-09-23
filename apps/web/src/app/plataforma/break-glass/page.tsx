@@ -27,11 +27,11 @@ const quando = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle:
 const SELO: Record<Concessao['status'], { texto: string; classe: string }> = {
   aguardando_aprovacao: {
     texto: 'aguardando 2ª pessoa',
-    classe: 'bg-amber-500/10 text-amber-300 ring-amber-500/30',
+    classe: 'bg-app-warning/10 text-app-warning ring-app-warning/30',
   },
-  ativa: { texto: 'ativa', classe: 'bg-rose-500/10 text-rose-300 ring-rose-500/30' },
-  expirada: { texto: 'expirada', classe: 'bg-white/5 text-slate-400 ring-white/10' },
-  revogada: { texto: 'revogada', classe: 'bg-white/5 text-slate-400 ring-white/10' },
+  ativa: { texto: 'ativa', classe: 'bg-app-danger/10 text-app-danger ring-app-danger/30' },
+  expirada: { texto: 'expirada', classe: 'bg-app-surface text-app-muted ring-app-border' },
+  revogada: { texto: 'revogada', classe: 'bg-app-surface text-app-muted ring-app-border' },
 };
 
 /**
@@ -51,8 +51,8 @@ export default async function BreakGlassPage() {
   if (!me.user.platformAdmin || concessoes.status === 404) {
     return (
       <main className="mx-auto w-full max-w-lg space-y-4 px-6 py-16">
-        <h1 className="text-2xl font-semibold text-white">Página não encontrada</h1>
-        <Link href="/" className="text-sm text-sky-300 underline-offset-4 hover:underline">
+        <h1 className="text-2xl font-semibold text-app-fg">Página não encontrada</h1>
+        <Link href="/" className="text-sm text-app-accent underline-offset-4 hover:underline">
           Voltar para a home
         </Link>
       </main>
@@ -62,7 +62,7 @@ export default async function BreakGlassPage() {
   if (concessoes.status === 401) {
     return (
       <main className="mx-auto w-full max-w-lg space-y-4 px-6 py-16">
-        <h1 className="text-2xl font-semibold text-white">Verificação necessária</h1>
+        <h1 className="text-2xl font-semibold text-app-fg">Verificação necessária</h1>
         <Alert kind="info">
           Esta área exige verificação em duas etapas recente. Entre novamente para continuar.
         </Alert>
@@ -78,12 +78,12 @@ export default async function BreakGlassPage() {
       <header className="space-y-1">
         <Link
           href="/plataforma"
-          className="text-xs uppercase tracking-[0.2em] text-slate-500 hover:text-slate-300"
+          className="text-xs uppercase tracking-[0.2em] text-app-muted hover:text-app-fg"
         >
           DashSGS · operação
         </Link>
-        <h1 className="text-2xl font-semibold text-white">Break-glass</h1>
-        <p className="text-sm text-slate-400">
+        <h1 className="text-2xl font-semibold text-app-fg">Break-glass</h1>
+        <p className="text-sm text-app-muted">
           Acesso excepcional a dados de um cliente. Quem pede não aprova; o owner é avisado por
           e-mail; o acesso expira sozinho e cada requisição vira linha de relatório.
         </p>
@@ -96,24 +96,24 @@ export default async function BreakGlassPage() {
         </Alert>
       ) : null}
 
-      <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">Concessões</h2>
+      <section className="space-y-4 rounded-xl border border-app-border bg-app-surface p-6">
+        <h2 className="text-sm font-medium uppercase tracking-wider text-app-muted">Concessões</h2>
 
         {lista.length === 0 ? (
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-app-muted">
             Nenhum acesso excepcional foi pedido até hoje. É o número que se quer manter.
           </p>
         ) : (
-          <ul className="divide-y divide-white/5">
+          <ul className="divide-y divide-app-border">
             {lista.map((concessao) => (
               <li key={concessao.id} className="space-y-2 py-4">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <div>
-                    <p className="font-medium text-slate-200">
+                    <p className="font-medium text-app-fg">
                       {concessao.tenantSlug}{' '}
-                      <span className="font-mono text-xs text-slate-500">{concessao.ticket}</span>
+                      <span className="font-mono text-xs text-app-muted">{concessao.ticket}</span>
                     </p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-app-muted">
                       {concessao.solicitante.nome} · papel {concessao.papel} ·{' '}
                       {quando.format(new Date(concessao.criadaEm))}
                       {concessao.expiraEm
@@ -121,7 +121,7 @@ export default async function BreakGlassPage() {
                         : ''}
                       {concessao.aprovador ? ` · aprovado por ${concessao.aprovador.nome}` : ''}
                     </p>
-                    <p className="mt-1 text-xs text-slate-400">{concessao.justificativa}</p>
+                    <p className="mt-1 text-xs text-app-muted">{concessao.justificativa}</p>
                   </div>
                   <span
                     className={`rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset ${SELO[concessao.status].classe}`}
@@ -133,7 +133,7 @@ export default async function BreakGlassPage() {
                 <div className="flex flex-wrap items-center gap-3">
                   <Link
                     href={`/plataforma/break-glass/${concessao.id}`}
-                    className="text-xs text-sky-300 underline-offset-4 hover:underline"
+                    className="text-xs text-app-accent underline-offset-4 hover:underline"
                   >
                     Relatório ({concessao.acessos} acesso(s))
                   </Link>
@@ -145,7 +145,7 @@ export default async function BreakGlassPage() {
 
                   {concessao.status === 'aguardando_aprovacao' &&
                   concessao.solicitante.id === me.user.id ? (
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-app-muted">
                       Aguardando outra pessoa da equipe — você pediu, você não aprova.
                     </span>
                   ) : null}
@@ -158,8 +158,8 @@ export default async function BreakGlassPage() {
         )}
       </section>
 
-      <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+      <section className="space-y-4 rounded-xl border border-app-border bg-app-surface p-6">
+        <h2 className="text-sm font-medium uppercase tracking-wider text-app-muted">
           Pedir acesso
         </h2>
         <SolicitarForm tenants={tenants.data ?? []} />

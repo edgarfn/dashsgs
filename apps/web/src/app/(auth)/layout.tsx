@@ -8,17 +8,17 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       <header className="space-y-1">
         <Link
           href="/"
-          className="text-xs uppercase tracking-[0.2em] text-slate-500 hover:text-slate-300"
+          className="text-xs uppercase tracking-[0.2em] text-app-muted hover:text-app-fg"
         >
           DashSGS
         </Link>
       </header>
 
-      <section className="rounded-xl border border-white/10 bg-white/[0.02] p-6 shadow-lg shadow-black/20">
+      <section className="rounded-xl border border-app-border bg-app-surface p-6 shadow-lg shadow-black/20">
         {children}
       </section>
 
-      <footer className="text-center text-xs text-slate-500">
+      <footer className="text-center text-xs text-app-muted">
         Acesso restrito. Todos os eventos de autenticação são registrados.
       </footer>
     </main>

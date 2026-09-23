@@ -54,9 +54,9 @@ function paraFiltro(filiais: FilialView[] | null) {
 
 /** Verde acima da meta, âmbar no limiar do alerta, vermelho abaixo dele (doc 15 §8: 90%). */
 function corDoRitmo(ritmo: number): string {
-  if (ritmo >= 100) return 'text-emerald-300';
-  if (ritmo >= 90) return 'text-amber-300';
-  return 'text-rose-300';
+  if (ritmo >= 100) return 'text-app-success';
+  if (ritmo >= 90) return 'text-app-warning';
+  return 'text-app-danger';
 }
 
 const MESES = [
@@ -125,12 +125,15 @@ export default async function MetasPage({
       <Cabecalho me={me} ativo="metas" />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-medium text-white">
+        <h2 className="text-lg font-medium text-app-fg">
           Metas{dados ? ` — ${nomeDaCompetencia(dados.competencia)}` : ''}
         </h2>
         <div className="flex items-center gap-3">
           {dados ? <SeloDeFrescor frescor={dados.frescor} /> : null}
-          <Link href="/vendas" className="text-sm text-sky-300 underline-offset-4 hover:underline">
+          <Link
+            href="/vendas"
+            className="text-sm text-app-accent underline-offset-4 hover:underline"
+          >
             Ver vendas
           </Link>
         </div>
@@ -138,7 +141,7 @@ export default async function MetasPage({
 
       <FiltrosGlobais filiais={paraFiltro(filiais.data)} selecionadas={filiaisParam}>
         <div className="space-y-1.5">
-          <label htmlFor="filtro-competencia" className="block text-xs text-slate-400">
+          <label htmlFor="filtro-competencia" className="block text-xs text-app-muted">
             Competência
           </label>
           <input
@@ -146,7 +149,7 @@ export default async function MetasPage({
             type="month"
             name="competencia"
             defaultValue={dados?.competencia ?? competenciaParam}
-            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-400/60"
+            className="rounded-lg border border-app-border bg-app-surface px-3 py-2 text-sm text-app-fg outline-none focus:border-app-accent/60"
           />
         </div>
       </FiltrosGlobais>
@@ -188,12 +191,12 @@ export default async function MetasPage({
             />
           </div>
 
-          <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
+          <section className="space-y-4 rounded-xl border border-app-border bg-app-surface p-6">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h3 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+              <h3 className="text-sm font-medium uppercase tracking-wider text-app-muted">
                 Ritmo por filial
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-app-muted">
                 Ordenado do pior para o melhor. O alerta de meta em risco dispara abaixo de 90%.
               </p>
             </div>
@@ -204,7 +207,7 @@ export default async function MetasPage({
                   <div className="flex flex-wrap items-baseline justify-between gap-3 text-sm">
                     <Link
                       href={`/vendas?filiais=${filial.filialErpId}`}
-                      className="text-slate-200 hover:underline"
+                      className="text-app-fg hover:underline"
                     >
                       {filial.filialNome}
                     </Link>
@@ -220,19 +223,19 @@ export default async function MetasPage({
                     a meta, a de cima o realizado, e o traço marca onde deveríamos estar hoje. É
                     a leitura de cinco segundos que o doc 15 §9 pede.
                   */}
-                  <div className="relative h-3 overflow-hidden rounded-full bg-white/5">
+                  <div className="relative h-3 overflow-hidden rounded-full bg-app-surface">
                     <div
-                      className={`absolute inset-y-0 left-0 bg-white/10 medida-largura ${classeMedida((filial.meta / maiorMeta) * 100)}`}
+                      className={`absolute inset-y-0 left-0 bg-app-hover medida-largura ${classeMedida((filial.meta / maiorMeta) * 100)}`}
                     />
                     <div
-                      className={`absolute inset-y-0 left-0 rounded-full bg-sky-400/70 medida-largura ${classeMedida((filial.realizado / maiorMeta) * 100)}`}
+                      className={`absolute inset-y-0 left-0 rounded-full bg-app-accent/70 medida-largura ${classeMedida((filial.realizado / maiorMeta) * 100)}`}
                     />
                     <div
-                      className={`absolute inset-y-0 w-px bg-amber-300 medida-esquerda ${classeMedida((filial.esperadoAteHoje / maiorMeta) * 100)}`}
+                      className={`absolute inset-y-0 w-px bg-app-warning medida-esquerda ${classeMedida((filial.esperadoAteHoje / maiorMeta) * 100)}`}
                     />
                   </div>
 
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-app-muted">
                     <span>Meta {formatar.moeda(filial.meta)}</span>
                     <span>Realizado {formatar.moeda(filial.realizado)}</span>
                     <span>Esperado hoje {formatar.moeda(filial.esperadoAteHoje)}</span>
@@ -243,11 +246,11 @@ export default async function MetasPage({
               ))}
             </ul>
 
-            <details className="text-xs text-slate-500">
-              <summary className="cursor-pointer text-slate-400">Ver dados</summary>
+            <details className="text-xs text-app-muted">
+              <summary className="cursor-pointer text-app-muted">Ver dados</summary>
               <div className="mt-3 overflow-x-auto">
                 <table className="w-full min-w-[34rem] text-left">
-                  <thead className="text-slate-500">
+                  <thead className="text-app-muted">
                     <tr>
                       <th className="py-1 pr-4 font-medium">Filial</th>
                       <th className="py-1 pr-4 text-right font-medium">Meta</th>
@@ -257,7 +260,7 @@ export default async function MetasPage({
                       <th className="py-1 pr-4 text-right font-medium">Ritmo</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5 text-slate-400">
+                  <tbody className="divide-y divide-app-border text-app-muted">
                     {dados.porFilial.map((filial) => (
                       <tr key={filial.filialErpId}>
                         <td className="py-1 pr-4">{filial.filialNome}</td>
@@ -284,7 +287,7 @@ export default async function MetasPage({
             </details>
           </section>
 
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-app-muted">
             {dados.base === 'curva_diaria'
               ? 'A projeção segue a curva diária lançada no ERP: sábado e feriado pesam o que a loja previu que pesariam.'
               : 'O ERP não informa a curva diária deste mês, então a projeção assume ritmo uniforme — ela tende a parecer pior no começo da semana e melhor no fim.'}

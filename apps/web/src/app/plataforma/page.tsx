@@ -48,8 +48,8 @@ export default async function PlataformaPage() {
   if (!me.user.platformAdmin || tenants.status === 404) {
     return (
       <main className="mx-auto w-full max-w-lg space-y-4 px-6 py-16">
-        <h1 className="text-2xl font-semibold text-white">Página não encontrada</h1>
-        <Link href="/" className="text-sm text-sky-300 underline-offset-4 hover:underline">
+        <h1 className="text-2xl font-semibold text-app-fg">Página não encontrada</h1>
+        <Link href="/" className="text-sm text-app-accent underline-offset-4 hover:underline">
           Voltar para a home
         </Link>
       </main>
@@ -59,11 +59,11 @@ export default async function PlataformaPage() {
   if (tenants.status === 401) {
     return (
       <main className="mx-auto w-full max-w-lg space-y-4 px-6 py-16">
-        <h1 className="text-2xl font-semibold text-white">Verificação necessária</h1>
+        <h1 className="text-2xl font-semibold text-app-fg">Verificação necessária</h1>
         <Alert kind="info">
           Esta área exige verificação em duas etapas recente. Entre novamente para continuar.
         </Alert>
-        <Link href="/perfil" className="text-sm text-sky-300 underline-offset-4 hover:underline">
+        <Link href="/perfil" className="text-sm text-app-accent underline-offset-4 hover:underline">
           Ir para o perfil
         </Link>
       </main>
@@ -78,25 +78,25 @@ export default async function PlataformaPage() {
       <header className="space-y-1">
         <Link
           href="/"
-          className="text-xs uppercase tracking-[0.2em] text-slate-500 hover:text-slate-300"
+          className="text-xs uppercase tracking-[0.2em] text-app-muted hover:text-app-fg"
         >
           DashSGS · operação
         </Link>
-        <h1 className="text-2xl font-semibold text-white">Tenants</h1>
-        <p className="text-sm text-slate-400">
+        <h1 className="text-2xl font-semibold text-app-fg">Tenants</h1>
+        <p className="text-sm text-app-muted">
           {lista.length} contrato(s). Criar, suspender, reativar e desligar — tudo auditado com ator
           e motivo.
         </p>
         <nav className="flex flex-wrap gap-3 pt-2 text-sm">
           <Link
             href="/plataforma/retencao"
-            className="text-sky-300 underline-offset-4 hover:underline"
+            className="text-app-accent underline-offset-4 hover:underline"
           >
             Retenção e descarte
           </Link>
           <Link
             href="/plataforma/break-glass"
-            className="text-sky-300 underline-offset-4 hover:underline"
+            className="text-app-accent underline-offset-4 hover:underline"
           >
             Break-glass
           </Link>
@@ -108,30 +108,30 @@ export default async function PlataformaPage() {
         separar por cliente. É por isso que ela mora aqui e não na tela de auditoria do tenant —
         verificar "só a parte de A" não significaria nada, porque o elo que falta pode ser de B.
       */}
-      <section className="space-y-2 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+      <section className="space-y-2 rounded-xl border border-app-border bg-app-surface p-6">
+        <h2 className="text-sm font-medium uppercase tracking-wider text-app-muted">
           Integridade da trilha de auditoria
         </h2>
         {!integridade ? (
-          <p className="text-sm text-slate-400">Não foi possível verificar a cadeia agora.</p>
+          <p className="text-sm text-app-muted">Não foi possível verificar a cadeia agora.</p>
         ) : integridade.ok ? (
           <>
-            <p className="text-sm text-emerald-300">
+            <p className="text-sm text-app-success">
               ✓ Cadeia íntegra — {integridade.conferidas.toLocaleString('pt-BR')} entradas
               reconferidas de {integridade.total.toLocaleString('pt-BR')}.
             </p>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-app-muted">
               Cada entrada é reconstruída e comparada com o hash gravado. A verificação percorre a
               cauda da trilha: cinco anos a cada carregamento de página tornaria o número inútil.
             </p>
           </>
         ) : (
           <>
-            <p className="text-sm text-rose-300">
+            <p className="text-sm text-app-danger">
               ✗ Cadeia quebrada na entrada {integridade.quebradaEm} —{' '}
               {integridade.conferidas.toLocaleString('pt-BR')} entradas conferidas.
             </p>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-app-muted">
               Isto é incidente de segurança, não defeito de tela: a aplicação não tem privilégio
               para alterar a trilha. Siga o doc 27 antes de qualquer outra coisa.
             </p>
@@ -139,24 +139,24 @@ export default async function PlataformaPage() {
         )}
       </section>
 
-      <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">Contratos</h2>
+      <section className="space-y-4 rounded-xl border border-app-border bg-app-surface p-6">
+        <h2 className="text-sm font-medium uppercase tracking-wider text-app-muted">Contratos</h2>
 
-        <ul className="divide-y divide-white/5">
+        <ul className="divide-y divide-app-border">
           {lista.map((tenant) => (
             <li key={tenant.id} className="space-y-3 py-4">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <div>
-                  <p className="font-medium text-slate-200">
+                  <p className="font-medium text-app-fg">
                     {tenant.name}{' '}
-                    <span className="font-mono text-xs text-slate-500">({tenant.slug})</span>
+                    <span className="font-mono text-xs text-app-muted">({tenant.slug})</span>
                   </p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-app-muted">
                     plano {tenant.plan} · {tenant.membros} membro(s) · {tenant.convitesPendentes}{' '}
                     convite(s) pendente(s) · desde {data.format(new Date(tenant.createdAt))}
                   </p>
                   {tenant.suspensionReason ? (
-                    <p className="mt-1 text-xs text-amber-300">
+                    <p className="mt-1 text-xs text-app-warning">
                       Suspenso em{' '}
                       {tenant.suspendedAt ? data.format(new Date(tenant.suspendedAt)) : '—'}:{' '}
                       {tenant.suspensionReason}
@@ -166,8 +166,8 @@ export default async function PlataformaPage() {
                 <span
                   className={`rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset ${
                     tenant.status === 'active'
-                      ? 'bg-emerald-500/10 text-emerald-300 ring-emerald-500/30'
-                      : 'bg-amber-500/10 text-amber-300 ring-amber-500/30'
+                      ? 'bg-app-success/10 text-app-success ring-app-success/30'
+                      : 'bg-app-warning/10 text-app-warning ring-app-warning/30'
                   }`}
                 >
                   {tenant.status === 'active' ? 'ativo' : 'suspenso'}
@@ -186,8 +186,8 @@ export default async function PlataformaPage() {
         </ul>
       </section>
 
-      <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+      <section className="space-y-4 rounded-xl border border-app-border bg-app-surface p-6">
+        <h2 className="text-sm font-medium uppercase tracking-wider text-app-muted">
           Provisionar tenant
         </h2>
         <CreateTenantForm />

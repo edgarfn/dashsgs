@@ -27,7 +27,7 @@ export default async function InvitePage({
   if (!invite) {
     return (
       <div className="space-y-4">
-        <h1 className="text-xl font-semibold text-white">Convite indisponível</h1>
+        <h1 className="text-xl font-semibold text-app-fg">Convite indisponível</h1>
         <Alert kind="error">
           Este convite é inválido, expirou ou já foi utilizado. Peça um novo ao administrador do seu
           tenant.
@@ -39,8 +39,8 @@ export default async function InvitePage({
   return (
     <div className="space-y-5">
       <div className="space-y-1">
-        <h1 className="text-xl font-semibold text-white">Convite para {invite.tenantName}</h1>
-        <p className="text-sm text-slate-400">{PAPEL_DESCRICAO[invite.role] ?? invite.role}</p>
+        <h1 className="text-xl font-semibold text-app-fg">Convite para {invite.tenantName}</h1>
+        <p className="text-sm text-app-muted">{PAPEL_DESCRICAO[invite.role] ?? invite.role}</p>
       </div>
 
       <AcceptInviteForm

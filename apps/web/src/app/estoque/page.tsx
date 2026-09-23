@@ -121,7 +121,7 @@ export default async function EstoquePage({
       <Cabecalho me={me} ativo="estoque" />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-medium text-white">{TITULOS[situacao]}</h2>
+        <h2 className="text-lg font-medium text-app-fg">{TITULOS[situacao]}</h2>
         {estoque ? <SeloDeFrescor frescor={estoque.frescor} /> : null}
       </div>
 
@@ -159,25 +159,25 @@ export default async function EstoquePage({
       <FiltrosGlobais filiais={paraFiltro(filiais.data)} selecionadas={filiaisParam}>
         <input type="hidden" name="situacao" value={situacao} />
         <div className="space-y-1.5">
-          <label htmlFor="filtro-curva" className="block text-xs text-slate-400">
+          <label htmlFor="filtro-curva" className="block text-xs text-app-muted">
             Curva ABC
           </label>
           <select
             id="filtro-curva"
             name="curva"
             defaultValue={curva ?? ''}
-            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-400/60"
+            className="rounded-lg border border-app-border bg-app-surface px-3 py-2 text-sm text-app-fg outline-none focus:border-app-accent/60"
           >
-            <option value="" className="bg-slate-900">
+            <option value="" className="bg-app-bg">
               Todas
             </option>
-            <option value="A" className="bg-slate-900">
+            <option value="A" className="bg-app-bg">
               Somente A
             </option>
-            <option value="B" className="bg-slate-900">
+            <option value="B" className="bg-app-bg">
               Somente B
             </option>
-            <option value="C" className="bg-slate-900">
+            <option value="C" className="bg-app-bg">
               Somente C
             </option>
           </select>
@@ -198,14 +198,14 @@ export default async function EstoquePage({
           }
         />
       ) : (
-        <section className="space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-          <h3 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+        <section className="space-y-3 rounded-xl border border-app-border bg-app-surface p-6">
+          <h3 className="text-sm font-medium uppercase tracking-wider text-app-muted">
             {formatar.inteiro(estoque.paginacao.total)} produtos
           </h3>
 
           <div className="overflow-x-auto">
             <table className="w-full min-w-[48rem] text-left text-sm">
-              <thead className="text-xs uppercase tracking-wider text-slate-500">
+              <thead className="text-xs uppercase tracking-wider text-app-muted">
                 <tr>
                   <th className="py-2 pr-4 font-medium">Curva</th>
                   <th className="py-2 pr-4 font-medium">Produto</th>
@@ -216,23 +216,23 @@ export default async function EstoquePage({
                   <th className="py-2 pr-4 text-right font-medium">Preço</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5 text-slate-300">
+              <tbody className="divide-y divide-app-border text-app-fg">
                 {estoque.produtos.map((produto) => (
                   <tr key={`${produto.filialErpId}-${produto.erpId}`}>
                     <td className="py-2 pr-4">
                       <span
                         className={`rounded px-1.5 py-0.5 text-xs ${
                           produto.curvaAbc === 'A'
-                            ? 'bg-rose-500/10 text-rose-300'
-                            : 'bg-white/5 text-slate-400'
+                            ? 'bg-app-danger/10 text-app-danger'
+                            : 'bg-app-surface text-app-muted'
                         }`}
                       >
                         {produto.curvaAbc ?? '—'}
                       </span>
                     </td>
                     <td className="py-2 pr-4">
-                      <span className="text-slate-200">{produto.descricao}</span>
-                      <span className="block text-xs text-slate-500">
+                      <span className="text-app-fg">{produto.descricao}</span>
+                      <span className="block text-xs text-app-muted">
                         #{produto.erpId}
                         {produto.departamento ? ` · ${produto.departamento}` : ''}
                       </span>
@@ -263,20 +263,20 @@ export default async function EstoquePage({
               {estoque.paginacao.pagina > 1 ? (
                 <Link
                   href={paginaUrl(estoque.paginacao.pagina - 1)}
-                  className="text-sky-300 underline-offset-4 hover:underline"
+                  className="text-app-accent underline-offset-4 hover:underline"
                 >
                   ← Página anterior
                 </Link>
               ) : (
                 <span />
               )}
-              <span className="text-slate-500">
+              <span className="text-app-muted">
                 Página {estoque.paginacao.pagina} de {estoque.paginacao.paginas}
               </span>
               {estoque.paginacao.pagina < estoque.paginacao.paginas ? (
                 <Link
                   href={paginaUrl(estoque.paginacao.pagina + 1)}
-                  className="text-sky-300 underline-offset-4 hover:underline"
+                  className="text-app-accent underline-offset-4 hover:underline"
                 >
                   Próxima página →
                 </Link>
@@ -286,7 +286,7 @@ export default async function EstoquePage({
             </nav>
           ) : null}
 
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-app-muted">
             Cobertura = estoque atual ÷ venda média diária do cadastro. Produtos sem venda média
             aparecem como “sem venda”.
           </p>

@@ -56,15 +56,15 @@ export function BackfillForm({ ativo, percentual }: { ativo: boolean; percentual
       {ativo ? (
         <form action={cancelar} className="space-y-3">
           <div className="space-y-1">
-            <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-app-hover">
               <div
                 data-barra
-                className={`h-full rounded-full bg-sky-400 transition-all medida-largura ${classeMedida(
+                className={`h-full rounded-full bg-app-accent transition-all medida-largura ${classeMedida(
                   percentual,
                 )}`}
               />
             </div>
-            <p className="text-sm text-slate-400">{percentual}% do histórico carregado.</p>
+            <p className="text-sm text-app-muted">{percentual}% do histórico carregado.</p>
           </div>
 
           <SubmitButton variant="ghost">Interromper carga</SubmitButton>
@@ -72,29 +72,29 @@ export function BackfillForm({ ativo, percentual }: { ativo: boolean; percentual
       ) : (
         <form action={iniciar} className="space-y-3">
           <div className="space-y-1.5">
-            <label htmlFor="campo-dias" className="block text-sm font-medium text-slate-200">
+            <label htmlFor="campo-dias" className="block text-sm font-medium text-app-fg">
               Profundidade do histórico
             </label>
             <select
               id="campo-dias"
               name="dias"
               defaultValue="90"
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-slate-100 outline-none focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/30 sm:w-64"
+              className="w-full rounded-lg border border-app-border bg-app-surface px-3 py-2.5 text-app-fg outline-none focus:border-app-accent/60 focus:ring-2 focus:ring-app-accent/30 sm:w-64"
             >
-              <option value="30" className="bg-slate-900">
+              <option value="30" className="bg-app-bg">
                 Últimos 30 dias
               </option>
-              <option value="90" className="bg-slate-900">
+              <option value="90" className="bg-app-bg">
                 Últimos 90 dias (recomendado)
               </option>
-              <option value="365" className="bg-slate-900">
+              <option value="365" className="bg-app-bg">
                 Último ano
               </option>
-              <option value="800" className="bg-slate-900">
+              <option value="800" className="bg-app-bg">
                 26 meses (comparativo ano a ano)
               </option>
             </select>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-app-muted">
               A carga vai do dia mais recente para trás e pode levar horas. Ela tem prioridade menor
               que a sincronização do dia, para não pesar no ERP da loja.
             </p>

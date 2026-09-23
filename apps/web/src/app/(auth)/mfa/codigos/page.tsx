@@ -24,15 +24,15 @@ export default async function RecoveryCodesPage({
   return (
     <div className="space-y-5">
       <div className="space-y-1">
-        <h1 className="text-xl font-semibold text-white">Guarde seus códigos de recuperação</h1>
-        <p className="text-sm text-slate-400">
+        <h1 className="text-xl font-semibold text-app-fg">Guarde seus códigos de recuperação</h1>
+        <p className="text-sm text-app-muted">
           Cada código serve uma única vez e substitui o aplicativo se você perder o telefone.
         </p>
       </div>
 
       <Alert kind="info">Esta é a única vez que eles aparecem. Guarde-os em local seguro.</Alert>
 
-      <ul className="grid grid-cols-2 gap-2 rounded-lg border border-white/10 bg-black/30 p-4 font-mono text-sm text-slate-200">
+      <ul className="grid grid-cols-2 gap-2 rounded-lg border border-app-border bg-app-hover p-4 font-mono text-sm text-app-fg">
         {lista.map((codigo) => (
           <li key={codigo}>{codigo}</li>
         ))}
@@ -40,7 +40,7 @@ export default async function RecoveryCodesPage({
 
       <Link
         href="/"
-        className="block w-full rounded-lg bg-sky-500 px-4 py-2.5 text-center text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
+        className="block w-full rounded-lg bg-app-accent px-4 py-2.5 text-center text-sm font-semibold text-app-accent-fg transition hover:opacity-90"
       >
         Guardei os códigos, continuar
       </Link>

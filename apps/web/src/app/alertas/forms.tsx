@@ -84,7 +84,7 @@ export function AjustarRegraForm({
         <div className="flex flex-wrap gap-3">
           {campos.map(([campo, valor]) => (
             <div key={campo} className="space-y-1.5">
-              <label htmlFor={`regra-${id}-${campo}`} className="block text-xs text-slate-400">
+              <label htmlFor={`regra-${id}-${campo}`} className="block text-xs text-app-muted">
                 {ROTULOS[campo] ?? campo}
               </label>
               <input
@@ -93,19 +93,19 @@ export function AjustarRegraForm({
                 name={`param.${campo}`}
                 defaultValue={String(valor)}
                 min={0}
-                className="w-44 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-400/60"
+                className="w-44 rounded-lg border border-app-border bg-app-surface px-3 py-2 text-sm text-app-fg outline-none focus:border-app-accent/60"
               />
             </div>
           ))}
         </div>
       ) : null}
 
-      <label className="flex items-center gap-2 text-sm text-slate-300">
+      <label className="flex items-center gap-2 text-sm text-app-fg">
         <input
           type="checkbox"
           name="canalEmail"
           defaultChecked={canalEmail}
-          className="h-4 w-4 rounded border-white/20 bg-white/5"
+          className="h-4 w-4 rounded border-app-border bg-app-surface"
         />
         Também enviar por e-mail
       </label>

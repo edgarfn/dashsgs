@@ -90,13 +90,13 @@ export default async function ComprasPage({
       <Cabecalho me={me} ativo="compras" />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-medium text-white">Compras</h2>
+        <h2 className="text-lg font-medium text-app-fg">Compras</h2>
         <div className="flex items-center gap-3">
           {dados ? <SeloDeFrescor frescor={dados.frescor} /> : null}
           {me.permissions.includes('dashboard.view') ? (
             <Link
               href="/financeiro"
-              className="text-sm text-sky-300 underline-offset-4 hover:underline"
+              className="text-sm text-app-accent underline-offset-4 hover:underline"
             >
               Ver financeiro
             </Link>
@@ -106,7 +106,7 @@ export default async function ComprasPage({
 
       <FiltrosGlobais filiais={paraFiltro(filiais.data)} selecionadas={filiaisParam}>
         <div className="space-y-1.5">
-          <label htmlFor="filtro-de" className="block text-xs text-slate-400">
+          <label htmlFor="filtro-de" className="block text-xs text-app-muted">
             Pedidos de
           </label>
           <input
@@ -115,11 +115,11 @@ export default async function ComprasPage({
             name="de"
             defaultValue={de}
             max={hoje}
-            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-400/60"
+            className="rounded-lg border border-app-border bg-app-surface px-3 py-2 text-sm text-app-fg outline-none focus:border-app-accent/60"
           />
         </div>
         <div className="space-y-1.5">
-          <label htmlFor="filtro-ate" className="block text-xs text-slate-400">
+          <label htmlFor="filtro-ate" className="block text-xs text-app-muted">
             até
           </label>
           <input
@@ -128,7 +128,7 @@ export default async function ComprasPage({
             name="ate"
             defaultValue={ate}
             max={hoje}
-            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-400/60"
+            className="rounded-lg border border-app-border bg-app-surface px-3 py-2 text-sm text-app-fg outline-none focus:border-app-accent/60"
           />
         </div>
       </FiltrosGlobais>
@@ -174,8 +174,8 @@ export default async function ComprasPage({
             />
           </div>
 
-          <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-            <h3 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+          <section className="space-y-4 rounded-xl border border-app-border bg-app-surface p-6">
+            <h3 className="text-sm font-medium uppercase tracking-wider text-app-muted">
               Pedidos por situação
             </h3>
             <BarrasHorizontais
@@ -189,13 +189,13 @@ export default async function ComprasPage({
           </section>
 
           {dados.pendentesAntigos.length > 0 ? (
-            <section className="space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-              <h3 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+            <section className="space-y-3 rounded-xl border border-app-border bg-app-surface p-6">
+              <h3 className="text-sm font-medium uppercase tracking-wider text-app-muted">
                 Pedidos parados
               </h3>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[36rem] text-left text-sm">
-                  <thead className="text-xs uppercase tracking-wider text-slate-500">
+                  <thead className="text-xs uppercase tracking-wider text-app-muted">
                     <tr>
                       <th className="py-2 pr-4 font-medium">Pedido</th>
                       <th className="py-2 pr-4 font-medium">Filial</th>
@@ -205,7 +205,7 @@ export default async function ComprasPage({
                       <th className="py-2 pr-4 text-right font-medium">Valor</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5 text-slate-300">
+                  <tbody className="divide-y divide-app-border text-app-fg">
                     {dados.pendentesAntigos.map((pedido) => (
                       <tr key={pedido.erpId}>
                         <td className="py-2 pr-4 tabular-nums">#{pedido.erpId}</td>
@@ -214,7 +214,7 @@ export default async function ComprasPage({
                           {pedido.dataPedido ? formatar.dataCompleta(pedido.dataPedido) : '—'}
                         </td>
                         <td className="py-2 pr-4">{pedido.situacao ?? '—'}</td>
-                        <td className="py-2 pr-4 text-right tabular-nums text-amber-300">
+                        <td className="py-2 pr-4 text-right tabular-nums text-app-warning">
                           {pedido.diasEmAberto}
                         </td>
                         <td className="py-2 pr-4 text-right tabular-nums">
@@ -225,7 +225,7 @@ export default async function ComprasPage({
                   </tbody>
                 </table>
               </div>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-app-muted">
                 O lead time conta do pedido ao atendimento — não à previsão do fornecedor, que é
                 promessa, não entrega.
               </p>

@@ -70,10 +70,10 @@ function AgingBlocos({ aging }: { aging: Aging }) {
   const titulo = aging.tipo === 'pagar' ? 'A pagar' : 'A receber';
 
   return (
-    <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
+    <section className="space-y-4 rounded-xl border border-app-border bg-app-surface p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-sm font-medium uppercase tracking-wider text-slate-400">{titulo}</h3>
-        <span className="text-lg font-semibold tabular-nums text-white">
+        <h3 className="text-sm font-medium uppercase tracking-wider text-app-muted">{titulo}</h3>
+        <span className="text-lg font-semibold tabular-nums text-app-fg">
           {formatar.moeda(aging.total)}
         </span>
       </div>
@@ -85,24 +85,24 @@ function AgingBlocos({ aging }: { aging: Aging }) {
           return (
             <li key={faixa.bucket} className="space-y-1">
               <div className="flex items-baseline justify-between gap-3 text-sm">
-                <span className={vencido ? 'text-rose-300' : 'text-slate-200'}>
+                <span className={vencido ? 'text-app-danger' : 'text-app-fg'}>
                   {vencido ? '⚠ ' : ''}
                   {faixa.rotulo}
                 </span>
-                <span className="tabular-nums text-slate-300">
+                <span className="tabular-nums text-app-fg">
                   {formatar.moeda(faixa.valor)}
-                  <span className="ml-2 text-xs text-slate-500">
+                  <span className="ml-2 text-xs text-app-muted">
                     {faixa.parcelas} {faixa.parcelas === 1 ? 'parcela' : 'parcelas'}
                   </span>
                 </span>
               </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-white/5">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-app-surface">
                 <div
                   data-barra
                   className={`h-full rounded-full medida-largura ${classeProporcao(
                     faixa.valor,
                     aging.total,
-                  )} ${vencido ? 'bg-rose-500/70' : 'bg-sky-500/70'}`}
+                  )} ${vencido ? 'bg-app-danger/70' : 'bg-app-accent/70'}`}
                 />
               </div>
             </li>
@@ -169,10 +169,13 @@ export default async function FinanceiroPage({
       <Cabecalho me={me} ativo="financeiro" />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-medium text-white">Financeiro</h2>
+        <h2 className="text-lg font-medium text-app-fg">Financeiro</h2>
         <div className="flex items-center gap-3">
           {dados ? <SeloDeFrescor frescor={dados.frescor} /> : null}
-          <Link href="/compras" className="text-sm text-sky-300 underline-offset-4 hover:underline">
+          <Link
+            href="/compras"
+            className="text-sm text-app-accent underline-offset-4 hover:underline"
+          >
             Ver compras
           </Link>
         </div>
@@ -180,7 +183,7 @@ export default async function FinanceiroPage({
 
       <FiltrosGlobais filiais={paraFiltro(filiais.data)} selecionadas={filiaisParam}>
         <div className="space-y-1.5">
-          <label htmlFor="filtro-de" className="block text-xs text-slate-400">
+          <label htmlFor="filtro-de" className="block text-xs text-app-muted">
             Despesas e cartões de
           </label>
           <input
@@ -189,11 +192,11 @@ export default async function FinanceiroPage({
             name="de"
             defaultValue={de}
             max={hoje}
-            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-400/60"
+            className="rounded-lg border border-app-border bg-app-surface px-3 py-2 text-sm text-app-fg outline-none focus:border-app-accent/60"
           />
         </div>
         <div className="space-y-1.5">
-          <label htmlFor="filtro-ate" className="block text-xs text-slate-400">
+          <label htmlFor="filtro-ate" className="block text-xs text-app-muted">
             até
           </label>
           <input
@@ -202,7 +205,7 @@ export default async function FinanceiroPage({
             name="ate"
             defaultValue={ate}
             max={hoje}
-            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-400/60"
+            className="rounded-lg border border-app-border bg-app-surface px-3 py-2 text-sm text-app-fg outline-none focus:border-app-accent/60"
           />
         </div>
       </FiltrosGlobais>
@@ -227,13 +230,13 @@ export default async function FinanceiroPage({
           </div>
 
           {dados.fluxo.length > 0 ? (
-            <section className="space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-              <h3 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+            <section className="space-y-3 rounded-xl border border-app-border bg-app-surface p-6">
+              <h3 className="text-sm font-medium uppercase tracking-wider text-app-muted">
                 Fluxo previsto por semana
               </h3>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[32rem] text-left text-sm">
-                  <thead className="text-xs uppercase tracking-wider text-slate-500">
+                  <thead className="text-xs uppercase tracking-wider text-app-muted">
                     <tr>
                       <th className="py-2 pr-4 font-medium">Semana de</th>
                       <th className="py-2 pr-4 text-right font-medium">A pagar</th>
@@ -241,7 +244,7 @@ export default async function FinanceiroPage({
                       <th className="py-2 pr-4 text-right font-medium">Saldo</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5 text-slate-300">
+                  <tbody className="divide-y divide-app-border text-app-fg">
                     {dados.fluxo.map((semana) => (
                       <tr key={semana.semana}>
                         <td className="py-2 pr-4 tabular-nums">
@@ -255,7 +258,7 @@ export default async function FinanceiroPage({
                         </td>
                         <td
                           className={`py-2 pr-4 text-right tabular-nums ${
-                            semana.saldo < 0 ? 'text-rose-300' : 'text-emerald-300'
+                            semana.saldo < 0 ? 'text-app-danger' : 'text-app-success'
                           }`}
                         >
                           {formatar.moeda(semana.saldo)}
@@ -268,12 +271,12 @@ export default async function FinanceiroPage({
             </section>
           ) : null}
 
-          <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
+          <section className="space-y-4 rounded-xl border border-app-border bg-app-surface p-6">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h3 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+              <h3 className="text-sm font-medium uppercase tracking-wider text-app-muted">
                 Despesas do período
               </h3>
-              <span className="text-sm text-slate-400">
+              <span className="text-sm text-app-muted">
                 {formatar.moeda(dados.despesas.total)}
                 {dados.despesas.fixasPct !== null
                   ? ` · ${formatar.percentual(dados.despesas.fixasPct)} fixas`
@@ -292,8 +295,8 @@ export default async function FinanceiroPage({
             />
           </section>
 
-          <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-            <h3 className="text-sm font-medium uppercase tracking-wider text-slate-400">Cartões</h3>
+          <section className="space-y-4 rounded-xl border border-app-border bg-app-surface p-6">
+            <h3 className="text-sm font-medium uppercase tracking-wider text-app-muted">Cartões</h3>
 
             <div className="grid gap-4 sm:grid-cols-3">
               <CardKpi titulo="Volume bruto" valor={formatar.moeda(dados.cartoes.volumeBruto)} />
@@ -317,7 +320,7 @@ export default async function FinanceiroPage({
                 detalhe: `${formatar.inteiro(linha.transacoes)} transações · taxa média ${formatar.percentual(linha.taxaMediaPct)}`,
               }))}
             />
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-app-muted">
               A taxa média é ponderada pelo volume: uma transação de R$ 5 não pesa o mesmo que uma
               de R$ 5.000.
             </p>

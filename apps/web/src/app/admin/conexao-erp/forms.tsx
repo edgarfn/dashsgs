@@ -53,19 +53,19 @@ export function ConexaoForm({ atual }: { atual: ValoresAtuais }) {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <label htmlFor="campo-tlsMode" className="block text-sm font-medium text-slate-200">
+          <label htmlFor="campo-tlsMode" className="block text-sm font-medium text-app-fg">
             Transporte
           </label>
           <select
             id="campo-tlsMode"
             name="tlsMode"
             defaultValue={atual.tlsMode}
-            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-slate-100 outline-none focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/30"
+            className="w-full rounded-lg border border-app-border bg-app-surface px-3 py-2.5 text-app-fg outline-none focus:border-app-accent/60 focus:ring-2 focus:ring-app-accent/30"
           >
-            <option value="https" className="bg-slate-900">
+            <option value="https" className="bg-app-bg">
               HTTPS (recomendado)
             </option>
-            <option value="vpn" className="bg-slate-900">
+            <option value="vpn" className="bg-app-bg">
               VPN provisionada pela plataforma
             </option>
           </select>
@@ -80,12 +80,12 @@ export function ConexaoForm({ atual }: { atual: ValoresAtuais }) {
         />
       </div>
 
-      <label className="flex items-center gap-2 text-sm text-slate-300">
+      <label className="flex items-center gap-2 text-sm text-app-fg">
         <input
           type="checkbox"
           name="isSgCloud"
           defaultChecked={atual.isSgCloud}
-          className="h-4 w-4 rounded border-white/20 bg-white/5"
+          className="h-4 w-4 rounded border-app-border bg-app-surface"
         />
         O ERP roda no SG Cloud
       </label>
@@ -96,12 +96,12 @@ export function ConexaoForm({ atual }: { atual: ValoresAtuais }) {
         tropeçar neles. Quem precisa, precisa de verdade — e aí o campo está aqui, com o motivo
         escrito ao lado em vez de escondido num arquivo de código.
       */}
-      <details className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
-        <summary className="cursor-pointer text-sm text-slate-300">
+      <details className="rounded-lg border border-app-border bg-app-surface p-4">
+        <summary className="cursor-pointer text-sm text-app-fg">
           Ajustes avançados do protocolo
         </summary>
 
-        <p className="mt-3 text-xs text-slate-500">
+        <p className="mt-3 text-xs text-app-muted">
           Estes campos cobrem pontos que a SG Sistemas ainda não confirmou. Os padrões são o que se
           observa na homologação — mexa apenas se a sua instalação se comportar diferente.
         </p>
@@ -115,26 +115,23 @@ export function ConexaoForm({ atual }: { atual: ValoresAtuais }) {
           />
 
           <div className="space-y-1.5">
-            <label
-              htmlFor="campo-authHeaderMode"
-              className="block text-sm font-medium text-slate-200"
-            >
+            <label htmlFor="campo-authHeaderMode" className="block text-sm font-medium text-app-fg">
               Formato do token
             </label>
             <select
               id="campo-authHeaderMode"
               name="authHeaderMode"
               defaultValue={atual.authHeaderMode}
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-slate-100 outline-none focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/30"
+              className="w-full rounded-lg border border-app-border bg-app-surface px-3 py-2.5 text-app-fg outline-none focus:border-app-accent/60 focus:ring-2 focus:ring-app-accent/30"
             >
-              <option value="raw" className="bg-slate-900">
+              <option value="raw" className="bg-app-bg">
                 JWT puro
               </option>
-              <option value="bearer" className="bg-slate-900">
+              <option value="bearer" className="bg-app-bg">
                 Bearer &lt;jwt&gt;
               </option>
             </select>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-app-muted">
               O sistema descobre sozinho na primeira recusa e passa a usar o que funcionou.
             </p>
           </div>
@@ -150,10 +147,10 @@ export function ConexaoForm({ atual }: { atual: ValoresAtuais }) {
 
         {Object.keys(atual.pageSizePorRota).length > 0 ? (
           <div className="mt-4 space-y-1">
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-app-muted">
               Limites que o sistema aprendeu sozinho com a sua instalação:
             </p>
-            <ul className="space-y-0.5 text-xs text-slate-500">
+            <ul className="space-y-0.5 text-xs text-app-muted">
               {Object.entries(atual.pageSizePorRota).map(([rota, teto]) => (
                 <li key={rota} className="font-mono">
                   {rota} — máximo {teto} itens por página
@@ -180,7 +177,7 @@ export function TestarConexaoForm() {
       {state.error ? <Alert kind="error">{state.error}</Alert> : null}
       {state.success ? <Alert kind="success">{state.success}</Alert> : null}
 
-      <p className="text-sm text-slate-400">
+      <p className="text-sm text-app-muted">
         O teste autentica no ERP, lê as rotas que o seu contrato com a SG libera e consulta a versão
         da instalação. Nada é sincronizado ainda.
       </p>

@@ -45,18 +45,18 @@ export function OffboardForm({ tenantId, slug }: { tenantId: string; slug: strin
 
   return (
     <details className="text-sm">
-      <summary className="cursor-pointer text-xs text-slate-500 hover:text-rose-300">
+      <summary className="cursor-pointer text-xs text-app-muted hover:text-app-danger">
         Desligar contrato
       </summary>
       <form action={action} className="mt-3 flex flex-wrap items-end gap-2">
         <input type="hidden" name="tenantId" value={tenantId} />
         {state.error ? (
-          <span className="w-full text-xs text-rose-300" role="alert">
+          <span className="w-full text-xs text-app-danger" role="alert">
             {state.error}
           </span>
         ) : null}
         {state.success ? (
-          <span className="w-full text-xs text-emerald-300" role="status">
+          <span className="w-full text-xs text-app-success" role="status">
             {state.success}
           </span>
         ) : null}
@@ -73,7 +73,7 @@ export function OffboardForm({ tenantId, slug }: { tenantId: string; slug: strin
         </div>
         <button
           type="submit"
-          className="rounded-lg border border-rose-400/30 px-3 py-2.5 text-sm text-rose-200 transition hover:bg-rose-500/10"
+          className="rounded-lg border border-app-danger/30 px-3 py-2.5 text-sm text-app-danger transition hover:bg-app-danger/10"
         >
           Desligar
         </button>
@@ -89,7 +89,7 @@ export function SuspendForm({ tenantId }: { tenantId: string }) {
     <form action={action} className="flex flex-wrap items-end gap-2">
       <input type="hidden" name="tenantId" value={tenantId} />
       {state.error ? (
-        <span className="w-full text-xs text-rose-300" role="alert">
+        <span className="w-full text-xs text-app-danger" role="alert">
           {state.error}
         </span>
       ) : null}
@@ -98,7 +98,7 @@ export function SuspendForm({ tenantId }: { tenantId: string }) {
       </div>
       <button
         type="submit"
-        className="rounded-lg border border-white/15 px-3 py-2.5 text-sm text-slate-200 transition hover:border-rose-400/40 hover:text-rose-200"
+        className="rounded-lg border border-app-border px-3 py-2.5 text-sm text-app-fg transition hover:border-app-danger/40 hover:text-app-danger"
       >
         Suspender
       </button>
@@ -113,13 +113,13 @@ export function ResumeButton({ tenantId }: { tenantId: string }) {
     <form action={action} className="flex items-center gap-2">
       <input type="hidden" name="tenantId" value={tenantId} />
       {state.error ? (
-        <span className="text-xs text-rose-300" role="alert">
+        <span className="text-xs text-app-danger" role="alert">
           {state.error}
         </span>
       ) : null}
       <button
         type="submit"
-        className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-slate-200 transition hover:border-emerald-400/40 hover:text-emerald-200"
+        className="rounded-lg border border-app-border px-3 py-1.5 text-xs text-app-fg transition hover:border-app-success/40 hover:text-app-success"
       >
         Reativar
       </button>

@@ -110,14 +110,14 @@ export default async function VendasPage({
       <Cabecalho me={me} ativo="vendas" />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-medium text-white">
+        <h2 className="text-lg font-medium text-app-fg">
           Diário de vendas — {formatar.dataCompleta(data)}
         </h2>
         <div className="flex items-center gap-3">
           {dia ? <SeloDeFrescor frescor={dia.frescor} /> : null}
           <Link
             href={`/vendas/comparativos?${filiaisParam ? `filiais=${filiaisParam}` : ''}`}
-            className="text-sm text-sky-300 underline-offset-4 hover:underline"
+            className="text-sm text-app-accent underline-offset-4 hover:underline"
           >
             Ver comparativos
           </Link>
@@ -126,7 +126,7 @@ export default async function VendasPage({
 
       <FiltrosGlobais filiais={paraFiltro(filiais.data)} selecionadas={filiaisParam}>
         <div className="space-y-1.5">
-          <label htmlFor="filtro-data" className="block text-xs text-slate-400">
+          <label htmlFor="filtro-data" className="block text-xs text-app-muted">
             Dia
           </label>
           <input
@@ -135,11 +135,11 @@ export default async function VendasPage({
             name="data"
             defaultValue={data}
             max={hoje}
-            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-400/60"
+            className="rounded-lg border border-app-border bg-app-surface px-3 py-2 text-sm text-app-fg outline-none focus:border-app-accent/60"
           />
         </div>
         <div className="space-y-1.5">
-          <label htmlFor="filtro-caixa" className="block text-xs text-slate-400">
+          <label htmlFor="filtro-caixa" className="block text-xs text-app-muted">
             Caixa
           </label>
           <input
@@ -149,26 +149,26 @@ export default async function VendasPage({
             min={1}
             defaultValue={caixa ?? ''}
             placeholder="todos"
-            className="w-24 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-400/60"
+            className="w-24 rounded-lg border border-app-border bg-app-surface px-3 py-2 text-sm text-app-fg outline-none focus:border-app-accent/60"
           />
         </div>
         <div className="space-y-1.5">
-          <label htmlFor="filtro-canceladas" className="block text-xs text-slate-400">
+          <label htmlFor="filtro-canceladas" className="block text-xs text-app-muted">
             Situação
           </label>
           <select
             id="filtro-canceladas"
             name="canceladas"
             defaultValue={canceladas ?? ''}
-            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-400/60"
+            className="rounded-lg border border-app-border bg-app-surface px-3 py-2 text-sm text-app-fg outline-none focus:border-app-accent/60"
           >
-            <option value="" className="bg-slate-900">
+            <option value="" className="bg-app-bg">
               Todos os cupons
             </option>
-            <option value="false" className="bg-slate-900">
+            <option value="false" className="bg-app-bg">
               Somente válidos
             </option>
-            <option value="true" className="bg-slate-900">
+            <option value="true" className="bg-app-bg">
               Somente cancelados
             </option>
           </select>
@@ -205,8 +205,8 @@ export default async function VendasPage({
           </div>
 
           {dia.formasDePagamento.length > 0 ? (
-            <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-              <h3 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+            <section className="space-y-4 rounded-xl border border-app-border bg-app-surface p-6">
+              <h3 className="text-sm font-medium uppercase tracking-wider text-app-muted">
                 Meios de pagamento
               </h3>
               <BarrasHorizontais
@@ -220,16 +220,16 @@ export default async function VendasPage({
             </section>
           ) : null}
 
-          <section className="space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-6">
+          <section className="space-y-3 rounded-xl border border-app-border bg-app-surface p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h3 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+              <h3 className="text-sm font-medium uppercase tracking-wider text-app-muted">
                 Cupons ({formatar.inteiro(dia.paginacao.total)})
               </h3>
               {me.permissions.includes('reports.export') ? (
                 <Link
                   href={`/api/exportar/vendas?${consulta.toString()}`}
                   prefetch={false}
-                  className="rounded-lg border border-white/15 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/5"
+                  className="rounded-lg border border-app-border px-3 py-2 text-sm text-app-fg transition hover:bg-app-hover"
                 >
                   Exportar CSV
                 </Link>
@@ -238,7 +238,7 @@ export default async function VendasPage({
 
             <div className="overflow-x-auto">
               <table className="w-full min-w-[44rem] text-left text-sm">
-                <thead className="text-xs uppercase tracking-wider text-slate-500">
+                <thead className="text-xs uppercase tracking-wider text-app-muted">
                   <tr>
                     <th className="py-2 pr-4 font-medium">Hora</th>
                     <th className="py-2 pr-4 font-medium">Filial</th>
@@ -249,11 +249,11 @@ export default async function VendasPage({
                     <th className="py-2 pr-4 text-right font-medium">Valor</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5 text-slate-300">
+                <tbody className="divide-y divide-app-border text-app-fg">
                   {dia.cupons.map((cupom) => (
                     <tr
                       key={`${cupom.filialErpId}-${cupom.caixa}-${cupom.cupom}`}
-                      className={cupom.cancelada ? 'text-slate-500 line-through' : undefined}
+                      className={cupom.cancelada ? 'text-app-muted line-through' : undefined}
                     >
                       <td className="py-2 pr-4 tabular-nums">{cupom.horario ?? '—'}</td>
                       <td className="py-2 pr-4">{cupom.filialNome}</td>
@@ -261,7 +261,9 @@ export default async function VendasPage({
                       <td className="py-2 pr-4 tabular-nums">
                         {cupom.cupom}
                         {cupom.cancelada ? (
-                          <span className="ml-2 text-xs text-rose-300 no-underline">cancelado</span>
+                          <span className="ml-2 text-xs text-app-danger no-underline">
+                            cancelado
+                          </span>
                         ) : null}
                       </td>
                       <td className="py-2 pr-4 tabular-nums">{cupom.itens}</td>
@@ -280,20 +282,20 @@ export default async function VendasPage({
                 {dia.paginacao.pagina > 1 ? (
                   <Link
                     href={paginaUrl(dia.paginacao.pagina - 1)}
-                    className="text-sky-300 underline-offset-4 hover:underline"
+                    className="text-app-accent underline-offset-4 hover:underline"
                   >
                     ← Página anterior
                   </Link>
                 ) : (
                   <span />
                 )}
-                <span className="text-slate-500">
+                <span className="text-app-muted">
                   Página {dia.paginacao.pagina} de {dia.paginacao.paginas}
                 </span>
                 {dia.paginacao.pagina < dia.paginacao.paginas ? (
                   <Link
                     href={paginaUrl(dia.paginacao.pagina + 1)}
-                    className="text-sky-300 underline-offset-4 hover:underline"
+                    className="text-app-accent underline-offset-4 hover:underline"
                   >
                     Próxima página →
                   </Link>

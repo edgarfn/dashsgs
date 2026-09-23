@@ -15,8 +15,8 @@ export default async function ResetPasswordPage({
   return (
     <div className="space-y-5">
       <div className="space-y-1">
-        <h1 className="text-xl font-semibold text-white">Definir nova senha</h1>
-        <p className="text-sm text-slate-400">
+        <h1 className="text-xl font-semibold text-app-fg">Definir nova senha</h1>
+        <p className="text-sm text-app-muted">
           Ao concluir, todas as sessões abertas nesta conta serão encerradas.
         </p>
       </div>

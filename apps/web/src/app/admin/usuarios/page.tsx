@@ -46,12 +46,12 @@ export default async function UsuariosPage() {
   if (!me.permissions.includes('users.manage')) {
     return (
       <main className="mx-auto w-full max-w-lg space-y-4 px-6 py-16">
-        <h1 className="text-2xl font-semibold text-white">Sem acesso a esta área</h1>
+        <h1 className="text-2xl font-semibold text-app-fg">Sem acesso a esta área</h1>
         <Alert kind="info">
           A gestão de usuários é restrita a quem administra o tenant. Fale com o owner da sua rede
           se precisar deste acesso.
         </Alert>
-        <Link href="/" className="text-sm text-sky-300 underline-offset-4 hover:underline">
+        <Link href="/" className="text-sm text-app-accent underline-offset-4 hover:underline">
           Voltar para a home
         </Link>
       </main>
@@ -70,42 +70,42 @@ export default async function UsuariosPage() {
       <header className="space-y-1">
         <Link
           href="/"
-          className="text-xs uppercase tracking-[0.2em] text-slate-500 hover:text-slate-300"
+          className="text-xs uppercase tracking-[0.2em] text-app-muted hover:text-app-fg"
         >
           {tenant?.tenantName ?? 'DashSGS'}
         </Link>
-        <h1 className="text-2xl font-semibold text-white">Usuários e acessos</h1>
-        <p className="text-sm text-slate-400">
+        <h1 className="text-2xl font-semibold text-app-fg">Usuários e acessos</h1>
+        <p className="text-sm text-app-muted">
           Quem entra, com que papel e em quais filiais. Toda alteração fica na trilha de auditoria.
         </p>
       </header>
 
-      <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+      <section className="space-y-4 rounded-xl border border-app-border bg-app-surface p-6">
+        <h2 className="text-sm font-medium uppercase tracking-wider text-app-muted">
           Membros ({membros.data?.length ?? 0})
         </h2>
 
-        <ul className="divide-y divide-white/5">
+        <ul className="divide-y divide-app-border">
           {(membros.data ?? []).map((membro) => (
             <li key={membro.membershipId} className="space-y-3 py-4">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <div>
-                  <p className="font-medium text-slate-200">
+                  <p className="font-medium text-app-fg">
                     {membro.user.name}
                     {membro.user.id === me.user.id ? (
-                      <span className="ml-2 rounded bg-sky-500/10 px-1.5 py-0.5 text-xs text-sky-300">
+                      <span className="ml-2 rounded bg-app-accent/10 px-1.5 py-0.5 text-xs text-app-accent">
                         você
                       </span>
                     ) : null}
                   </p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-app-muted">
                     {membro.user.email} · {membro.user.mfaEnabled ? 'MFA ativo' : 'sem MFA'} ·{' '}
                     {membro.user.lastLoginAt
                       ? `último acesso ${data.format(new Date(membro.user.lastLoginAt))}`
                       : 'nunca acessou'}
                   </p>
                 </div>
-                <span className="rounded-full bg-white/5 px-3 py-1 font-mono text-xs text-slate-300">
+                <span className="rounded-full bg-app-surface px-3 py-1 font-mono text-xs text-app-fg">
                   {membro.role}
                 </span>
               </div>
@@ -121,21 +121,21 @@ export default async function UsuariosPage() {
         </ul>
       </section>
 
-      <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+      <section className="space-y-4 rounded-xl border border-app-border bg-app-surface p-6">
+        <h2 className="text-sm font-medium uppercase tracking-wider text-app-muted">
           Convites pendentes
         </h2>
 
         {convites.data && convites.data.length > 0 ? (
-          <ul className="divide-y divide-white/5">
+          <ul className="divide-y divide-app-border">
             {convites.data.map((convite) => (
               <li
                 key={convite.id}
                 className="flex flex-wrap items-center justify-between gap-3 py-3"
               >
                 <div>
-                  <p className="text-sm text-slate-200">{convite.email}</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-sm text-app-fg">{convite.email}</p>
+                  <p className="text-xs text-app-muted">
                     papel {convite.role} · expira em {data.format(new Date(convite.expiresAt))}
                   </p>
                 </div>
@@ -148,8 +148,8 @@ export default async function UsuariosPage() {
         )}
       </section>
 
-      <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+      <section className="space-y-4 rounded-xl border border-app-border bg-app-surface p-6">
+        <h2 className="text-sm font-medium uppercase tracking-wider text-app-muted">
           Convidar alguém
         </h2>
         <InviteForm />

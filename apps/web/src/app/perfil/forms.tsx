@@ -46,7 +46,7 @@ export function DisableMfaForm() {
       {state.error ? <Alert kind="error">{state.error}</Alert> : null}
       {state.success ? <Alert kind="success">{state.success}</Alert> : null}
 
-      <p className="text-sm text-slate-400">
+      <p className="text-sm text-app-muted">
         Para desativar, confirme com a senha e um código do aplicativo — sessão roubada não basta.
       </p>
 
@@ -77,10 +77,10 @@ export function RevokeSessionButton({
     <form action={action} className="flex items-center gap-2">
       <input type="hidden" name="sessionId" value={sessionId} />
       <input type="hidden" name="current" value={current ? '1' : '0'} />
-      {state.error ? <span className="text-xs text-rose-300">{state.error}</span> : null}
+      {state.error ? <span className="text-xs text-app-danger">{state.error}</span> : null}
       <button
         type="submit"
-        className="rounded-lg border border-white/15 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-rose-400/40 hover:text-rose-200"
+        className="rounded-lg border border-app-border px-3 py-1.5 text-xs font-medium text-app-fg transition hover:border-app-danger/40 hover:text-app-danger"
       >
         {current ? 'Sair deste dispositivo' : 'Encerrar'}
       </button>

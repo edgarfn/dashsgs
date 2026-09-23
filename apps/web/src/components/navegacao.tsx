@@ -80,7 +80,7 @@ export function Cabecalho({ me, ativo }: { me: MeResponse; ativo?: string }) {
       {tenant?.viaBreakGlass ? (
         <p
           role="status"
-          className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200"
+          className="rounded-lg border border-app-danger/40 bg-app-danger/10 px-4 py-3 text-sm text-app-danger"
         >
           <strong>Acesso excepcional em vigor.</strong> Você está vendo dados de
           {` ${tenant.tenantName} `}
@@ -94,10 +94,10 @@ export function Cabecalho({ me, ativo }: { me: MeResponse; ativo?: string }) {
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
-          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+          <p className="text-xs uppercase tracking-[0.2em] text-app-muted">
             {tenant?.tenantName ?? 'Sem tenant selecionado'}
           </p>
-          <h1 className="text-2xl font-semibold text-white">Olá, {me.user.name.split(' ')[0]}</h1>
+          <h1 className="text-2xl font-semibold text-app-fg">Olá, {me.user.name.split(' ')[0]}</h1>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -105,21 +105,21 @@ export function Cabecalho({ me, ativo }: { me: MeResponse; ativo?: string }) {
             <Link
               key={item.href}
               href={item.href}
-              className="rounded-lg border border-white/15 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/5"
+              className="rounded-lg border border-app-border px-3 py-2 text-sm text-app-fg transition hover:bg-app-hover"
             >
               {item.rotulo}
             </Link>
           ))}
           <Link
             href="/perfil"
-            className="rounded-lg border border-white/15 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/5"
+            className="rounded-lg border border-app-border px-3 py-2 text-sm text-app-fg transition hover:bg-app-hover"
           >
             Perfil
           </Link>
           <form action={logoutAction}>
             <button
               type="submit"
-              className="rounded-lg border border-white/15 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/5"
+              className="rounded-lg border border-app-border px-3 py-2 text-sm text-app-fg transition hover:bg-app-hover"
             >
               Sair
             </button>
@@ -128,7 +128,7 @@ export function Cabecalho({ me, ativo }: { me: MeResponse; ativo?: string }) {
       </div>
 
       <nav aria-label="Seções do produto">
-        <ul className="flex flex-wrap gap-1 border-b border-white/10">
+        <ul className="flex flex-wrap gap-1 border-b border-app-border">
           {secoes.map((secao) => (
             <li key={secao.chave}>
               <Link
@@ -136,8 +136,8 @@ export function Cabecalho({ me, ativo }: { me: MeResponse; ativo?: string }) {
                 aria-current={ativo === secao.chave ? 'page' : undefined}
                 className={`inline-block border-b-2 px-3 py-2 text-sm transition ${
                   ativo === secao.chave
-                    ? 'border-sky-400 text-white'
-                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                    ? 'border-app-accent text-app-fg'
+                    : 'border-transparent text-app-muted hover:text-app-fg'
                 }`}
               >
                 {secao.rotulo}
@@ -169,24 +169,24 @@ export function FiltrosGlobais({
   return (
     <form
       method="get"
-      className="flex flex-wrap items-end gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-4"
+      className="flex flex-wrap items-end gap-3 rounded-xl border border-app-border bg-app-surface p-4"
     >
       {filiais.length > 1 ? (
         <div className="space-y-1.5">
-          <label htmlFor="filtro-filiais" className="block text-xs text-slate-400">
+          <label htmlFor="filtro-filiais" className="block text-xs text-app-muted">
             Filial
           </label>
           <select
             id="filtro-filiais"
             name="filiais"
             defaultValue={selecionadas ?? ''}
-            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-400/60"
+            className="rounded-lg border border-app-border bg-app-surface px-3 py-2 text-sm text-app-fg outline-none focus:border-app-accent/60"
           >
-            <option value="" className="bg-slate-900">
+            <option value="" className="bg-app-bg">
               Todas as filiais
             </option>
             {filiais.map((filial) => (
-              <option key={filial.erpId} value={String(filial.erpId)} className="bg-slate-900">
+              <option key={filial.erpId} value={String(filial.erpId)} className="bg-app-bg">
                 {filial.nome}
               </option>
             ))}
@@ -198,7 +198,7 @@ export function FiltrosGlobais({
 
       <button
         type="submit"
-        className="rounded-lg border border-white/15 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/5"
+        className="rounded-lg border border-app-border px-3 py-2 text-sm text-app-fg transition hover:bg-app-hover"
       >
         Aplicar
       </button>

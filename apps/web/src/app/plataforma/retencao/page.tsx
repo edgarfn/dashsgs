@@ -42,8 +42,8 @@ export default async function RetencaoPage() {
   if (!me.user.platformAdmin || painel.status === 404) {
     return (
       <main className="mx-auto w-full max-w-lg space-y-4 px-6 py-16">
-        <h1 className="text-2xl font-semibold text-white">Página não encontrada</h1>
-        <Link href="/" className="text-sm text-sky-300 underline-offset-4 hover:underline">
+        <h1 className="text-2xl font-semibold text-app-fg">Página não encontrada</h1>
+        <Link href="/" className="text-sm text-app-accent underline-offset-4 hover:underline">
           Voltar para a home
         </Link>
       </main>
@@ -53,7 +53,7 @@ export default async function RetencaoPage() {
   if (painel.status === 401) {
     return (
       <main className="mx-auto w-full max-w-lg space-y-4 px-6 py-16">
-        <h1 className="text-2xl font-semibold text-white">Verificação necessária</h1>
+        <h1 className="text-2xl font-semibold text-app-fg">Verificação necessária</h1>
         <Alert kind="info">
           Esta área exige verificação em duas etapas recente. Entre novamente para continuar.
         </Alert>
@@ -71,12 +71,12 @@ export default async function RetencaoPage() {
       <header className="space-y-1">
         <Link
           href="/plataforma"
-          className="text-xs uppercase tracking-[0.2em] text-slate-500 hover:text-slate-300"
+          className="text-xs uppercase tracking-[0.2em] text-app-muted hover:text-app-fg"
         >
           DashSGS · operação
         </Link>
-        <h1 className="text-2xl font-semibold text-white">Retenção e descarte</h1>
-        <p className="text-sm text-slate-400">
+        <h1 className="text-2xl font-semibold text-app-fg">Retenção e descarte</h1>
+        <p className="text-sm text-app-muted">
           {pendencias.length} política(s) do doc 10 §2 executadas todo dia às 3h20. A purga roda
           sozinha; o botão abaixo só antecipa.
         </p>
@@ -93,12 +93,12 @@ export default async function RetencaoPage() {
         </Alert>
       )}
 
-      <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">Políticas</h2>
+      <section className="space-y-4 rounded-xl border border-app-border bg-app-surface p-6">
+        <h2 className="text-sm font-medium uppercase tracking-wider text-app-muted">Políticas</h2>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="text-xs uppercase tracking-wider text-slate-500">
+            <thead className="text-xs uppercase tracking-wider text-app-muted">
               <tr>
                 <th className="py-2 pr-4">Dado</th>
                 <th className="py-2 pr-4">Tabela</th>
@@ -108,26 +108,26 @@ export default async function RetencaoPage() {
                 <th className="py-2">Origem</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5">
+            <tbody className="divide-y divide-app-border">
               {pendencias.map((linha) => (
                 <tr key={linha.politica} className="align-top">
                   <td className="py-3 pr-4">
-                    <p className="text-slate-200">{linha.politica.replace(/_/g, ' ')}</p>
-                    <p className="text-xs text-slate-500">{motivoDe.get(linha.politica)}</p>
+                    <p className="text-app-fg">{linha.politica.replace(/_/g, ' ')}</p>
+                    <p className="text-xs text-app-muted">{motivoDe.get(linha.politica)}</p>
                   </td>
-                  <td className="py-3 pr-4 font-mono text-xs text-slate-400">{linha.tabela}</td>
-                  <td className="py-3 pr-4 text-slate-300">{linha.prazo}</td>
-                  <td className="py-3 pr-4 tabular-nums text-slate-400">
+                  <td className="py-3 pr-4 font-mono text-xs text-app-muted">{linha.tabela}</td>
+                  <td className="py-3 pr-4 text-app-fg">{linha.prazo}</td>
+                  <td className="py-3 pr-4 tabular-nums text-app-muted">
                     {data.format(new Date(linha.corte))}
                   </td>
                   <td
                     className={`py-3 pr-4 text-right tabular-nums ${
-                      linha.pendentes > 0 ? 'text-rose-300' : 'text-slate-500'
+                      linha.pendentes > 0 ? 'text-app-danger' : 'text-app-muted'
                     }`}
                   >
                     {linha.pendentes}
                   </td>
-                  <td className="py-3 text-xs text-slate-500">{linha.origem}</td>
+                  <td className="py-3 text-xs text-app-muted">{linha.origem}</td>
                 </tr>
               ))}
             </tbody>
@@ -137,21 +137,21 @@ export default async function RetencaoPage() {
         <ExecutarRetencaoForm />
       </section>
 
-      <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+      <section className="space-y-4 rounded-xl border border-app-border bg-app-surface p-6">
+        <h2 className="text-sm font-medium uppercase tracking-wider text-app-muted">
           Offboarding aguardando purga física
         </h2>
 
         {(dados?.offboardingPendente ?? []).length === 0 ? (
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-app-muted">
             Nenhum contrato desligado passou da carência de 30 dias (doc 08 §5).
           </p>
         ) : (
-          <ul className="divide-y divide-white/5 text-sm">
+          <ul className="divide-y divide-app-border text-sm">
             {(dados?.offboardingPendente ?? []).map((tenant) => (
               <li key={tenant.id} className="flex justify-between gap-3 py-3">
-                <span className="font-mono text-xs text-slate-300">{tenant.slug}</span>
-                <span className="text-xs text-slate-500">
+                <span className="font-mono text-xs text-app-fg">{tenant.slug}</span>
+                <span className="text-xs text-app-muted">
                   desligado em {data.format(new Date(tenant.deletedAt))}
                 </span>
               </li>

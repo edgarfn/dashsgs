@@ -69,7 +69,7 @@ function SerieDiaria({ serie }: { serie: ComparativoView['serie'] }) {
           <div key={ponto.data} className="flex h-full min-w-[6px] flex-1 items-end">
             <div
               data-barra
-              className={`w-full rounded-t bg-sky-500/70 medida-altura ${classeProporcao(
+              className={`w-full rounded-t bg-app-accent/70 medida-altura ${classeProporcao(
                 ponto.venda,
                 maximo,
               )}`}
@@ -78,17 +78,17 @@ function SerieDiaria({ serie }: { serie: ComparativoView['serie'] }) {
           </div>
         ))}
       </div>
-      <figcaption className="flex justify-between text-xs text-slate-500">
+      <figcaption className="flex justify-between text-xs text-app-muted">
         <span>{formatar.dataCompleta(serie[0]?.data ?? '')}</span>
         <span>{formatar.dataCompleta(serie[serie.length - 1]?.data ?? '')}</span>
       </figcaption>
 
-      <details className="text-sm text-slate-300">
-        <summary className="cursor-pointer text-xs text-slate-400 hover:text-slate-200">
+      <details className="text-sm text-app-fg">
+        <summary className="cursor-pointer text-xs text-app-muted hover:text-app-fg">
           Ver dados da série
         </summary>
         <table className="mt-2 w-full text-left text-sm">
-          <thead className="text-xs uppercase tracking-wider text-slate-500">
+          <thead className="text-xs uppercase tracking-wider text-app-muted">
             <tr>
               <th className="py-1 pr-4 font-medium">Dia</th>
               <th className="py-1 pr-4 font-medium">Venda</th>
@@ -96,7 +96,7 @@ function SerieDiaria({ serie }: { serie: ComparativoView['serie'] }) {
               <th className="py-1 pr-4 font-medium">Margem</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/5">
+          <tbody className="divide-y divide-app-border">
             {serie.map((ponto) => (
               <tr key={`linha-${ponto.data}`}>
                 <td className="py-1 pr-4 tabular-nums">{formatar.dataCompleta(ponto.data)}</td>
@@ -160,10 +160,13 @@ export default async function ComparativosPage({
       <Cabecalho me={me} ativo="vendas" />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-medium text-white">Comparativos</h2>
+        <h2 className="text-lg font-medium text-app-fg">Comparativos</h2>
         <div className="flex items-center gap-3">
           {dados ? <SeloDeFrescor frescor={dados.frescor} /> : null}
-          <Link href="/vendas" className="text-sm text-sky-300 underline-offset-4 hover:underline">
+          <Link
+            href="/vendas"
+            className="text-sm text-app-accent underline-offset-4 hover:underline"
+          >
             Ver o diário
           </Link>
         </div>
@@ -171,7 +174,7 @@ export default async function ComparativosPage({
 
       <FiltrosGlobais filiais={paraFiltro(filiais.data)} selecionadas={filiaisParam}>
         <div className="space-y-1.5">
-          <label htmlFor="filtro-de" className="block text-xs text-slate-400">
+          <label htmlFor="filtro-de" className="block text-xs text-app-muted">
             De
           </label>
           <input
@@ -180,11 +183,11 @@ export default async function ComparativosPage({
             name="de"
             defaultValue={de}
             max={hoje}
-            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-400/60"
+            className="rounded-lg border border-app-border bg-app-surface px-3 py-2 text-sm text-app-fg outline-none focus:border-app-accent/60"
           />
         </div>
         <div className="space-y-1.5">
-          <label htmlFor="filtro-ate" className="block text-xs text-slate-400">
+          <label htmlFor="filtro-ate" className="block text-xs text-app-muted">
             Até
           </label>
           <input
@@ -193,7 +196,7 @@ export default async function ComparativosPage({
             name="ate"
             defaultValue={ate}
             max={hoje}
-            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-400/60"
+            className="rounded-lg border border-app-border bg-app-surface px-3 py-2 text-sm text-app-fg outline-none focus:border-app-accent/60"
           />
         </div>
       </FiltrosGlobais>
@@ -230,16 +233,16 @@ export default async function ComparativosPage({
             />
           </div>
 
-          <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-            <h3 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+          <section className="space-y-4 rounded-xl border border-app-border bg-app-surface p-6">
+            <h3 className="text-sm font-medium uppercase tracking-wider text-app-muted">
               Venda por dia
             </h3>
             <SerieDiaria serie={dados.serie} />
           </section>
 
           <div className="grid gap-6 lg:grid-cols-2">
-            <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-              <h3 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+            <section className="space-y-4 rounded-xl border border-app-border bg-app-surface p-6">
+              <h3 className="text-sm font-medium uppercase tracking-wider text-app-muted">
                 Ranking de filiais
               </h3>
               <BarrasHorizontais
@@ -252,8 +255,8 @@ export default async function ComparativosPage({
               />
             </section>
 
-            <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-              <h3 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+            <section className="space-y-4 rounded-xl border border-app-border bg-app-surface p-6">
+              <h3 className="text-sm font-medium uppercase tracking-wider text-app-muted">
                 Por dia da semana (média)
               </h3>
               <BarrasHorizontais
@@ -268,8 +271,8 @@ export default async function ComparativosPage({
           </div>
 
           {dados.porDepartamento.length > 0 ? (
-            <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-              <h3 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+            <section className="space-y-4 rounded-xl border border-app-border bg-app-surface p-6">
+              <h3 className="text-sm font-medium uppercase tracking-wider text-app-muted">
                 Venda por departamento
               </h3>
               <BarrasHorizontais
@@ -283,7 +286,7 @@ export default async function ComparativosPage({
                       : `${formatar.decimal(dep.quantidade)} unidades · margem ${formatar.percentual(dep.margemPct)}`,
                 }))}
               />
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-app-muted">
                 A margem por departamento usa o custo atual do cadastro do produto — a API não
                 devolve o custo praticado no momento da venda (doc 33).
               </p>

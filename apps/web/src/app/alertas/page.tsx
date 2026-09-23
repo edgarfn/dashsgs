@@ -29,10 +29,10 @@ interface FeedView {
 }
 
 const SEVERIDADE = {
-  critica: { rotulo: 'crítica', estilo: 'bg-rose-500/10 text-rose-300 ring-rose-500/30' },
-  alta: { rotulo: 'alta', estilo: 'bg-amber-500/10 text-amber-300 ring-amber-500/30' },
-  media: { rotulo: 'média', estilo: 'bg-sky-500/10 text-sky-300 ring-sky-500/30' },
-  baixa: { rotulo: 'baixa', estilo: 'bg-slate-500/10 text-slate-300 ring-slate-500/20' },
+  critica: { rotulo: 'crítica', estilo: 'bg-app-danger/10 text-app-danger ring-app-danger/30' },
+  alta: { rotulo: 'alta', estilo: 'bg-app-warning/10 text-app-warning ring-app-warning/30' },
+  media: { rotulo: 'média', estilo: 'bg-app-accent/10 text-app-accent ring-app-accent/30' },
+  baixa: { rotulo: 'baixa', estilo: 'bg-app-muted/10 text-app-muted ring-app-muted/20' },
 } as const;
 
 const dataHora = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
@@ -78,8 +78,8 @@ export default async function AlertasPage({
       aria-current={status === valor ? 'page' : undefined}
       className={`rounded-lg border px-3 py-2 text-sm transition ${
         status === valor
-          ? 'border-sky-400/60 bg-sky-500/10 text-white'
-          : 'border-white/15 text-slate-300 hover:bg-white/5'
+          ? 'border-app-accent/60 bg-app-accent/10 text-app-fg'
+          : 'border-app-border text-app-fg hover:bg-app-hover'
       }`}
     >
       {rotulo}
@@ -91,14 +91,14 @@ export default async function AlertasPage({
       <Cabecalho me={me} ativo="alertas" />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-medium text-white">Alertas</h2>
+        <h2 className="text-lg font-medium text-app-fg">Alertas</h2>
         <div className="flex items-center gap-3">
           {me.permissions.includes('alerts.manage') ? (
             <>
               <AvaliarAgoraForm />
               <Link
                 href="/alertas/regras"
-                className="text-sm text-sky-300 underline-offset-4 hover:underline"
+                className="text-sm text-app-accent underline-offset-4 hover:underline"
               >
                 Configurar avisos
               </Link>
@@ -150,7 +150,7 @@ export default async function AlertasPage({
           {feed.eventos.map((evento) => (
             <li
               key={evento.id}
-              className="flex flex-wrap items-start justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.02] p-5"
+              className="flex flex-wrap items-start justify-between gap-4 rounded-xl border border-app-border bg-app-surface p-5"
             >
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
@@ -159,14 +159,14 @@ export default async function AlertasPage({
                   >
                     {SEVERIDADE[evento.severidade].rotulo}
                   </span>
-                  <h3 className="text-base font-medium text-white">{evento.titulo}</h3>
+                  <h3 className="text-base font-medium text-app-fg">{evento.titulo}</h3>
                   {evento.status === 'acknowledged' ? (
-                    <span className="text-xs text-slate-500">· reconhecido</span>
+                    <span className="text-xs text-app-muted">· reconhecido</span>
                   ) : null}
                 </div>
 
-                <p className="text-sm text-slate-300">{evento.resumo}</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-sm text-app-fg">{evento.resumo}</p>
+                <p className="text-xs text-app-muted">
                   {dataHora.format(new Date(evento.criadoEm))}
                   {evento.reconhecidoEm
                     ? ` · reconhecido em ${dataHora.format(new Date(evento.reconhecidoEm))}`
@@ -178,7 +178,7 @@ export default async function AlertasPage({
                 {evento.link ? (
                   <Link
                     href={evento.link}
-                    className="text-sm text-sky-300 underline-offset-4 hover:underline"
+                    className="text-sm text-app-accent underline-offset-4 hover:underline"
                   >
                     Ver contexto
                   </Link>

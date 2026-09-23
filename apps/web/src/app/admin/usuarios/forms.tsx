@@ -23,17 +23,17 @@ const ROLE_LABEL: Record<Role, string> = {
 function RoleSelect({ name, defaultValue }: { name: string; defaultValue?: Role }) {
   return (
     <div className="space-y-1.5">
-      <label htmlFor={`campo-${name}`} className="block text-sm font-medium text-slate-200">
+      <label htmlFor={`campo-${name}`} className="block text-sm font-medium text-app-fg">
         Papel
       </label>
       <select
         id={`campo-${name}`}
         name={name}
         defaultValue={defaultValue ?? 'viewer'}
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-slate-100 outline-none focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/30"
+        className="w-full rounded-lg border border-app-border bg-app-surface px-3 py-2.5 text-app-fg outline-none focus:border-app-accent/60 focus:ring-2 focus:ring-app-accent/30"
       >
         {ROLES.map((role) => (
-          <option key={role} value={role} className="bg-slate-900">
+          <option key={role} value={role} className="bg-app-bg">
             {ROLE_LABEL[role]}
           </option>
         ))}
@@ -79,7 +79,7 @@ export function MemberRow({
   const [removeState, remove] = useActionState<FormState, FormData>(removeMemberAction, {});
 
   if (!podeEditar) {
-    return <p className="text-xs text-slate-500">Você não edita o próprio vínculo.</p>;
+    return <p className="text-xs text-app-muted">Você não edita o próprio vínculo.</p>;
   }
 
   return (
@@ -102,7 +102,7 @@ export function MemberRow({
         </div>
         <button
           type="submit"
-          className="rounded-lg border border-white/15 px-3 py-2.5 text-sm text-slate-200 transition hover:bg-white/5"
+          className="rounded-lg border border-app-border px-3 py-2.5 text-sm text-app-fg transition hover:bg-app-hover"
         >
           Salvar
         </button>
@@ -110,7 +110,10 @@ export function MemberRow({
 
       <form action={remove}>
         <input type="hidden" name="membershipId" value={membershipId} />
-        <button type="submit" className="text-xs text-rose-300 underline-offset-4 hover:underline">
+        <button
+          type="submit"
+          className="text-xs text-app-danger underline-offset-4 hover:underline"
+        >
           Remover acesso
         </button>
       </form>
@@ -124,10 +127,10 @@ export function RevokeInviteButton({ inviteId }: { inviteId: string }) {
   return (
     <form action={action} className="flex items-center gap-2">
       <input type="hidden" name="inviteId" value={inviteId} />
-      {state.error ? <span className="text-xs text-rose-300">{state.error}</span> : null}
+      {state.error ? <span className="text-xs text-app-danger">{state.error}</span> : null}
       <button
         type="submit"
-        className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-slate-200 transition hover:border-rose-400/40 hover:text-rose-200"
+        className="rounded-lg border border-app-border px-3 py-1.5 text-xs text-app-fg transition hover:border-app-danger/40 hover:text-app-danger"
       >
         Revogar
       </button>

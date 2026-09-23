@@ -164,28 +164,28 @@ export default async function HomePage({
         <>
           <FiltrosGlobais filiais={paraFiltro(filiais.data)} selecionadas={filiaisParam}>
             <div className="space-y-1.5">
-              <label htmlFor="filtro-custo" className="block text-xs text-slate-400">
+              <label htmlFor="filtro-custo" className="block text-xs text-app-muted">
                 Base de custo (margem)
               </label>
               <select
                 id="filtro-custo"
                 name="custo"
                 defaultValue={custo}
-                className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-400/60"
+                className="rounded-lg border border-app-border bg-app-surface px-3 py-2 text-sm text-app-fg outline-none focus:border-app-accent/60"
               >
-                <option value="medio" className="bg-slate-900">
+                <option value="medio" className="bg-app-bg">
                   Custo médio
                 </option>
-                <option value="real" className="bg-slate-900">
+                <option value="real" className="bg-app-bg">
                   Custo real
                 </option>
-                <option value="com_encargos" className="bg-slate-900">
+                <option value="com_encargos" className="bg-app-bg">
                   Custo com encargos
                 </option>
-                <option value="fiscal_medio" className="bg-slate-900">
+                <option value="fiscal_medio" className="bg-app-bg">
                   Custo fiscal médio
                 </option>
-                <option value="sem_icms" className="bg-slate-900">
+                <option value="sem_icms" className="bg-app-bg">
                   Custo sem ICMS
                 </option>
               </select>
@@ -194,7 +194,7 @@ export default async function HomePage({
 
           <section className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+              <h2 className="text-sm font-medium uppercase tracking-wider text-app-muted">
                 Hoje ({formatar.dataCompleta(home.hoje.data)})
               </h2>
               <SeloDeFrescor frescor={home.hoje.frescor} />
@@ -207,23 +207,23 @@ export default async function HomePage({
             </div>
 
             {home.hoje.frescor.provisorio ? (
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-app-muted">
                 Os números de hoje são provisórios: o ERP ainda recalcula cancelamentos e estoque no
                 fechamento do dia.
               </p>
             ) : null}
           </section>
 
-          <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-            <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+          <section className="space-y-4 rounded-xl border border-app-border bg-app-surface p-6">
+            <h2 className="text-sm font-medium uppercase tracking-wider text-app-muted">
               Curva do dia
             </h2>
             <CurvaDoDia pontos={home.hoje.curva} />
           </section>
 
           {home.hoje.porFilial.length > 1 ? (
-            <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-              <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+            <section className="space-y-4 rounded-xl border border-app-border bg-app-surface p-6">
+              <h2 className="text-sm font-medium uppercase tracking-wider text-app-muted">
                 Venda por filial (hoje)
               </h2>
               <BarrasHorizontais
@@ -240,7 +240,7 @@ export default async function HomePage({
 
           <section className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+              <h2 className="text-sm font-medium uppercase tracking-wider text-app-muted">
                 Último dia fechado
                 {home.consolidado.data ? ` (${formatar.dataCompleta(home.consolidado.data)})` : ''}
               </h2>
@@ -278,13 +278,13 @@ export default async function HomePage({
           </section>
 
           {home.fechamento.length > 0 ? (
-            <section className="space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-              <h2 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+            <section className="space-y-3 rounded-xl border border-app-border bg-app-surface p-6">
+              <h2 className="text-sm font-medium uppercase tracking-wider text-app-muted">
                 Status do fechamento por filial
               </h2>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[34rem] text-left text-sm">
-                  <thead className="text-xs uppercase tracking-wider text-slate-500">
+                  <thead className="text-xs uppercase tracking-wider text-app-muted">
                     <tr>
                       <th className="py-2 pr-4 font-medium">Filial</th>
                       <th className="py-2 pr-4 font-medium">Dia</th>
@@ -293,7 +293,7 @@ export default async function HomePage({
                       <th className="py-2 pr-4 font-medium">Divergência</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5 text-slate-300">
+                  <tbody className="divide-y divide-app-border text-app-fg">
                     {home.fechamento.map((filial) => (
                       <tr key={filial.filialErpId}>
                         <td className="py-2 pr-4">{filial.nome}</td>
@@ -308,7 +308,7 @@ export default async function HomePage({
                         </td>
                         <td className="py-2 pr-4">
                           {filial.possuiDivergencia ? (
-                            <span className="text-amber-300">⚠ apontada pelo ERP</span>
+                            <span className="text-app-warning">⚠ apontada pelo ERP</span>
                           ) : (
                             'sem divergência'
                           )}
@@ -318,16 +318,16 @@ export default async function HomePage({
                   </tbody>
                 </table>
               </div>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-app-muted">
                 Divergência apontada pelo ERP costuma indicar fechamento incompleto na loja — trate
                 no ERP; a ressincronização é automática.
               </p>
             </section>
           ) : null}
 
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-app-muted">
             Quer o detalhe cupom a cupom?{' '}
-            <Link href="/vendas" className="text-sky-300 underline-offset-4 hover:underline">
+            <Link href="/vendas" className="text-app-accent underline-offset-4 hover:underline">
               Abra o diário de vendas
             </Link>
             .

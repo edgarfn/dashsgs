@@ -53,7 +53,10 @@ export default async function RegrasPage() {
           Configurar avisos é tarefa de quem administra a rede. Você continua recebendo e
           reconhecendo os alertas no feed.
         </Alert>
-        <Link href="/alertas" className="text-sm text-sky-300 underline-offset-4 hover:underline">
+        <Link
+          href="/alertas"
+          className="text-sm text-app-accent underline-offset-4 hover:underline"
+        >
           Voltar para o feed
         </Link>
       </main>
@@ -72,12 +75,15 @@ export default async function RegrasPage() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
-          <h2 className="text-lg font-medium text-white">Avisos</h2>
-          <p className="text-sm text-slate-400">
+          <h2 className="text-lg font-medium text-app-fg">Avisos</h2>
+          <p className="text-sm text-app-muted">
             O DashSGS verifica estas condições a cada 5 minutos e avisa no feed e por e-mail.
           </p>
         </div>
-        <Link href="/alertas" className="text-sm text-sky-300 underline-offset-4 hover:underline">
+        <Link
+          href="/alertas"
+          className="text-sm text-app-accent underline-offset-4 hover:underline"
+        >
           Ver o feed
         </Link>
       </div>
@@ -90,23 +96,23 @@ export default async function RegrasPage() {
         {ativas.map((regra) => (
           <article
             key={regra.id}
-            className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6"
+            className="space-y-4 rounded-xl border border-app-border bg-app-surface p-6"
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-base font-medium text-white">{regra.name}</h3>
-                  <span className="rounded-full bg-white/5 px-2 py-0.5 text-xs text-slate-400">
+                  <h3 className="text-base font-medium text-app-fg">{regra.name}</h3>
+                  <span className="rounded-full bg-app-hover px-2 py-0.5 text-xs text-app-muted">
                     severidade {SEVERIDADE_LABEL[regra.severity]}
                   </span>
                   {regra.enabled ? (
-                    <span className="text-xs text-emerald-300">✔ ligado</span>
+                    <span className="text-xs text-app-success">✔ ligado</span>
                   ) : (
-                    <span className="text-xs text-slate-500">• desligado</span>
+                    <span className="text-xs text-app-muted">• desligado</span>
                   )}
                 </div>
-                <p className="text-sm text-slate-400">{regra.descricao}</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-sm text-app-muted">{regra.descricao}</p>
+                <p className="text-xs text-app-muted">
                   Enviado para {AUDIENCIA_LABEL[regra.audiencia] ?? regra.audiencia}.
                 </p>
               </div>
@@ -122,19 +128,19 @@ export default async function RegrasPage() {
       </section>
 
       {aguardando.length > 0 ? (
-        <section className="space-y-3 rounded-xl border border-dashed border-white/15 bg-white/[0.01] p-6">
-          <h3 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+        <section className="space-y-3 rounded-xl border border-dashed border-app-border bg-app-surface p-6">
+          <h3 className="text-sm font-medium uppercase tracking-wider text-app-muted">
             Aguardando dados
           </h3>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-app-muted">
             Estes avisos já existem no produto, mas dependem de informação que ainda não é trazida
             do seu ERP. Eles ligam sozinhos quando a sincronização correspondente entrar.
           </p>
-          <ul className="space-y-2 text-sm text-slate-300">
+          <ul className="space-y-2 text-sm text-app-fg">
             {aguardando.map((regra) => (
               <li key={regra.id} className="flex flex-wrap justify-between gap-2">
                 <span>{regra.name}</span>
-                <span className="text-xs text-slate-500">depende de {regra.dependencia}</span>
+                <span className="text-xs text-app-muted">depende de {regra.dependencia}</span>
               </li>
             ))}
           </ul>
