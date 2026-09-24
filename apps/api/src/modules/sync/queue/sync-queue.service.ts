@@ -71,6 +71,15 @@ export class SyncQueueService implements OnModuleDestroy {
   /**
    * Enfileira um domínio para um tenant. O id do job é determinístico: se a cadência anterior
    * ainda não foi processada, a nova não vira uma segunda cópia na fila.
+   *
+   * O Lua do BullMQ (`addStandardJob`) recusa reenfileirar um id que já exista em Redis em
+   * **qualquer** estado — inclusive já `completed` ou já `failed` — até a limpeza
+   * (`removeOnComplete`/`removeOnFail`, lá embaixo) apagar a chave. Sem tratar isso, a primeira
+   * tentativa de um domínio que falhasse travava toda tentativa seguinte (cadência ou
+   * "Sincronizar agora") por até 3 dias: elas colidiam com o job morto e nem chegavam a ser
+   * processadas — o painel ficava preso em "nunca rodou" mesmo com a conexão já corrigida. Por
+   * isso, só um job ainda pendente (`waiting`/`active`/`delayed`) continua protegido contra
+   * duplicata; um já resolvido é removido antes de reenfileirar.
    */
   async enfileirar(
     job: JobSync,
@@ -80,6 +89,20 @@ export class SyncQueueService implements OnModuleDestroy {
     const id = [job.tenantId ?? 'todos', job.domain, job.filialErpId ?? 'geral', job.data ?? 'auto']
       .join('--')
       .slice(0, 120);
+
+    const existente = await this.sync.getJob(id);
+    if (existente) {
+      const estado = await existente.getState();
+      if (estado === 'completed' || estado === 'failed') {
+        await existente.remove();
+        this.logger.info(
+          { event: 'sync_job_resolvido_substituido', jobId: id, estadoAnterior: estado },
+          'sync_job_resolvido_substituido',
+        );
+      } else {
+        return;
+      }
+    }
 
     await this.sync.add(job.domain, job, {
       jobId: id,

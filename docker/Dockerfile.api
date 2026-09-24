@@ -53,8 +53,15 @@ EXPOSE 3001
 ARG APP_VERSION=0.0.0-local
 ENV APP_VERSION=$APP_VERSION
 
+# Mesma imagem serve dois comandos (doc 19 §2): `api` (dist/main.js, escuta em PORT) e
+# `workers` (dist/worker.js, escuta em WORKER_PORT — doc 04 §2). O healthcheck não sabe qual dos
+# dois está rodando neste container, então tenta as duas portas e passa se qualquer uma responder
+# — a que não tem processo do lado simplesmente recusa a conexão e cai no catch.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:3001/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "\
+    const testar = (porta) => fetch('http://127.0.0.1:' + porta + '/healthz').then((r) => r.ok).catch(() => false); \
+    Promise.all([testar(process.env.PORT || 3001), testar(process.env.WORKER_PORT || 3002)]) \
+      .then(([api, worker]) => process.exit(api || worker ? 0 : 1));"
 
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["node", "dist/main.js"]
