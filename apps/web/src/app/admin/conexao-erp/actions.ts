@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { apiRequest, errorMessage } from '@/lib/server/api-client';
+import { apiRequest, ERP_TIMEOUT_MS, errorMessage } from '@/lib/server/api-client';
 import { type FormState } from '../../(auth)/actions';
 
 /** Ações do wizard de conexão com o ERP (doc 16 §2 "Admin — Conexão ERP"). */
@@ -49,7 +49,9 @@ export async function testarConexaoAction(): Promise<FormState> {
     rotasAdicionadas: string[];
     rotasRemovidas: string[];
     health: { versao: string | null; razaoSocial: string | null } | null;
-  }>('POST', '/tenant/erp-connection/test');
+    // O teste autentica e consulta o status no ERP dentro do request; com o timeout padrão de
+    // 10 s o Next desistia antes da API terminar e acusava falha num teste que deu certo.
+  }>('POST', '/tenant/erp-connection/test', undefined, { timeoutMs: ERP_TIMEOUT_MS });
 
   revalidatePath('/admin/conexao-erp');
 

@@ -2,6 +2,7 @@ import 'server-only';
 import { CORRELATION_ID_HEADER, CSRF_HEADER, type ApiErrorBody } from '@dashsgs/shared';
 import { cookies, headers } from 'next/headers';
 import { getWebEnv, isWebProduction } from './env';
+import { logServidor } from './log';
 
 /**
  * Cliente da API interna usado pelos Server Actions e Server Components.
@@ -35,6 +36,23 @@ interface RequestOptions {
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 
+/**
+ * Teto para as rotas que falam com o ERP **dentro** do request (hoje só o teste de conexão).
+ *
+ * O orçamento da API para uma chamada à SG é o `SG_HTTP_TIMEOUT_MS` (60 s por padrão), e o teste
+ * faz duas em sequência — autorização e status. Com os 10 s do padrão daqui, o Next desistia
+ * primeiro e devolvia "não foi possível falar com o servidor" enquanto a API terminava o teste e
+ * gravava o resultado: a tela mostrava o erro e, ao lado, o cartão verde do teste que tinha dado
+ * certo. Quem espera tem que esperar mais que quem trabalha, senão o erro é mentira.
+ */
+export const ERP_TIMEOUT_MS = 120_000;
+
+/** Erro de rede do `fetch` do Node guarda o motivo real (ECONNREFUSED, ENOTFOUND…) em `cause`. */
+function codigoDeRede(erro: unknown): string | null {
+  const causa = erro instanceof Error ? (erro.cause as { code?: unknown } | undefined) : undefined;
+  return typeof causa?.code === 'string' ? causa.code : null;
+}
+
 export async function apiRequest<T>(
   method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE',
   path: string,
@@ -66,6 +84,22 @@ export async function apiRequest<T>(
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const rota = `${method} ${path}`;
+  const id = correlationId ?? 'desconhecido';
+  const inicio = Date.now();
+
+  const falha = (status: number, message: string): ApiResponse<T> => ({
+    ok: false,
+    status,
+    data: null,
+    error: {
+      code: 'SERVICE_UNAVAILABLE',
+      message,
+      correlationId: id,
+      timestamp: new Date().toISOString(),
+    },
+    setCookies: [],
+  });
 
   try {
     const response = await fetch(`${env.internalApiUrl}/api/v1${path}`, {
@@ -76,8 +110,33 @@ export async function apiRequest<T>(
       cache: 'no-store',
     });
 
+    let payload: unknown = null;
     const text = await response.text();
-    const payload = text ? (JSON.parse(text) as unknown) : null;
+
+    if (text) {
+      try {
+        payload = JSON.parse(text) as unknown;
+      } catch {
+        // Corpo que não é JSON quase nunca vem da API: é página de erro de proxy/gateway no meio
+        // do caminho. O status é a informação que resolve — dizer "inalcançável" jogaria fora o
+        // único dado útil que chegou.
+        logServidor('error', {
+          event: 'bff_resposta_nao_json',
+          correlation_id: id,
+          metodo: method,
+          rota: path,
+          status: response.status,
+          duracao_ms: Date.now() - inicio,
+          trecho: text.slice(0, 200),
+        });
+
+        return falha(
+          response.status,
+          `A API respondeu HTTP ${response.status} em ${rota} num formato que não é JSON — ` +
+            `normalmente é um proxy respondendo no lugar dela. (id: ${id})`,
+        );
+      }
+    }
 
     return {
       ok: response.ok,
@@ -86,20 +145,40 @@ export async function apiRequest<T>(
       error: response.ok ? null : (payload as ApiErrorBody),
       setCookies: response.headers.getSetCookie?.() ?? [],
     };
-  } catch {
-    // Detalhe fica no log do servidor; a tela mostra estado de erro (doc 16 §3).
-    return {
-      ok: false,
-      status: 0,
-      data: null,
-      error: {
-        code: 'SERVICE_UNAVAILABLE',
-        message: 'Não foi possível falar com o servidor. Tente novamente.',
-        correlationId: correlationId ?? 'desconhecido',
-        timestamp: new Date().toISOString(),
-      },
-      setCookies: [],
-    };
+  } catch (erro) {
+    // Quem sabe se foi o nosso timeout é o nosso próprio signal, e não o nome do erro: neste
+    // mesmo `catch` caem tanto `AbortError` quanto `TypeError: fetch failed` (falha de rede), e
+    // o rótulo é detalhe de implementação do fetch. O signal é nosso e não depende disso.
+    const expirou = controller.signal.aborted;
+    const codigo = codigoDeRede(erro);
+
+    logServidor('error', {
+      event: expirou ? 'bff_timeout' : 'bff_falha_de_rede',
+      correlation_id: id,
+      metodo: method,
+      rota: path,
+      duracao_ms: Date.now() - inicio,
+      timeout_ms: timeoutMs,
+      causa: codigo ?? (erro instanceof Error ? erro.message : String(erro)),
+    });
+
+    // O endereço interno da API fica só no log: não ajuda quem está na tela e é topologia
+    // nossa (doc 09 §1). Para o usuário vai o que ele consegue usar — o que falhou, quanto
+    // tempo esperamos, o que fazer agora e o id que liga a tela à linha de log.
+    if (expirou) {
+      return falha(
+        0,
+        `O servidor não respondeu em ${Math.round(timeoutMs / 1000)}s a ${rota}. A operação pode ` +
+          'ter continuado do lado de lá — recarregue a página para ver como ela terminou antes ' +
+          `de tentar de novo. (id: ${id})`,
+      );
+    }
+
+    return falha(
+      0,
+      `Não foi possível falar com a API em ${rota}${codigo ? ` (${codigo})` : ''}. ` +
+        `Tente novamente. (id: ${id})`,
+    );
   } finally {
     clearTimeout(timer);
   }
