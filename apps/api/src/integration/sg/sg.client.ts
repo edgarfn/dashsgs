@@ -323,10 +323,18 @@ export class SgClient {
     );
   }
 
-  /** Resumo diário por filial — janela documentada de 30 dias (doc 03). */
+  /**
+   * Resumo diário por filial — janela documentada de 30 dias (doc 03).
+   *
+   * O parâmetro é `filial` (singular), como em toda rota deste cliente que recorta por filial —
+   * apesar do caminho `/filiais/vendas` ser plural. Enviar `filiais` (array) fazia a API real
+   * devolver 400 "Parametros obrigatorios nao informados: filial", que o mock nunca acusava
+   * porque casa a rota só pelo caminho, sem olhar a query (doc 34 §4.7 — ficou em aberto até a
+   * homologação real revelar o corpo do 400).
+   */
   async getResumoFilial(
     contexto: SgCallContext,
-    params: { filiais: number[]; dataInicial: string; dataFinal: string },
+    params: { filial: number; dataInicial: string; dataFinal: string },
   ): Promise<ResultadoColeta<SgResumoFilial>> {
     assertJanela(params.dataInicial, params.dataFinal);
 
@@ -337,7 +345,7 @@ export class SgClient {
       contexto,
       `${BASE}/filiais/vendas`,
       {
-        filiais: params.filiais,
+        filial: params.filial,
         dataInicial: params.dataInicial,
         dataFinal: params.dataFinal,
       },

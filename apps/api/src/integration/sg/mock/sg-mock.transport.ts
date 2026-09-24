@@ -171,12 +171,16 @@ export class SgMockTransport implements SgTransport {
       return json({ error: 'Parametros obrigatorios: dataInicial, dataFinal' }, 400);
     }
 
-    const filiais = alvo.searchParams.getAll('filiais').map(Number).filter(Boolean);
-    const hoje = new Date().toISOString().slice(0, 10);
+    // Singular, como toda rota que recorta por filial — a API real recusa com 400 quando o
+    // cliente manda `filiais` (doc 34 §4.7). Sem essa exigência aqui, o mock aceitaria a mesma
+    // regressão que só a homologação real acusou.
+    const filial = alvo.searchParams.get('filial');
+    if (!filial) {
+      return json({ error: 'Parametros obrigatorios nao informados: filial' }, 400);
+    }
 
-    return json(
-      gerarResumoFilial(filiais.length > 0 ? filiais : [1], dataInicial, dataFinal, hoje),
-    );
+    const hoje = new Date().toISOString().slice(0, 10);
+    return json(gerarResumoFilial([Number(filial)], dataInicial, dataFinal, hoje));
   }
 
   /** Devolve página vazia a partir da segunda: exercita o laço de paginação de verdade. */

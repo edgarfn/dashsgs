@@ -91,7 +91,7 @@ export class ResumoFilialSync implements JobDeSync {
     // A API recusa períodos acima de 30 dias: quem pede 90 recebe erro, não uma página a menos.
     for (const fatia of fatiar(inicio, fim, JANELA_MAXIMA_DIAS)) {
       const coleta = await this.sg.getResumoFilial(contexto.sg, {
-        filiais: [filialErpId],
+        filial: filialErpId,
         dataInicial: fatia.inicio,
         dataFinal: fatia.fim,
       });

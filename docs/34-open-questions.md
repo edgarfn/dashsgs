@@ -259,6 +259,16 @@ Correção: reduzir continua sendo a sondagem, mas o valor só vira fato aprendi
 resposta chega inteira naquele tamanho**. Verificado contra o servidor real: a sequência
 200 → 100 → 50 ainda acontece, e `page_size_por_rota` termina nula.
 
+> **Correção (24/09/2026): o "motivo que não era o tamanho" tinha nome.** Um primeiro sync real
+> de `resumo_filial` (não só `dimensoes`, que foi o testado aqui) trouxe o corpo do 400: `"Parametros
+> obrigatorios nao informados: filial"` — **singular**. `getResumoFilial` mandava `filiais`
+> (array, plural — o único lugar do cliente que fazia isso; toda outra rota por filial usa
+> `filial` no singular), e a API real recusava a chamada inteira antes mesmo de olhar
+> `itensPorPagina`. O mock nunca acusou porque `resumoFilial()` também lia `filiais` (o mesmo nome
+> errado) e caía num fallback silencioso para `[1]` — o teste passava pelo motivo errado. Os dois
+> lados foram corrigidos para `filial` (singular), e o mock passou a exigir o parâmetro, como a
+> API real exige.
+
 #### Defeito 3 — o portão de contrato está inerte, e parece ativo
 
 `assertRotaContratada` libera tudo quando `routesGranted` está vazio, com o comentário "conexão

@@ -368,7 +368,7 @@ describe('integração com a API SG (integração)', () => {
 
     it('resumo diário converte flags de fechamento', async () => {
       const { itens } = await sg.getResumoFilial(contexto, {
-        filiais: [1],
+        filial: 1,
         dataInicial: '2026-09-11',
         dataFinal: '2026-09-11',
       });
@@ -385,7 +385,7 @@ describe('integração com a API SG (integração)', () => {
       transporte.chamadas = 0;
       await expect(
         sg.getResumoFilial(contexto, {
-          filiais: [1],
+          filial: 1,
           dataInicial: '2026-07-01',
           dataFinal: '2026-09-30',
         }),
@@ -497,7 +497,7 @@ describe('integração com a API SG (integração)', () => {
       // Só a primeira chamada recusa: reduzir resolve, então o tamanho menor é um fato.
       transporte.recusar400 = { contem: '/filiais/vendas', vezes: 1 };
 
-      await sg.getResumoFilial({ ...contexto }, { filiais: [1], ...janela });
+      await sg.getResumoFilial({ ...contexto }, { filial: 1, ...janela });
 
       const teto = await tetoGravado();
       expect(teto).toBeDefined();
@@ -507,9 +507,9 @@ describe('integração com a API SG (integração)', () => {
     it('400 que NÃO some não grava teto nenhum', async () => {
       transporte.recusar400 = { contem: '/filiais/vendas', vezes: Number.MAX_SAFE_INTEGER };
 
-      await expect(
-        sg.getResumoFilial({ ...contexto }, { filiais: [1], ...janela }),
-      ).rejects.toThrow(SgError);
+      await expect(sg.getResumoFilial({ ...contexto }, { filial: 1, ...janela })).rejects.toThrow(
+        SgError,
+      );
 
       // O erro é de outro parâmetro; o tamanho de página do cliente não tem nada com isso.
       expect(await tetoGravado()).toBeUndefined();
