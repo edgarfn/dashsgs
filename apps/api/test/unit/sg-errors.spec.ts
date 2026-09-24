@@ -110,4 +110,31 @@ describe('rótulo de endpoint para métrica', () => {
     );
     expect(rotuloEndpoint('/sgsistemas/v1/status')).toBe('/sgsistemas/v1/status');
   });
+
+  /**
+   * O `/public` do SG Cloud precisa sobreviver ao rótulo: é ele que separa "rota fora do
+   * contrato" de "cadastro apontando para caminho inexistente nesta instalação".
+   */
+  it('preserva o prefixo do SG Cloud', () => {
+    expect(rotuloEndpoint('/public/integracao/sgsistemas/v1/autorizacao')).toBe(
+      '/public/autorizacao',
+    );
+  });
+});
+
+describe('descrição operacional do erro (last_error)', () => {
+  it('diz qual endpoint falhou — 404 de corpo vazio não vira "nao_encontrado" solto', () => {
+    const erro = classificarResposta(404, null, { endpoint: '/public/autorizacao' });
+
+    expect(erro.falha).toBe('nao_encontrado');
+    expect(erro.descricaoOperacional()).toBe('nao_encontrado em /public/autorizacao (HTTP 404)');
+  });
+
+  it('mantém a falha como primeiro token e agrega a mensagem da origem quando existir', () => {
+    const erro = classificarResposta(403, { error: 'sem contrato' }, { endpoint: '/vendas' });
+
+    expect(erro.descricaoOperacional()).toBe(
+      'rota_nao_contratada em /vendas (HTTP 403): sem contrato',
+    );
+  });
 });

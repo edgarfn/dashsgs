@@ -13,7 +13,12 @@ import {
   FIXTURE_MARCAS,
   FIXTURE_PRODUTOS,
 } from '../../src/integration/sg/mock/fixtures';
-import { filialSchema, produtoSchema, vendaCupomSchema } from '../../src/integration/sg/types';
+import {
+  filialSchema,
+  produtoSchema,
+  statusSchema,
+  vendaCupomSchema,
+} from '../../src/integration/sg/types';
 
 /**
  * Normalização da camada anticorrupção (doc 12 §4). Cada caso aqui é uma esquisitice
@@ -154,5 +159,38 @@ describe('schemas de recurso', () => {
       itens: [{ ordem: 1, idProduto: 10, idOferta: '5 ', quantidade: 1, precoVenda: 2 }],
     });
     expect(venda.itens[0]?.ofertaErpId).toBe('5');
+  });
+
+  /**
+   * Corpo real do `/status` da homologação (24/09/2026). O schema lia `cnpj`/`razaoSocial`, que
+   * esta instalação não envia — e como o campo é opcional, a tela mostrava a instalação vazia
+   * sem nenhum erro. Regressão: o nome e o CNPJ têm que sair preenchidos.
+   */
+  it('lê nomeFantasia/cnpjFilialBase do /status (nomes reais da instalação)', () => {
+    const status = statusSchema.parse({
+      versao: 'TRUNK-XX-XX-XXXX',
+      revisao: 65825,
+      dataSistema: '2026-09-18 02:15:38',
+      cnpjFilialBase: '31875378987',
+      codigoCliente: '100',
+      nomeFantasia: 'SGS DEMONSTRACAO',
+    });
+
+    expect(status.versao).toBe('TRUNK-XX-XX-XXXX');
+    expect(status.revisao).toBe('65825');
+    expect(status.razaoSocial).toBe('SGS DEMONSTRACAO');
+    expect(status.cnpj).toBe('31875378987');
+  });
+
+  it('mantém cnpj/razaoSocial quando a instalação usa os nomes documentados', () => {
+    const status = statusSchema.parse({
+      versao: 'X',
+      revisao: '1',
+      cnpj: '00000000000191',
+      razaoSocial: 'REDE EXEMPLO LTDA',
+    });
+
+    expect(status.razaoSocial).toBe('REDE EXEMPLO LTDA');
+    expect(status.cnpj).toBe('00000000000191');
   });
 });

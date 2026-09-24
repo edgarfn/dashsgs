@@ -43,19 +43,30 @@ export const autorizacaoResponseSchema = z
 export type AutorizacaoResponse = z.infer<typeof autorizacaoResponseSchema>;
 
 // ---------------------------------------------------------------- status (health-check)
+/**
+ * `GET /sgsistemas/v1/status`.
+ *
+ * O corpo real da homologação (conferido em 24/09/2026) traz `cnpjFilialBase` e `nomeFantasia`
+ * — **não** `cnpj`/`razaoSocial`, que era o que este schema lia. Como `sgTexto` é opcional, o
+ * descasamento não dava erro: a instalação aparecia vazia na tela de Conexão ERP e o CNPJ da
+ * filial base nunca era gravado. Os dois nomes ficam aceitos porque o corpo do /status não está
+ * documentado (doc 02 §2) e outra versão do ERP pode responder diferente.
+ */
 export const statusSchema = z
   .object({
     versao: sgTexto(40),
     revisao: sgTexto(40),
     cnpj: sgTexto(20),
+    cnpjFilialBase: sgTexto(20),
     razaoSocial: sgTexto(160),
+    nomeFantasia: sgTexto(160),
   })
   .passthrough()
   .transform((bruto) => ({
     versao: bruto.versao,
     revisao: bruto.revisao,
-    cnpj: bruto.cnpj,
-    razaoSocial: bruto.razaoSocial,
+    cnpj: bruto.cnpj ?? bruto.cnpjFilialBase,
+    razaoSocial: bruto.razaoSocial ?? bruto.nomeFantasia,
   }));
 export type SgStatus = z.infer<typeof statusSchema>;
 

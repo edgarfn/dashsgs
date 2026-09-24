@@ -122,7 +122,13 @@ export class SgHttpClient {
   }
 
   async request(contexto: SgConnectionContext, opcoes: SgRequestOptions): Promise<SgResposta> {
-    const endpoint = rotuloEndpoint(opcoes.path);
+    // O prefixo entra aqui, antes do rótulo, e não só na hora de montar a URL: é ele que
+    // distingue `/autorizacao` de `/public/autorizacao`, e essa é exatamente a diferença entre
+    // "rota fora do contrato" e "cadastro apontando para um caminho que não existe nesta
+    // instalação". Sem isso, o 404 de corpo vazio chega ao operador como `nao_encontrado` puro.
+    // `aplicarPrefixo` é idempotente, então `executar` pode reaplicá-lo sem duplicar.
+    const caminho = this.comPrefixo(contexto, opcoes.path);
+    const endpoint = rotuloEndpoint(caminho);
     const podeRepetir = opcoes.method === 'GET';
     const tentativasMax = podeRepetir ? RETRIES_GET : 1;
 

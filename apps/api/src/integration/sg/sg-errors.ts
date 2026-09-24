@@ -92,6 +92,26 @@ export class SgError extends Error {
   }
 
   /**
+   * Resumo para o operador — vai em `last_error` e na tela de Conexão ERP.
+   *
+   * Carrega o **endpoint**: sem ele, um 404 de corpo vazio (que é o que esta API devolve quando
+   * o caminho não existe) chega como `nao_encontrado` puro, e quem lê não tem como saber se foi
+   * a autorização ou o /status — que é a diferença entre "prefixo/SG Cloud errado no cadastro" e
+   * "rota fora do contrato". Não é mensagem de usuário final: essa continua em `toAppException()`.
+   */
+  descricaoOperacional(): string {
+    return [
+      this.falha,
+      this.detalhe.endpoint ? `em ${this.detalhe.endpoint}` : null,
+      this.detalhe.status ? `(HTTP ${this.detalhe.status})` : null,
+      this.detalhe.mensagemOrigem ? `: ${this.detalhe.mensagemOrigem}` : null,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .replace(' :', ':');
+  }
+
+  /**
    * Erro que o usuário do DashSGS vai ver. Nunca repassa a mensagem crua do ERP: ela pode
    * conter nome de tabela, caminho e outros detalhes internos da instalação (doc 09 §1).
    */

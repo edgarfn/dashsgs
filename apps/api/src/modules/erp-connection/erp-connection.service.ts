@@ -304,10 +304,7 @@ export class ErpConnectionService {
 
       return { ...(await this.view(tenantId)), rotasAdicionadas, rotasRemovidas };
     } catch (erro) {
-      const motivo =
-        erro instanceof SgError
-          ? `${erro.falha}${erro.detalhe.mensagemOrigem ? `: ${erro.detalhe.mensagemOrigem}` : ''}`
-          : 'falha inesperada';
+      const motivo = erro instanceof SgError ? erro.descricaoOperacional() : 'falha inesperada';
 
       await this.tenantDb.run(tenantId, (tx) =>
         tx.erpConnection.update({
@@ -408,10 +405,7 @@ export class ErpConnectionService {
         rotasRemovidas,
       };
     } catch (erro) {
-      const motivo =
-        erro instanceof SgError
-          ? `${erro.falha}${erro.detalhe.mensagemOrigem ? `: ${erro.detalhe.mensagemOrigem}` : ''}`
-          : 'falha inesperada';
+      const motivo = erro instanceof SgError ? erro.descricaoOperacional() : 'falha inesperada';
 
       await this.tenantDb.run(tenantId, (tx) =>
         tx.erpConnection.update({
