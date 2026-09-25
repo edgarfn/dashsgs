@@ -4,11 +4,39 @@ import { MetricsService } from '../../common/metrics/metrics.service';
 import { RedisService } from '../../common/redis/redis.service';
 import { SgHttpClient, type SgConnectionContext } from './http/sg-http.client';
 import { SgError } from './sg-errors';
-import { autorizacaoResponseSchema } from './types';
+import { autorizacaoResponseSchema, normalizarRotas } from './types';
 
 /** Caminho documentado da autorização (doc 02 §2); no SG Cloud ganha o prefixo `/public`. */
 export const AUTH_PATH = '/integracao/sgsistemas/v1/autorizacao';
 export const AUTH_PATH_CLOUD = '/public/integracao/sgsistemas/v1/autorizacao';
+
+/**
+ * Lê a claim `routes` de dentro do JWT.
+ *
+ * A coleção oficial da SG (conferida em 24/09/2026) manda a **mesma** lista em dois lugares na
+ * resposta da autorização: o campo `routes` do corpo e a claim `routes` do token — 28 rotas
+ * idênticas no exemplo publicado. Ler só o corpo deixa o produto cego numa instalação que
+ * preencha apenas a claim, e "cego" aqui significa portão de contrato desligado sem ninguém
+ * saber (doc 34 §4.7, defeito 3).
+ *
+ * Isto **não** é verificação de assinatura, e não pode ser confundida com uma: é leitura de um
+ * dado que o próprio servidor acabou de emitir para nós, usada só para saber o que ele libera.
+ * Quem decide de verdade é o ERP, que recusa a chamada fora do contrato.
+ */
+export function rotasDoJwt(token: string): string[] {
+  const payload = token.split('.')[1];
+  if (!payload) return [];
+
+  try {
+    const corpo: unknown = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    const rotas = (corpo as { routes?: unknown })?.routes;
+    if (!Array.isArray(rotas)) return [];
+    return normalizarRotas(rotas.filter((rota): rota is string => typeof rota === 'string'));
+  } catch {
+    // Token opaco ou payload ilegível: o portão fica como estava, sem derrubar a autenticação.
+    return [];
+  }
+}
 
 /**
  * O token vale 1 hora (doc 02 §2). Renovamos aos 50 minutos: os 10 minutos de folga cobrem
@@ -122,9 +150,14 @@ export class SgTokenManager {
       });
     }
 
+    // Corpo e claim carregam a mesma lista no contrato documentado. Quando o corpo vem sem ela,
+    // a claim ainda pode ter — e vice-versa; nenhuma das duas é obrigatória na prática.
+    const rotas =
+      parsed.data.routes.length > 0 ? parsed.data.routes : rotasDoJwt(parsed.data.token);
+
     const token: TokenSg = {
       token: parsed.data.token,
-      routes: parsed.data.routes,
+      routes: rotas,
       headerMode: conexao.authHeaderMode,
       expiresAt: new Date(Date.now() + TTL_CACHE_S * 1000),
       novo: true,
@@ -137,6 +170,10 @@ export class SgTokenManager {
         event: 'sg_token_refreshed',
         tenant_id: conexao.tenantId,
         rotas: token.routes.length,
+        // Sem isto, "0 rotas" no painel não dizia se o corpo veio vazio, se a claim veio vazia
+        // ou se o produto estava lendo o lugar errado — a dúvida que travou o doc 34 §4.7.
+        origemRotas:
+          parsed.data.routes.length > 0 ? 'corpo' : token.routes.length > 0 ? 'jwt' : 'ausente',
         headerMode: token.headerMode,
       },
       'sg_token_refreshed',

@@ -65,10 +65,20 @@ export async function testarConexaoAction(): Promise<FormState> {
       ? ` Contrato mudou: +${dados?.rotasAdicionadas.length} / −${dados?.rotasRemovidas.length} rotas.`
       : '';
 
+  // Lista vazia não é "zero rotas contratadas": a autorização da SG pode responder sem o campo
+  // `routes` (o corpo e a claim do token são opcionais na prática), e nesse caso o produto não
+  // sabe o contrato — em vez de restringir, ele deixa passar. Dizer "0 rotas" afirmava um fato
+  // que o teste não mediu, e assustava sem motivo.
+  const rotas = dados?.routesGranted.length ?? 0;
+  const contrato =
+    rotas > 0
+      ? `${rotas} rotas contratadas.`
+      : 'A instalação não informou a lista de rotas do contrato — nenhum painel será restringido por ela.';
+
   return {
     success:
       `Conexão OK com ${dados?.health?.razaoSocial ?? 'o ERP'}` +
       `${dados?.health?.versao ? ` (versão ${dados.health.versao})` : ''}. ` +
-      `${dados?.routesGranted.length ?? 0} rotas contratadas.${mudanca}`,
+      `${contrato}${mudanca}`,
   };
 }

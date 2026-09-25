@@ -289,6 +289,25 @@ vazia" precisa deixar de ser indistinguível de "ainda não sei", e isso muda o 
 > fica de pé é a alegação de que a claim é sempre vazia nesta instalação.
 Mesmo formato do furo de TLS/VPN da §4.4 — mecanismo de proteção que não se aplica, sem aviso.
 
+> **Resolução (24/09/2026), com o contrato oficial na mão.** A coleção publicada pela SG foi
+> baixada de novo (114 endpoints) e o endpoint de autorização tem **dois exemplos de resposta**. O
+> de sucesso traz a mesma lista de 28 rotas em **dois lugares**: o campo `routes` do corpo *e* a
+> claim `routes` dentro do JWT — idênticas, conferidas item a item. O produto lia **só o corpo**.
+>
+> Contra a instalação real, medido no token que ela emitiu de fato: o corpo vem
+> `{token, expire_time}`, sem `routes`, e o payload do JWT vem `{usuario, expire_time}`, sem a
+> claim. **As duas fontes estão vazias** — esta credencial de homologação realmente não recebe a
+> lista, e isso é configuração do lado da SG, não parsing nosso. O `rotas: 114` medido em 18/09
+> continua sem explicação, e agora tem instrumento: `sg_token_refreshed` passou a logar
+> `origemRotas` (`corpo` | `jwt` | `ausente`), então a próxima ocorrência se explica sozinha.
+>
+> Duas mudanças: o token manager passou a ler a claim do JWT quando o corpo vem sem `routes`
+> (`rotasDoJwt`, sem verificar assinatura — é leitura, não confiança), e a tela parou de afirmar
+> "0 rotas contratadas". Lista vazia depois de um teste agora diz o que é: *a instalação não
+> informou a lista, nada será restringido por contrato*. O portão continua falhando aberto — a
+> decisão de produto sobre torná-lo obrigatório segue em aberto —, mas deixou de se disfarçar de
+> contagem.
+
 #### Resíduos conhecidos
 
 - **Espelho misto.** O sync é upsert: a filial 1 passou a ser a real, e as filiais 2, 3 e 4 do

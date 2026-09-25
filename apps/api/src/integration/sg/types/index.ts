@@ -26,6 +26,17 @@ import {
  */
 
 // ---------------------------------------------------------------- autorização
+/**
+ * Rotas vêm como "MÉTODO /path"; normalizamos caixa e espaços para comparar sem susto.
+ *
+ * Fica exportado porque a mesma lista chega por dois caminhos — o corpo da resposta e a claim
+ * dentro do JWT — e normalizar diferente nos dois faria o diff de contrato ("rotas adicionadas /
+ * removidas") acusar mudança que não houve.
+ */
+export function normalizarRotas(rotas: readonly string[]): string[] {
+  return rotas.map((rota) => rota.trim().replace(/\s+/g, ' ').toUpperCase());
+}
+
 export const autorizacaoResponseSchema = z
   .object({
     token: z.string().min(20),
@@ -36,8 +47,7 @@ export const autorizacaoResponseSchema = z
   .passthrough()
   .transform((bruto) => ({
     token: bruto.token,
-    // Rotas vêm como "MÉTODO /path"; normalizamos caixa e espaços para comparar sem susto.
-    routes: bruto.routes.map((rota) => rota.trim().replace(/\s+/g, ' ').toUpperCase()),
+    routes: normalizarRotas(bruto.routes),
     expireTime: bruto.expire_time?.trim() || null,
   }));
 export type AutorizacaoResponse = z.infer<typeof autorizacaoResponseSchema>;

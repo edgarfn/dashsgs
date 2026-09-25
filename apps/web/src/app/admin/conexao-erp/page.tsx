@@ -161,6 +161,19 @@ export default async function ConexaoErpPage() {
             ))}
           </ul>
         </section>
+      ) : conexao?.routesCheckedAt ? (
+        <section className="space-y-3 rounded-xl border border-app-border bg-app-surface p-6">
+          <h2 className="text-sm font-medium uppercase tracking-wider text-app-muted">
+            Rotas contratadas
+          </h2>
+          <p className="text-sm text-app-muted">
+            A autorização desta instalação respondeu <strong>sem</strong> a lista de rotas. Isso não
+            é o mesmo que &quot;nenhuma rota liberada&quot;: o DashSGS não recebeu o contrato e, por
+            isso, não restringe painel nenhum por ele — quem recusa uma chamada fora do contrato é o
+            próprio ERP. Se algum painel vier vazio por falta de permissão, peça à SG a liberação da
+            rota correspondente.
+          </p>
+        </section>
       ) : null}
 
       <section className="space-y-4 rounded-xl border border-app-border bg-app-surface p-6">
